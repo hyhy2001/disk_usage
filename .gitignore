@@ -1,0 +1,12 @@
+.agent
+
+# Mock Data
+mock_reports/
+
+# Python Utility Scripts
+*.py
+__pycache__/
+
+# IDEs
+.vscode/
+.idea/

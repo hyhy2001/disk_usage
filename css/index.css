@@ -1,0 +1,102 @@
+:root {
+    /* Base Colors - Slate & Emerald Pro VIP Theme */
+    --bg-base: #0f1115;
+    --bg-surface: rgba(23, 27, 34, 0.65);
+    --bg-surface-elevated: rgba(30, 36, 45, 0.85);
+    
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-accent: #10b981; /* Emerald */
+    
+    /* Semantic Colors */
+    --emerald-500: #10b981;
+    --emerald-400: #34d399;
+    --emerald-100: rgba(16, 185, 129, 0.1);
+    
+    --rose-500: #f43f5e;
+    --rose-400: #fb7185;
+    --rose-100: rgba(244, 63, 94, 0.1);
+    
+    --sky-500: #0ea5e9;
+    --sky-400: #38bdf8;
+    --sky-100: rgba(14, 165, 233, 0.1);
+    
+    --indigo-500: #6366f1; /* Used sparingly as an accent */
+    
+    /* Layout */
+    --sidebar-width: 280px;
+    --border-radius-lg: 16px;
+    --border-radius-md: 12px;
+    --border-radius-sm: 8px;
+    
+    /* Effects */
+    --glass-border: 1px solid rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.36);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body.dark-theme {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: 'Inter', -apple-system, sans-serif;
+    line-height: 1.5; /* UX audit fix: Add standard line height */
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+}
+
+/* Background Effects */
+.background-mesh {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 0%, #171b22 0%, #0f1115 100%);
+}
+
+.glow-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.15;
+}
+
+.orb-1 {
+    top: -10%;
+    right: -5%;
+    width: 40vw;
+    height: 40vw;
+    background: var(--sky-500);
+}
+
+.orb-2 {
+    bottom: -20%;
+    left: -10%;
+    width: 50vw;
+    height: 50vw;
+    background: var(--emerald-500);
+}
+
+/* Typography Utilities */
+.number {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+}
+
+.text-accent { color: var(--text-accent); }
+.text-emerald { color: var(--emerald-500); }
+.text-rose { color: var(--rose-500); }
+.text-sky { color: var(--sky-500); }
+
+.bg-emerald\/10 { background-color: var(--emerald-100); }
+.bg-rose\/10 { background-color: var(--rose-100); }
+.bg-sky\/10 { background-color: var(--sky-100); }

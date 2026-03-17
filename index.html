@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StorageOS | Disk Usage Dashboard</title>
+    <!-- SEO and Meta Tags -->
+    <meta name="description" content="StorageOS is a fast, static web dashboard for monitoring disk usage reports across internal teams and virtual servers.">
+    <meta property="og:title" content="StorageOS Dashboard">
+    <meta property="og:description" content="Real-time static dashboard for disk usage analysis and storage capacity tracking.">
+    <meta property="og:type" content="website">
+    
+    <!-- Modern Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/index.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+</head>
+<body class="dark-theme">
+    <div class="background-mesh">
+        <div class="glow-orb orb-1"></div>
+        <div class="glow-orb orb-2"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Sidebar / Navigation -->
+        <aside class="sidebar glass-panel">
+            <div class="brand">
+                <div class="logo">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="brand-icon">
+                        <path d="M21 16V8C21 6.89543 20.1046 6 19 6H5C3.89543 6 3 6.89543 3 8V16C3 17.1046 3.89543 18 5 18H19C20.1046 18 21 17.1046 21 16Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M3 10H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M3 14H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <circle cx="7" cy="12" r="1" fill="currentColor"/>
+                    </svg>
+                    <span>Storage<span class="text-accent">OS</span></span>
+                </div>
+            </div>
+            
+            <div class="status-monitor">
+                <div class="status-header">
+                    <span class="status-dot scanning"></span>
+                    <span id="system-status">System Standing By</span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-track">
+                        <div id="scan-progress-bar" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="status-details">
+                    <span id="files-processed">0/0 files</span>
+                    
+                    <!-- Visible button to trigger manual sync -->
+                    <label style="display:none;" for="btn-fetch">Sync Server Data</label>
+                    <button id="btn-fetch" class="btn-primary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Sync Now
+                    </button>
+                </div>
+            </div>
+
+            <nav class="nav-links">
+                <!-- Navigation can go here later -->
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-titles">
+                    <h1>Disk Usage Overview</h1>
+                    <p class="subtitle" id="data-timerange">Waiting for data payload...</p>
+                </div>
+            </header>
+
+            <!-- Metrics Level -->
+            <div class="metrics-grid">
+                <div class="metric-card glass-panel">
+                    <div class="metric-icon bg-emerald/10">
+                        <svg class="text-emerald" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+                    </div>
+                    <div class="metric-info">
+                        <span class="metric-label">Total Capacity</span>
+                        <div class="metric-value">
+                            <span id="val-total" class="number">0</span><span class="unit">TB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card glass-panel">
+                    <div class="metric-icon bg-rose/10">
+                        <svg class="text-rose" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+                    </div>
+                    <div class="metric-info">
+                        <span class="metric-label">Used Space</span>
+                        <div class="metric-value">
+                            <span id="val-used" class="number">0</span><span class="unit">TB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card glass-panel">
+                    <div class="metric-icon bg-sky/10">
+                        <svg class="text-sky" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    </div>
+                    <div class="metric-info">
+                        <span class="metric-label">Available Space</span>
+                        <div class="metric-value">
+                            <span id="val-free" class="number">0</span><span class="unit">TB</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Level -->
+            <div class="charts-grid">
+                <!-- Main Timeline Chart -->
+                <div class="chart-container large-span glass-panel">
+                    <div class="panel-header">
+                        <h2>Capacity Over Time</h2>
+                    </div>
+                    <div class="canvas-wrapper">
+                        <canvas id="timelineChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Team Distribution Donut -->
+                <div class="chart-container glass-panel">
+                    <div class="panel-header">
+                        <h2>Usage by Teams</h2>
+                    </div>
+                    <div class="canvas-wrapper">
+                        <canvas id="teamChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Users Bar Distribution -->
+                <div class="chart-container glass-panel">
+                    <div class="panel-header">
+                        <h2>Top Consuming Users</h2>
+                    </div>
+                    <div class="canvas-wrapper">
+                        <canvas id="usersChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Core Scripts -->
+    <script src="js/dataFetcher.js" type="module"></script>
+    <script src="js/dataStore.js" type="module"></script>
+    <script src="js/chartManager.js" type="module"></script>
+    <script src="js/main.js" type="module"></script>
+</body>
+</html>
