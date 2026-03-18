@@ -66,7 +66,7 @@ foreach ($entries as $i => $e) {
     ];
 }
 
-$action = $_SERVER['HTTP_X_APP_ACTION'] ?? '';
+$action = $_POST['req'] ?? ($_GET['req'] ?? '');
 
 // ── Route: list_drives  →  list disks ───────────────────────────────────────────
 if ($action === 'list_drives') {
@@ -82,7 +82,7 @@ if ($action === 'list_drives') {
 }
 
 // ── Resolve disk for data routes ──────────────────────────────────────────────
-$diskId = $_SERVER['HTTP_X_APP_DRIVE'] ?? array_key_first($disks);
+$diskId = $_POST['drive'] ?? ($_GET['drive'] ?? array_key_first($disks));
 
 if (!isset($disks[$diskId])) {
     http_response_code(404);

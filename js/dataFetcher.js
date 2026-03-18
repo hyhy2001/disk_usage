@@ -44,9 +44,9 @@ class DataFetcher {
 
     async _initDiskSelector() {
         try {
-            const res  = await fetch('api.php', {
-                headers: { 'X-App-Action': 'list_drives' }
-            });
+            const formData = new FormData();
+            formData.append('req', 'list_drives');
+            const res  = await fetch('api.php', { method: 'POST', body: formData });
             const json = await res.json();
             if (json.status !== 'success') return;
 
@@ -95,9 +95,9 @@ class DataFetcher {
             this.setProcessingState(true);
             UINodes.statusText.textContent = "Connecting to API...";
             
-            const response = await fetch('api.php', {
-                headers: { 'X-App-Drive': this._activeDisk }
-            });
+            const formData = new FormData();
+            formData.append('drive', this._activeDisk);
+            const response = await fetch('api.php', { method: 'POST', body: formData });
             if (!response.ok) {
                 throw new Error(`HTTP error ${response.status} from api.php.`);
             }
@@ -140,9 +140,10 @@ class DataFetcher {
 
     async _fetchPermissions() {
         try {
-            const res  = await fetch('api.php', {
-                headers: { 'X-App-Action': 'permissions', 'X-App-Drive': this._activeDisk }
-            });
+            const formData = new FormData();
+            formData.append('req', 'permissions');
+            formData.append('drive', this._activeDisk);
+            const res  = await fetch('api.php', { method: 'POST', body: formData });
             const json = await res.json();
             if (json.status === 'success') {
                 this.dataStore.permissionIssues = json.data ?? null;
