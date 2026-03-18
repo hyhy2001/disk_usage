@@ -23,16 +23,17 @@ A modern, blazing-fast, server-rendered static web dashboard designed to visuali
    git clone https://github.com/hyhy2001/disk_usage.git
    ```
 2. **PHP Requirement:** Ensure `php-fpm` (or mod_php) is installed and running on your Linux web server (Nginx or Apache).
-3. **Data Source:** Place your incoming JSON reports inside the `mock_reports/` directory. If you want to use a different absolute path on your server, edit `api.php` line 9.
-4. **Permissions:** Ensure your Web Server process (e.g., `www-data` or `nginx`) has **Read** permission to access the data directory.
+3. **Data Configuration:** Open `disks.json` to map your disk configurations and directory paths.
+4. **Permissions:** Ensure your Web Server process (e.g., `www-data` or `nginx`) has **Read** permission to access the data directories specified in your config.
 5. **Launch:** Access the `/index.html` URL in a browser. The dashboard will instantly process all JSONs and render the charts.
 
 ## 📂 File Structure Overview
 
-```
+```text
 /
 ├── index.html           # Main dashboard container
 ├── api.php              # PHP Endpoint: Aggregates JSON reports blazingly fast
+├── disks.json           # Disk directory mappings and configurations
 ├── css/                 # Modern styling (Variables, Grid Layout, Glass panels)
 └── js/                  # Application logic (DataStore, Fetcher, Charts)
 ```
