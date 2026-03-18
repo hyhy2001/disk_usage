@@ -44,7 +44,7 @@ class DataFetcher {
 
     async _initDiskSelector() {
         try {
-            const res  = await fetch('/api.php?action=disks');
+            const res  = await fetch('api.php?action=disks');
             const json = await res.json();
             if (json.status !== 'success') return;
 
