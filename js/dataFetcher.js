@@ -44,7 +44,7 @@ class DataFetcher {
 
     async _initDiskSelector() {
         try {
-            const res  = await fetch('api.php?action=disks');
+            const res  = await fetch('api.php?req=list_drives');
             const json = await res.json();
             if (json.status !== 'success') return;
 
@@ -93,7 +93,7 @@ class DataFetcher {
             this.setProcessingState(true);
             UINodes.statusText.textContent = "Connecting to API...";
             
-            const response = await fetch(`api.php?disk=${encodeURIComponent(this._activeDisk)}`);
+            const response = await fetch(`api.php?drive=${encodeURIComponent(this._activeDisk)}`);
             if (!response.ok) {
                 throw new Error(`HTTP error ${response.status} from api.php.`);
             }
@@ -136,7 +136,7 @@ class DataFetcher {
 
     async _fetchPermissions() {
         try {
-            const res  = await fetch(`api.php?action=permissions&disk=${encodeURIComponent(this._activeDisk)}`);
+            const res  = await fetch(`api.php?req=permissions&drive=${encodeURIComponent(this._activeDisk)}`);
             const json = await res.json();
             if (json.status === 'success') {
                 this.dataStore.permissionIssues = json.data ?? null;
