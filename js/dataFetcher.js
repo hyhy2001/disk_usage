@@ -23,7 +23,7 @@ function startClock() {
 class DataFetcher {
     constructor() {
         this.dataStore = new DataStore();
-        this._activeDisk = 'disk_sda';
+        this._activeDisk = null;
         
         // Initialize charts
         AppState.chartManagerInstance = new ChartManager();
@@ -84,6 +84,10 @@ class DataFetcher {
 
     async startServerSync() {
         if (AppState.isProcessing) return;
+        if (!this._activeDisk) {
+            UINodes.statusText.textContent = "No valid disk to scan.";
+            return;
+        }
         
         try {
             this.setProcessingState(true);
