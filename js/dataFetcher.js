@@ -44,30 +44,27 @@ class DataFetcher {
 
     async _initDiskSelector() {
         try {
-            const formData = new FormData();
-            formData.append('req', 'list_drives');
-            const res  = await fetch('api.php', { method: 'POST', body: formData });
-            const json = await res.json();
-            if (json.status !== 'success') return;
+            const res  = await fetch('disks.json');
+            const disks = await res.json();
+            this.disksConfig = disks;
 
             const select = document.getElementById('disk-select');
             if (!select) return;
 
-            select.innerHTML = json.disks.map(d => `
-                <option value="${d.id}" ${!d.available ? 'disabled' : ''}>${d.name}${d.available ? '' : ' (no data)'}</option>
+            select.innerHTML = disks.map(d => `
+                <option value="${d.id}">${d.name}</option>
             `).join('');
 
-            // Pick first available disk
-            const first = json.disks.find(d => d.available);
-            if (first) {
-                this._activeDisk = first.id;
-                select.value = first.id;
-                this._updateDiskPath(json.disks.find(d => d.id === first.id));
+            // Pick first
+            if (disks.length > 0) {
+                this._activeDisk = disks[0].id;
+                select.value = disks[0].id;
+                this._updateDiskPath(disks[0]);
             }
 
             select.addEventListener('change', () => {
                 this._activeDisk = select.value;
-                const disk = json.disks.find(d => d.id === select.value);
+                const disk = disks.find(d => d.id === select.value);
                 this._updateDiskPath(disk);
                 this.startServerSync();
             });
@@ -84,6 +81,31 @@ class DataFetcher {
         }
     }
 
+    async _fetchDirectoryFiles(url) {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status} fetching directory list`);
+        
+        const contentType = res.headers.get('content-type') || '';
+        let fileUrls = [];
+
+        if (contentType.includes('application/json')) {
+            const arr = await res.json();
+            fileUrls = arr.map(f => new URL(f, url).href);
+        } else {
+            // Assume HTML Directory index (Nginx/Apache)
+            const html = await res.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const links = Array.from(doc.querySelectorAll('a'))
+                                .map(a => a.getAttribute('href'))
+                                .filter(href => href && href.endsWith('.json'));
+            
+            // Deduplicate and resolve URLs
+            fileUrls = [...new Set(links.map(href => new URL(href, url).href))];
+        }
+        return fileUrls;
+    }
+
     async startServerSync() {
         if (AppState.isProcessing) return;
         if (!this._activeDisk) {
@@ -93,18 +115,40 @@ class DataFetcher {
         
         try {
             this.setProcessingState(true);
-            UINodes.statusText.textContent = "Connecting to API...";
             
-            const formData = new FormData();
-            formData.append('drive', this._activeDisk);
-            const response = await fetch('api.php', { method: 'POST', body: formData });
-            if (!response.ok) {
-                throw new Error(`HTTP error ${response.status} from api.php.`);
-            }
+            const diskConfig = this.disksConfig?.find(d => d.id === this._activeDisk);
+            let jsonResponse;
 
-            const jsonResponse = await response.json();
+            if (diskConfig && diskConfig.url) {
+                // Fetch from remote URL directory
+                UINodes.statusText.textContent = "Scanning remote directory...";
+                const allFiles = await this._fetchDirectoryFiles(diskConfig.url);
+                
+                // Filter disk usage reports
+                const reportFiles = allFiles.filter(f => !f.includes('permission_issues'));
+                
+                if (reportFiles.length === 0) {
+                    throw new Error("No JSON reports found in remote directory.");
+                }
+
+                UINodes.statusText.textContent = `Downloading ${reportFiles.length} reports...`;
+                
+                // Load concurrently
+                const fetchPromises = reportFiles.map(f => fetch(f).then(r => r.ok ? r.json() : null).catch(() => null));
+                const results = await Promise.all(fetchPromises);
+                const validData = results.filter(d => d !== null);
+                
+                jsonResponse = { status: 'success', data: validData, total_files: validData.length };
+            } else {
+                UINodes.statusText.textContent = "Connecting to Local API...";
+                const formData = new FormData();
+                formData.append('drive', this._activeDisk);
+                const response = await fetch('api.php', { method: 'POST', body: formData });
+                if (!response.ok) throw new Error(`HTTP error ${response.status} from api.php.`);
+                jsonResponse = await response.json();
+            }
             
-            if (jsonResponse.status !== 'success' || !jsonResponse.data || jsonResponse.data.length === 0) {
+            if ((jsonResponse.status && jsonResponse.status !== 'success') || !jsonResponse.data || jsonResponse.data.length === 0) {
                 alert("No JSON reports found or API returned an error.");
                 this.setProcessingState(false);
                 return;
@@ -140,12 +184,38 @@ class DataFetcher {
 
     async _fetchPermissions() {
         try {
-            const formData = new FormData();
-            formData.append('req', 'permissions');
-            formData.append('drive', this._activeDisk);
-            const res  = await fetch('api.php', { method: 'POST', body: formData });
-            const json = await res.json();
-            if (json.status === 'success') {
+            const diskConfig = this.disksConfig?.find(d => d.id === this._activeDisk);
+            let json;
+
+            if (diskConfig && diskConfig.url) {
+                const allFiles = await this._fetchDirectoryFiles(diskConfig.url);
+                const permFiles = allFiles.filter(f => f.includes('permission_issues'));
+                
+                if (permFiles.length === 0) return;
+                
+                const fetchPromises = permFiles.map(f => fetch(f).then(r => r.ok ? r.json() : null).catch(() => null));
+                const results = await Promise.all(fetchPromises);
+                
+                const validData = results.filter(d => d !== null);
+                if (validData.length > 0) {
+                    validData.sort((a,b) => (b.date || 0) - (a.date || 0));
+                    json = { status: 'success', data: validData[0] };
+                } else {
+                    json = { status: 'success', data: null };
+                }
+            } else if (diskConfig && diskConfig.permissions_url) {
+                const res = await fetch(diskConfig.permissions_url);
+                const rawData = await res.json();
+                json = { status: 'success', data: rawData };
+            } else {
+                const formData = new FormData();
+                formData.append('req', 'permissions');
+                formData.append('drive', this._activeDisk);
+                const res  = await fetch('api.php', { method: 'POST', body: formData });
+                json = await res.json();
+            }
+
+            if (json?.status === 'success') {
                 this.dataStore.permissionIssues = json.data ?? null;
                 document.dispatchEvent(new CustomEvent('permissionsLoaded', { detail: json.data }));
             }
