@@ -2228,6 +2228,10 @@
     font-size: 0.75rem;
 }
 
+.perm-item > * {
+    min-width: 0;
+}
+
 .perm-item:hover { background: rgba(255,255,255,0.05); }
 
 .perm-item-icon { font-size: 0.9rem; text-align: center; }
@@ -2257,6 +2261,8 @@
     font-size: 0.7rem;
     color: #fb7185;
     font-style: italic;
+    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
