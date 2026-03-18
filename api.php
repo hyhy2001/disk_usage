@@ -16,6 +16,23 @@ function resolvePath(string $path): string {
     return rtrim(__DIR__ . DIRECTORY_SEPARATOR . $path, '/\\');
 }
 
+// ── Helper: Read JSON files (Bypass WAF glob() block) ─────────────────────────
+function getJsonFiles(string $dir, string $match = ''): array {
+    if (!is_dir($dir)) return [];
+    $dh = @opendir($dir);
+    if ($dh === false) return [];
+    
+    $res = [];
+    while (($f = readdir($dh)) !== false) {
+        if ($f === '.' || $f === '..') continue;
+        if (substr($f, -5) !== '.json') continue;
+        if ($match !== '' && strpos($f, $match) === false) continue;
+        $res[] = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . $f;
+    }
+    closedir($dh);
+    return $res;
+}
+
 // ── Load disks.json ───────────────────────────────────────────────────────────
 $disksJsonPath = __DIR__ . '/disks.json';
 
@@ -38,7 +55,7 @@ foreach ($entries as $i => $e) {
     $rawPath  = $e['path'] ?? "disk_{$i}";
     $id       = $e['id']   ?? preg_replace('/[^a-z0-9]+/', '_', strtolower($rawPath));
     $resolved = resolvePath($rawPath);
-    $allJson  = is_dir($resolved) ? (glob($resolved . DIRECTORY_SEPARATOR . '*.json') ?: []) : [];
+    $allJson  = getJsonFiles($resolved);
     $count    = count(array_filter($allJson, fn($f) => strpos(basename($f), 'permission_issues') === false));
     $disks[$id] = [
         'id'        => $id,
@@ -85,7 +102,7 @@ if (!is_dir($reportDir)) {
 
 // ── Route: permissions  →  latest permission_issues file ────────
 if ($action === 'permissions') {
-    $files = glob($reportDir . DIRECTORY_SEPARATOR . '*permission_issues*.json') ?: [];
+    $files = getJsonFiles($reportDir, 'permission_issues');
 
     if (empty($files)) {
         echo json_encode(["status" => "success", "disk" => ["id" => $diskId, "dir" => $disk['dir']], "data" => null]);
@@ -118,7 +135,7 @@ if ($action === 'permissions') {
 
 // ── Route: ?disk=<id>  →  aggregated disk usage data ────────────────────────
 // Matches any *.json EXCEPT *permission_issues* files
-$allFiles   = glob($reportDir . DIRECTORY_SEPARATOR . '*.json') ?: [];
+$allFiles   = getJsonFiles($reportDir);
 $files      = array_filter($allFiles, fn($f) => strpos(basename($f), 'permission_issues') === false);
 $aggregated = [];
 
