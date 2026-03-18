@@ -1,0 +1,17 @@
+[
+  {
+    "id":   "disk_sda",
+    "name": "Primary Storage",
+    "path": "mock_reports/disk_sda"
+  },
+  {
+    "id":   "disk_sdb",
+    "name": "Archive Pool",
+    "path": "mock_reports/disk_sdb"
+  },
+  {
+    "id":   "disk_sdc",
+    "name": "Backup Volume",
+    "path": "mock_reports/disk_sdc"
+  }
+]

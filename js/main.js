@@ -11,6 +11,7 @@ export const UINodes = {
     valTotal: document.getElementById('val-total'),
     valUsed: document.getElementById('val-used'),
     valFree: document.getElementById('val-free'),
+    valScanned: document.getElementById('val-scanned'),
     timeRange: document.getElementById('data-timerange')
 };
 
@@ -47,7 +48,7 @@ export function animateValue(obj, start, end, duration) {
     window.requestAnimationFrame(step);
 }
 
-// Function to convert bytes to TB
+// Convert bytes to TB (decimal: 1 TB = 1,000,000,000,000 bytes)
 export function bytesToTB(bytes) {
-    return bytes / (1024 * 1024 * 1024 * 1024);
+    return bytes / 1e12;
 }

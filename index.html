@@ -16,9 +16,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     
     <!-- CSS -->
-    <link rel="stylesheet" href="css/index.css">
-    <link rel="stylesheet" href="css/layout.css">
-    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/index.css?v=9">
+    <link rel="stylesheet" href="css/layout.css?v=9">
+    <link rel="stylesheet" href="css/components.css?v=9">
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
@@ -40,10 +40,37 @@
                         <path d="M3 14H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         <circle cx="7" cy="12" r="1" fill="currentColor"/>
                     </svg>
-                    <span>Storage<span class="text-accent">OS</span></span>
+                    <span>Disk<span class="text-accent"> Usage</span></span>
                 </div>
+                <!-- Live clock -->
+                <div id="sidebar-clock" class="sidebar-clock"></div>
             </div>
-            
+
+            <!-- Navigation — directly below logo -->
+            <nav class="nav-links">
+                <button id="nav-overview" class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    <span>Overview</span>
+                </button>
+                <button id="nav-detail" class="nav-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    <span>Detail</span>
+                </button>
+
+            </nav>
+
+            <!-- Disk Selector -->
+            <div class="disk-selector-wrap">
+                <label class="disk-selector-label">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16"/></svg>
+                    Active Disk
+                </label>
+                <select id="disk-select" class="disk-select">
+                    <option value="">Loading disks…</option>
+                </select>
+            </div>
+
+            <!-- Status Monitor — pushed to bottom -->
             <div class="status-monitor">
                 <div class="status-header">
                     <span class="status-dot scanning"></span>
@@ -56,8 +83,6 @@
                 </div>
                 <div class="status-details">
                     <span id="files-processed">0/0 files</span>
-                    
-                    <!-- Visible button to trigger manual sync -->
                     <label style="display:none;" for="btn-fetch">Sync Server Data</label>
                     <button id="btn-fetch" class="btn-primary">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
@@ -65,17 +90,16 @@
                     </button>
                 </div>
             </div>
-
-            <nav class="nav-links">
-                <!-- Navigation can go here later -->
-            </nav>
         </aside>
 
         <!-- Main Content Area -->
         <main class="main-content">
+            <!-- ===== OVERVIEW PAGE ===== -->
+            <section id="page-overview" class="page-section page-hidden">
             <header class="top-header">
                 <div class="header-titles">
                     <h1>Disk Usage Overview</h1>
+                    <p id="header-disk-path" class="subtitle header-disk-path">Selecting disk…</p>
                     <p class="subtitle" id="data-timerange">Waiting for data payload...</p>
                 </div>
             </header>
@@ -100,8 +124,13 @@
                     </div>
                     <div class="metric-info">
                         <span class="metric-label">Used Space</span>
-                        <div class="metric-value">
+                        <div class="metric-value metric-value-stack">
                             <span id="val-used" class="number">0</span><span class="unit">TB</span>
+                            <span class="metric-scan-div">/</span>
+                            <span class="metric-scan-sub">
+                                <span id="val-scanned" style="color:#f59e0b">0</span><span class="unit-sm">TB</span>
+                            </span>
+                            <span class="metric-scan-hint">scan</span>
                         </div>
                     </div>
                 </div>
@@ -123,8 +152,19 @@
             <div class="charts-grid">
                 <!-- Main Timeline Chart -->
                 <div class="chart-container large-span glass-panel">
-                    <div class="panel-header">
-                        <h2>Capacity Over Time</h2>
+                    <div class="panel-header timeline-header">
+                        <div class="timeline-title-block">
+                            <h2>Capacity Over Time</h2>
+                            <div id="timeline-stat-header" class="timeline-stat-header"></div>
+                        </div>
+                        <div class="chart-range-btns">
+                            <button class="range-btn" data-range="7">7D</button>
+                            <button class="range-btn" data-range="30">30D</button>
+                            <button class="range-btn" data-range="180">6M</button>
+                            <button class="range-btn" data-range="365">1Y</button>
+                            <button class="range-btn" data-range="1825">5Y</button>
+                            <button class="range-btn active" data-range="all">All</button>
+                        </div>
                     </div>
                     <div class="canvas-wrapper">
                         <canvas id="timelineChart"></canvas>
@@ -151,13 +191,153 @@
                     </div>
                 </div>
             </div>
+            </section><!-- /#page-overview -->
+
+            <!-- ===== DETAIL PAGE ===== -->
+            <section id="page-detail" class="page-section page-hidden">
+
+                <!-- General System Stat Bar (always visible) -->
+                <div class="detail-stat-bar glass-panel">
+                    <div class="stat-block" id="detail-stat-total">
+                        <span class="stat-number">—</span>
+                        <span class="stat-label">Total Capacity</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-block" id="detail-stat-used">
+                        <span class="stat-number text-rose">—</span>
+                        <span class="stat-subscan">/ <span id="detail-stat-scanned-val" style="color:#f59e0b">—</span> scan</span>
+                        <span class="stat-label">Used / Scan</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-block" id="detail-stat-free">
+                        <span class="stat-number">—</span>
+                        <span class="stat-label">Free</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-block" id="detail-stat-pct">
+                        <span class="stat-number">—</span>
+                        <span class="stat-label">Usage %</span>
+                    </div>
+
+                </div>
+
+                <!-- Tab Bar -->
+                <div class="detail-tabs">
+                    <button class="detail-tab-btn active" data-tab="snapshot">📸 Latest Snapshot</button>
+                    <button class="detail-tab-btn" data-tab="history">📊 History &amp; Analysis</button>
+                    <button class="detail-tab-btn" data-tab="permissions">🔒 Permission Issues</button>
+                </div>
+
+                <!-- ── Tab Pane 1: Latest Snapshot ── -->
+                <div class="detail-tab-pane active" id="tab-pane-snapshot">
+                    <div id="tab-snapshot-body" class="snapshot-body">Loading…</div>
+                </div>
+
+                <!-- ── Tab Pane 2: History & Analysis ── -->
+                <div class="detail-tab-pane" id="tab-pane-history">
+                    <div class="history-layout">
+
+                        <!-- ① Time Range Bar -->
+                        <div class="history-timerange glass-panel">
+                            <div class="timerange-presets">
+                                <span class="timerange-label">🕐</span>
+                                <button class="hrange-btn" data-days="7">7D</button>
+                                <button class="hrange-btn active" data-days="30">30D</button>
+                                <button class="hrange-btn" data-days="90">3M</button>
+                                <button class="hrange-btn" data-days="180">6M</button>
+                                <button class="hrange-btn" data-days="365">1Y</button>
+                                <button class="hrange-btn" data-days="NaN">All</button>
+                            </div>
+                            <div class="timerange-custom">
+                                <input type="date" id="filter-date-start" class="date-input">
+                                <span class="date-sep">→</span>
+                                <input type="date" id="filter-date-end" class="date-input">
+                            </div>
+                        </div>
+
+                        <!-- ② Main row: Filter Box + Content -->
+                        <div class="history-main-row">
+
+                            <!-- Left: User Filter Box -->
+                            <div class="glass-panel user-filter-box">
+                                <div class="user-filter-header">
+                                    <span class="user-filter-title">👤 Users</span>
+                                    <span class="user-filter-count" id="history-user-count">—</span>
+                                </div>
+                                <input type="text" id="user-filter-search" class="user-filter-search" placeholder="🔍 Search user…">
+                                <div class="user-filter-list" id="user-chips">
+                                    <span class="table-empty">Loading…</span>
+                                </div>
+                                <div class="user-filter-footer">
+                                    <button class="user-bar-btn" id="btn-top10">Top 10</button>
+                                    <button class="user-bar-btn" id="btn-clear-users">Clear</button>
+                                    <button id="btn-reset-filter" class="user-bar-btn" style="width:100%">↺ Reset</button>
+                                </div>
+                            </div>
+
+                            <!-- Right: Charts + Data Table -->
+                            <div class="history-content">
+
+                                <!-- Overview Charts (2-col) -->
+                                <div class="history-charts-row">
+                                    <div class="glass-panel history-chart-card">
+                                        <div class="history-chart-header">
+                                            <span class="history-chart-title">📈 Total Disk Usage</span>
+                                            <span class="history-chart-stat" id="history-total-stat"></span>
+                                        </div>
+                                        <div class="history-chart-body">
+                                            <canvas id="historyTotalChart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="glass-panel history-chart-card">
+                                        <div class="history-chart-header">
+                                            <span class="history-chart-title">🔥 Fastest Growing Users</span>
+                                            <span class="history-chart-stat" id="history-growers-stat"></span>
+                                        </div>
+                                        <div class="history-chart-body">
+                                            <canvas id="historyGrowersChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Data Table -->
+                                <div class="glass-panel history-chart-card">
+                                    <div class="history-chart-header">
+                                        <span class="history-chart-title">📋 Data Table</span>
+                                    </div>
+                                    <div id="detail-view-area">
+                                        <p class="table-empty">Select a date range or users to explore historical data.</p>
+                                    </div>
+                                </div>
+
+                            </div><!-- /.history-content -->
+                        </div><!-- /.history-main-row -->
+
+                    </div><!-- /.history-layout -->
+                </div><!-- /#tab-pane-history -->
+
+                <!-- ── Tab Pane 3: Permission Issues ── -->
+                <div class="detail-tab-pane" id="tab-pane-permissions">
+                    <div id="permissions-body">
+                        <p class="table-empty">Loading permission data…</p>
+                    </div>
+                </div><!-- /#tab-pane-permissions -->
+
+            </section><!-- /#page-detail -->
+
+
+
         </main>
     </div>
 
-    <!-- Core Scripts -->
+
+
+
     <script src="js/dataFetcher.js" type="module"></script>
     <script src="js/dataStore.js" type="module"></script>
     <script src="js/chartManager.js" type="module"></script>
+    <script src="js/permissionRenderer.js" type="module"></script>
     <script src="js/main.js" type="module"></script>
 </body>
 </html>
+
