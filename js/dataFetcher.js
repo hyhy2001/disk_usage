@@ -44,7 +44,9 @@ class DataFetcher {
 
     async _initDiskSelector() {
         try {
-            const res  = await fetch('disks.json');
+            // Edit this if you want to hardcode to an absolute config URL
+            const configUrl = 'disks.json'; 
+            const res  = await fetch(configUrl);
             const disks = await res.json();
             this.disksConfig = disks;
 
@@ -118,11 +120,12 @@ class DataFetcher {
             
             const diskConfig = this.disksConfig?.find(d => d.id === this._activeDisk);
             let jsonResponse;
+            const targetDataUrl = diskConfig?.url || diskConfig?.path;
 
-            if (diskConfig && diskConfig.url) {
+            if (targetDataUrl) {
                 // Fetch from remote URL directory
                 UINodes.statusText.textContent = "Scanning remote directory...";
-                const allFiles = await this._fetchDirectoryFiles(diskConfig.url);
+                const allFiles = await this._fetchDirectoryFiles(targetDataUrl);
                 
                 // Filter disk usage reports
                 const reportFiles = allFiles.filter(f => !f.includes('permission_issues'));
@@ -186,9 +189,10 @@ class DataFetcher {
         try {
             const diskConfig = this.disksConfig?.find(d => d.id === this._activeDisk);
             let json;
+            const targetDataUrl = diskConfig?.url || diskConfig?.path;
 
-            if (diskConfig && diskConfig.url) {
-                const allFiles = await this._fetchDirectoryFiles(diskConfig.url);
+            if (targetDataUrl) {
+                const allFiles = await this._fetchDirectoryFiles(targetDataUrl);
                 const permFiles = allFiles.filter(f => f.includes('permission_issues'));
                 
                 if (permFiles.length === 0) return;
