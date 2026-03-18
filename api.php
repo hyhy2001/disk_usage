@@ -50,9 +50,9 @@ foreach ($entries as $i => $e) {
     ];
 }
 
-$action = $_GET['req'] ?? '';
+$action = $_SERVER['HTTP_X_APP_ACTION'] ?? '';
 
-// ── Route: ?req=list_drives  →  list disks ──────────────────────────────────────
+// ── Route: list_drives  →  list disks ───────────────────────────────────────────
 if ($action === 'list_drives') {
     $out = array_map(fn($d) => [
         'id'        => $d['id'],
@@ -66,7 +66,7 @@ if ($action === 'list_drives') {
 }
 
 // ── Resolve disk for data routes ──────────────────────────────────────────────
-$diskId = $_GET['drive'] ?? array_key_first($disks);
+$diskId = $_SERVER['HTTP_X_APP_DRIVE'] ?? array_key_first($disks);
 
 if (!isset($disks[$diskId])) {
     http_response_code(404);
@@ -83,7 +83,7 @@ if (!is_dir($reportDir)) {
     exit;
 }
 
-// ── Route: ?req=permissions&drive=<id>  →  latest permission_issues file ───
+// ── Route: permissions  →  latest permission_issues file ────────
 if ($action === 'permissions') {
     $files = glob($reportDir . DIRECTORY_SEPARATOR . '*permission_issues*.json') ?: [];
 
