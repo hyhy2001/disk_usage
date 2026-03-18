@@ -75,6 +75,7 @@
                 <div class="status-header">
                     <span class="status-dot scanning"></span>
                     <span id="system-status">System Standing By</span>
+                    <span id="last-sync-time" class="last-sync-time"></span>
                 </div>
                 <div class="progress-container">
                     <div class="progress-track">
@@ -168,6 +169,26 @@
                     </div>
                     <div class="canvas-wrapper">
                         <canvas id="timelineChart"></canvas>
+                    </div>
+
+                    <!-- Integrate Growth Trends Table tightly below the canvas -->
+                    <div class="timeline-footer-table">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Metric</th>
+                                    <th>1 Day</th>
+                                    <th>7 Days</th>
+                                    <th>30 Days</th>
+                                    <th>3 Months</th>
+                                    <th>6 Months</th>
+                                    <th>1 Year</th>
+                                    <th>Max</th>
+                                </tr>
+                            </thead>
+                            <tbody id="overview-period-table">
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 

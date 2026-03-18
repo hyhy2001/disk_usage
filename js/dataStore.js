@@ -97,6 +97,8 @@ export class DataStore {
                 report.other_usage.forEach(item => {
                     const prev = this.otherUsageMap.get(item.name) || 0;
                     if (item.used > prev) this.otherUsageMap.set(item.name, item.used);
+                    if (!this.userTimelineMap.has(item.name)) this.userTimelineMap.set(item.name, []);
+                    this.userTimelineMap.get(item.name).push({ timestamp: ts, used: item.used });
                 });
             }
         });
@@ -112,7 +114,7 @@ export class DataStore {
 
     getTimelineData() { return this.timelineData; }
     getDateRange()    { return this.dateRange; }
-    getAllUserNames()  { return Array.from(this.userUsageMap.keys()).sort(); }
+    getAllUserNames()  { return Array.from(this.userTimelineMap.keys()).sort(); }
     getAllTeamNames()  { return Array.from(this.teamUsageMap.keys()).sort(); }
 
     // Returns the full latest snapshot object

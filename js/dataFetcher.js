@@ -171,6 +171,12 @@ class DataFetcher {
             UINodes.progressBar.style.width = `100%`;
             UINodes.filesProcessed.textContent = `${AppState.filesTotal}/${AppState.filesTotal} files`;
 
+            const now = new Date();
+            const dStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const tStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const syncEl = document.getElementById('last-sync-time');
+            if (syncEl) syncEl.textContent = `${dStr} ${tStr}`;
+
             this.handleComplete();
 
             // Also fetch latest permission issues for this disk

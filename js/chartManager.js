@@ -20,6 +20,7 @@ export class ChartManager {
     render(dataStore) {
         this._fullTimeline = dataStore.getTimelineData();   // store full dataset
         this.renderTimeline(this._fullTimeline);
+        this.renderPeriodTable(this._fullTimeline);
         this.renderTeamChart(
             dataStore.getTeamDistribution(),
             dataStore.latestStats.used
@@ -46,6 +47,85 @@ export class ChartManager {
         });
     }
 
+
+
+    renderPeriodTable(timelineData) {
+        const tbody = document.getElementById('overview-period-table');
+        if (!tbody) return;
+        
+        if (!timelineData || timelineData.length < 2) {
+             tbody.innerHTML = '<tr><td colspan="8" class="table-empty">Not enough data to calculate trends.</td></tr>';
+             return;
+        }
+
+        const formatBytesRound = (b) => {
+            if (b === 0) return '0 B';
+            const num = Math.abs(b);
+            if (num >= 1e12) return (b / 1e12).toFixed(2) + ' TB';
+            if (num >= 1e9)  return (b / 1e9).toFixed(2) + ' GB';
+            if (num >= 1e6)  return (b / 1e6).toFixed(2) + ' MB';
+            return (b / 1e3).toFixed(2) + ' KB';
+        };
+
+        const lastPoint = timelineData[timelineData.length - 1];
+        const lastTs = lastPoint.timestamp;
+        
+        const periods = [
+            { label: '1 Day', ms: 86400000, days: 1 },
+            { label: '7 Days', ms: 7 * 86400000, days: 7 },
+            { label: '30 Days', ms: 30 * 86400000, days: 30 },
+            { label: '3 Months', ms: 90 * 86400000, days: 90 },
+            { label: '6 Months', ms: 180 * 86400000, days: 180 },
+            { label: '1 Year', ms: 365 * 86400000, days: 365 },
+            { label: 'Max (All Time)', ms: Infinity, days: 1 } // Days will be calculated
+        ];
+
+        const calc = periods.map(p => {
+             const targetTs = lastTs - p.ms;
+             let refPoint = timelineData[0];
+             if (p.ms !== Infinity) {
+                 refPoint = timelineData.slice().reverse().find(d => d.timestamp <= targetTs) || timelineData[0];
+             }
+             
+             const diffBytes = lastPoint.used - refPoint.used;
+             const pct = refPoint.used > 0 ? ((diffBytes / refPoint.used) * 100).toFixed(2) : '0.00';
+             
+             let actualDays = p.days;
+             if (p.ms === Infinity) {
+                 actualDays = Math.max(1, (lastTs - refPoint.timestamp) / 86400000);
+             }
+             const avgDaily = diffBytes / actualDays;
+             
+             return {
+                 diff: diffBytes,
+                 pct: pct,
+                 avg: avgDaily,
+                 isUp: diffBytes >= 0,
+                 empty: diffBytes === 0
+             };
+        });
+
+        const colorClass = (isUp, isEmpty) => isEmpty ? '' : (isUp ? 'text-rose' : 'text-emerald');
+        const arrow = (isUp, isEmpty) => isEmpty ? '' : (isUp ? '▲ ' : '▼ ');
+        const sign = (isUp, isEmpty) => isEmpty ? '' : (isUp ? '+' : '');
+
+        let html = `<tr><td><strong>Growth (Capacity)</strong></td>`;
+        calc.forEach(c => {
+            html += `<td class="${colorClass(c.isUp, c.empty)}">${arrow(c.isUp, c.empty)}${formatBytesRound(c.diff)}</td>`;
+        });
+        html += `</tr><tr><td><strong>% Change</strong></td>`;
+        calc.forEach(c => {
+            html += `<td class="${colorClass(c.isUp, c.empty)}">${sign(c.isUp, c.empty)}${c.pct}%</td>`;
+        });
+        html += `</tr><tr><td><strong>Avg Daily Change</strong></td>`;
+        calc.forEach(c => {
+            html += `<td class="${colorClass(c.isUp, c.empty)}">${arrow(c.isUp, c.empty)}${formatBytesRound(c.avg)}/d</td>`;
+        });
+        html += `</tr>`;
+        
+        tbody.innerHTML = html;
+    }
+
     renderTimeline(timelineData) {
         const ctx = document.getElementById('timelineChart').getContext('2d');
 
@@ -58,13 +138,31 @@ export class ChartManager {
         const labels    = timelineData.map(d => new Date(d.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }));
         const usedData  = timelineData.map(d => d.used / 1e12);
         const scanData  = timelineData.map(d => (d.scanned || 0) / 1e12);
+        
         const totalData = timelineData.map(d => d.total / 1e12);
 
+        const deltaData = [0];
+        for (let i = 1; i < usedData.length; i++) {
+           deltaData.push((usedData[i] - usedData[i-1]));
+        }
+
+        const formatBytesDynamically = (tb) => {
+            if (tb === 0) return '0 B';
+            const b = tb * 1e12;
+            const num = Math.abs(b);
+            if (num >= 1e12) return (b / 1e12).toFixed(2) + ' TB';
+            if (num >= 1e9)  return (b / 1e9).toFixed(2) + ' GB';
+            if (num >= 1e6)  return (b / 1e6).toFixed(2) + ' MB';
+            if (num >= 1e3)  return (b / 1e3).toFixed(2) + ' KB';
+            return b.toFixed(2) + ' B';
+        };
+
+
         // ── Stats subheader ───────────────────────────────────────────────────
-        const first = usedData[0] ?? 0;
         const last  = usedData[usedData.length - 1] ?? 0;
-        const delta = last - first;
-        const pctCh = first ? ((delta / first) * 100).toFixed(2) : '0.00';
+        const prev  = (usedData.length > 1 ? usedData[usedData.length - 2] : usedData[0]) ?? 0;
+        const delta = last - prev;
+        const pctCh = prev ? ((delta / prev) * 100).toFixed(2) : '0.00';
         const up    = delta >= 0;
         const statsEl = document.getElementById('timeline-stat-header');
         if (statsEl) {
@@ -189,7 +287,7 @@ export class ChartManager {
                 labels,
                 datasets: [
                     {
-                        label: 'Used Capacity (TB)',
+                        label: 'Used Capacity',
                         data: usedData,
                         borderColor: '#fbbf24',
                         backgroundColor: gradientFill,
@@ -201,7 +299,7 @@ export class ChartManager {
                         order: 1
                     },
                     {
-                        label: 'Scan Result (TB)',
+                        label: 'Scan Result',
                         data: scanData,
                         borderColor: 'rgba(251,191,36,0.35)',
                         backgroundColor: 'transparent',
@@ -214,18 +312,17 @@ export class ChartManager {
                         order: 2
                     },
                     {
-                        label: 'Total Capacity (TB)',
+                        label: 'Total Capacity',
                         data: totalData,
-                        borderColor: 'rgba(148,163,184,0.18)',
+                        borderColor: 'rgba(148,163,184,0.60)',
                         backgroundColor: 'transparent',
-                        borderWidth: 1,
+                        borderWidth: 2,
                         borderDash: [6, 4],
                         fill: false,
                         tension: 0,
                         pointRadius: 0,
                         order: 3
-                    }
-                ]
+                    }                ]
             },
             options: {
                 responsive: true,
@@ -247,13 +344,13 @@ export class ChartManager {
                         callbacks: {
                             title: items => items[0]?.label ?? '',
                             label: item => {
-                                const tb = item.raw.toFixed(3);
-                                const gb = (item.raw * 1000).toFixed(0);
-                                return ` ${item.dataset.label}: ${tb} TB  (${gb} GB)`;
+                                const valStr = formatBytesDynamically(item.raw);
+                                return ` ${item.dataset.label}: ${valStr}`;
                             }
                         }
                     }
                 },
+                layout: { padding: { right: 30 } },
                 scales: {
                     x: {
                         grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false },
@@ -263,15 +360,18 @@ export class ChartManager {
                         position: 'right',
                         beginAtZero: false,
                         grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                        afterFit(scale) { scale.width = 65; },
                         ticks: {
                             color: '#475569',
                             font: { size: 11 },
-                            callback: v => `${v.toFixed(2)} TB`
+                            callback: v => formatBytesDynamically(v)
                         }
                     }
+
                 }
             }
         });
+
     }
 
 
@@ -409,7 +509,7 @@ export class ChartManager {
         const delta = last - first;
         const pctCh = first ? ((delta / first) * 100).toFixed(1) : '0.0';
         const el2   = document.getElementById('history-total-stat');
-        if (el2) el2.innerHTML = `${last.toFixed(3)} TB &nbsp;<span style="color:${delta>=0?'#34d399':'#fb7185'}">${delta>=0?'▲':'▼'} ${Math.abs(pctCh)}%</span>`;
+        if (el2) el2.innerHTML = '';
 
         if (this._histTotalChart) this._histTotalChart.destroy();
         this._histTotalChart = new Chart(ctx, {
@@ -475,7 +575,7 @@ export class ChartManager {
     }
 
     renderUserTrendChart(userTimelineMap, selectedUsers, startMs, endMs) {
-        const el = document.getElementById('historyUserTrendChart');
+        const el = document.getElementById('historyTotalChart');
         if (!el) return;
         const ctx = el.getContext('2d');
 
@@ -507,8 +607,8 @@ export class ChartManager {
         const countEl = document.getElementById('history-user-count');
         if (countEl) countEl.textContent = `${selectedUsers.length} user${selectedUsers.length !== 1 ? 's' : ''}`;
 
-        if (this._histUserTrendChart) this._histUserTrendChart.destroy();
-        this._histUserTrendChart = new Chart(ctx, {
+        if (this._histTotalChart) { this._histTotalChart.destroy(); this._histTotalChart = null; }
+        this._histTotalChart = new Chart(ctx, {
             type: 'line',
             data: { labels, datasets },
             options: {

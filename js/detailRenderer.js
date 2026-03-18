@@ -125,7 +125,7 @@ function renderSnapshotView() {
         section('📦', 'General System', null, stackedBar),
         section('🏷️', 'Team Usage', `${teams.length} teams`, teamRows),
         section('👤', 'Top 10 Users', `${users.length} total`, userRows),
-        section('📁', 'Other Usage', `${other.length} items`, otherRows),
+        section('📁', 'Other Usage', `${other.length} total`, otherRows),
     ].join('');
 }
 
@@ -258,9 +258,17 @@ export function applyFilters() {
 
     // ── History charts ──────────────────────────────────────────────────────
     if (chartMgr) {
-        const filtered = (_store.getTimelineData() || [])
-            .filter(d => d.timestamp >= f.startMs && d.timestamp <= f.endMs);
-        chartMgr.renderHistoryTotalChart(filtered);
+        if (pivotUsers && f.selectedUsers && f.selectedUsers.length > 0) {
+            const histTitle = document.querySelector('#historyTotalChart')?.parentElement?.previousElementSibling?.querySelector('.history-chart-title');
+            if (histTitle) histTitle.textContent = '📈 Selected Users Usage';
+            chartMgr.renderUserTrendChart(_store.userTimelineMap, pivotUsers, f.startMs, f.endMs);
+        } else {
+            const histTitle = document.querySelector('#historyTotalChart')?.parentElement?.previousElementSibling?.querySelector('.history-chart-title');
+            if (histTitle) histTitle.textContent = '📈 Total Disk Usage';
+            const filtered = (_store.getTimelineData() || [])
+                .filter(d => d.timestamp >= f.startMs && d.timestamp <= f.endMs);
+            chartMgr.renderHistoryTotalChart(filtered);
+        }
 
         const growers = _store.getTopUsersByGrowth(f.startMs, f.endMs).slice(0, 10);
         chartMgr.renderTopGrowersChart(growers);
