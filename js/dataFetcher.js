@@ -22,7 +22,7 @@ function startClock() {
 
 // ── Single API call — no params, returns all disk data ────────────────────────
 async function fetchAllDisks() {
-    const res = await fetch('api.php', { method: 'POST' });
+    const res = await fetch('api.php');
     if (!res.ok) throw new Error(`HTTP ${res.status} from api.php`);
     return res.json();
 }

@@ -7,9 +7,9 @@
 //
 // POST api.php  →  { status, disks: [ { id, name, dir, available, data[], perms } ] }
 
-// Block non-POST access (direct browser, curl GET, scanners)
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(200);
+// Allow GET and POST — block everything else (PUT, DELETE, HEAD, scanners)
+if (!in_array($_SERVER['REQUEST_METHOD'], ['GET', 'POST'], true)) {
+    http_response_code(405);
     exit;
 }
 
