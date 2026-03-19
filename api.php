@@ -1,11 +1,12 @@
 <?php
 // api.php — Disk Usage Dashboard API
-// POST do=disks                 → list all configured disks
-// POST do=perms&drive=<id>      → latest permission_issues*.json for disk
-// POST drive=<id>               → aggregated disk_usage_report*.json for disk
+// Routing is implicit — determined by which POST params are present:
+//   (no drive)           → list all configured disks
+//   drive=<id>           → aggregated disk_usage_report*.json
+//   drive=<id> + p=1     → latest permission_issues*.json
 
-// ── Block direct browser access (no params) ───────────────────────────────────
-if (empty($_GET) && empty($_POST)) {
+// Block non-POST requests (direct browser access, curl GET, etc.)
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(200);
     exit;
 }
@@ -13,12 +14,9 @@ if (empty($_GET) && empty($_POST)) {
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
-// ── Input validation ──────────────────────────────────────────────────────────
-$ALLOWED_ACTIONS = ['disks', 'perms', ''];
-
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function getParam(string $key, string $default = ''): string {
-    $val = $_POST[$key] ?? ($_GET[$key] ?? $default);
-    return trim((string)$val);
+    return trim((string)($_POST[$key] ?? $default));
 }
 
 function jsonError(int $code, string $message): void {
@@ -32,20 +30,7 @@ function jsonSuccess(array $payload): void {
     exit;
 }
 
-$action = getParam('do');
-$diskId = getParam('drive');
-
-// Validate action param
-if (!in_array($action, $ALLOWED_ACTIONS, true)) {
-    jsonError(400, "Unknown action.");
-}
-
-// Sanitize disk ID: allow only alphanumeric + underscore/hyphen
-if ($diskId !== '' && !preg_match('/^[a-zA-Z0-9_\-]+$/', $diskId)) {
-    jsonError(400, "Invalid disk id format.");
-}
-
-// ── Helper: resolve path (absolute or relative to this file) ──────────────────
+// Resolve relative path to absolute (relative = relative to this file)
 function resolvePath(string $path): string {
     if ($path !== '' && ($path[0] === '/' || (strlen($path) > 1 && $path[1] === ':'))) {
         return rtrim($path, '/\\');
@@ -53,7 +38,7 @@ function resolvePath(string $path): string {
     return rtrim(__DIR__ . DIRECTORY_SEPARATOR . $path, '/\\');
 }
 
-// ── Helper: Read JSON files (Bypass WAF glob() block) ─────────────────────────
+// Read *.json files in a dir — uses opendir() to bypass WAF glob() block
 function getJsonFiles(string $dir, string $match = ''): array {
     if (!is_dir($dir)) return [];
     $dh = @opendir($dir);
@@ -82,8 +67,17 @@ if (!is_array($entries) || count($entries) === 0) {
     jsonError(500, "disks.json is empty or invalid.");
 }
 
-// ── Route: disks — list all disks (eager, needed for full list) ────────────────
-if ($action === 'disks') {
+// ── Read params ───────────────────────────────────────────────────────────────
+$diskId  = getParam('drive');
+$isPerms = getParam('p') === '1';
+
+// Sanitize disk ID
+if ($diskId !== '' && !preg_match('/^[a-zA-Z0-9_\-]+$/', $diskId)) {
+    jsonError(400, "Invalid disk id.");
+}
+
+// ── Route: no drive → list all disks ─────────────────────────────────────────
+if ($diskId === '') {
     $out = [];
     foreach ($entries as $i => $e) {
         $rawPath  = $e['path'] ?? "disk_{$i}";
@@ -102,19 +96,11 @@ if ($action === 'disks') {
     jsonSuccess(['disks' => $out]);
 }
 
-// ── Resolve disk for data routes (lazy: only resolve the requested disk) ──────
+// ── Resolve the requested disk ────────────────────────────────────────────────
 $diskEntry = null;
 foreach ($entries as $i => $e) {
     $rawPath = $e['path'] ?? "disk_{$i}";
     $id      = $e['id']   ?? preg_replace('/[^a-z0-9]+/', '_', strtolower($rawPath));
-
-    // Default to first disk if no drive param given
-    if ($diskId === '') {
-        $diskId    = $id;
-        $diskEntry = ['id' => $id, 'name' => $e['name'] ?? $id, 'rawPath' => $rawPath];
-        break;
-    }
-
     if ($id === $diskId) {
         $diskEntry = ['id' => $id, 'name' => $e['name'] ?? $id, 'rawPath' => $rawPath];
         break;
@@ -122,18 +108,18 @@ foreach ($entries as $i => $e) {
 }
 
 if ($diskEntry === null) {
-    jsonError(404, "Unknown disk id: {$diskId}");
+    jsonError(404, "Unknown disk.");
 }
 
 $reportDir = resolvePath($diskEntry['rawPath']);
 $dirLabel  = basename(rtrim($diskEntry['rawPath'], '/\\'));
 
 if (!is_dir($reportDir)) {
-    jsonError(404, "Reports directory not found: {$reportDir}");
+    jsonError(404, "Reports directory not found.");
 }
 
-// ── Route: perms — latest permission_issues file ───────────────────────────────
-if ($action === 'perms') {
+// ── Route: drive + p=1 → latest permission_issues ────────────────────────────
+if ($isPerms) {
     $files = getJsonFiles($reportDir, 'permission_issues');
 
     if (empty($files)) {
@@ -142,23 +128,19 @@ if ($action === 'perms') {
 
     $latest     = null;
     $latestDate = -1;
-
     foreach ($files as $file) {
         $content = file_get_contents($file);
         if ($content === false) continue;
         $json = json_decode($content, true);
         if (!is_array($json)) continue;
         $d = $json['date'] ?? 0;
-        if ($d > $latestDate) {
-            $latestDate = $d;
-            $latest     = $json;
-        }
+        if ($d > $latestDate) { $latestDate = $d; $latest = $json; }
     }
 
     jsonSuccess(['disk' => ['id' => $diskId, 'dir' => $dirLabel], 'data' => $latest]);
 }
 
-// ── Route: disk usage — aggregated report files ───────────────────────────────
+// ── Route: drive only → aggregated disk usage ─────────────────────────────────
 $allFiles   = getJsonFiles($reportDir);
 $files      = array_filter($allFiles, fn($f) => strpos(basename($f), 'permission_issues') === false);
 $aggregated = [];

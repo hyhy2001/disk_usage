@@ -49,12 +49,12 @@ class DataFetcher {
         });
     }
 
-    // ── Load disk list from api.php (req=list_drives) ─────────────────────────
+    // ── Load disk list from api.php (no drive param = list disks) ─────────────
     async _initDiskSelector() {
         try {
-            const json = await callApi({ do: 'disks' });
+            const json = await callApi({});
             if (json.status !== 'success' || !Array.isArray(json.disks)) {
-                console.warn('list_drives returned unexpected response:', json);
+                console.warn('list disks returned unexpected response:', json);
                 return;
             }
 
@@ -146,7 +146,7 @@ class DataFetcher {
     // ── Fetch permission issues ───────────────────────────────────────────────
     async _fetchPermissions() {
         try {
-            const json = await callApi({ do: 'perms', drive: this._activeDisk });
+            const json = await callApi({ drive: this._activeDisk, p: '1' });
             if (json?.status === 'success') {
                 this.dataStore.permissionIssues = json.data ?? null;
                 document.dispatchEvent(new CustomEvent('permissionsLoaded', { detail: json.data }));
