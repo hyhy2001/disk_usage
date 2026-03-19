@@ -20,13 +20,9 @@ function startClock() {
     setInterval(tick, 1000);
 }
 
-// ── API helper — all data flows through api.php ───────────────────────────────
-async function callApi(params = {}) {
-    const formData = new FormData();
-    for (const [key, val] of Object.entries(params)) {
-        formData.append(key, val);
-    }
-    const res = await fetch('api.php', { method: 'POST', body: formData });
+// ── Single API call — no params, returns all disk data ────────────────────────
+async function fetchAllDisks() {
+    const res = await fetch('api.php', { method: 'POST' });
     if (!res.ok) throw new Error(`HTTP ${res.status} from api.php`);
     return res.json();
 }
@@ -35,6 +31,7 @@ class DataFetcher {
     constructor() {
         this.dataStore = new DataStore();
         this._activeDisk = null;
+        this._cache = null; // Full API response cached after first load
 
         AppState.chartManagerInstance = new ChartManager();
 
@@ -49,16 +46,19 @@ class DataFetcher {
         });
     }
 
-    // ── Load disk list from api.php (no drive param = list disks) ─────────────
+    // ── Load disk list and populate selector ──────────────────────────────────
     async _initDiskSelector() {
         try {
-            const json = await callApi({});
+            UINodes.statusText.textContent = 'Connecting to API...';
+            const json = await fetchAllDisks();
+
             if (json.status !== 'success' || !Array.isArray(json.disks)) {
-                console.warn('list disks returned unexpected response:', json);
+                console.warn('Unexpected API response:', json);
                 return;
             }
 
-            this.disksConfig = json.disks;
+            // Cache the full response
+            this._cache = json;
 
             const select = document.getElementById('disk-select');
             if (!select) return;
@@ -75,12 +75,14 @@ class DataFetcher {
 
             select.addEventListener('change', () => {
                 this._activeDisk = select.value;
-                const disk = this.disksConfig?.find(d => d.id === select.value);
+                const disk = this._cache?.disks?.find(d => d.id === select.value);
                 this._updateDiskPath(disk);
-                this.startServerSync();
+                // Use cached data — no extra API call needed
+                this._renderDisk(disk);
             });
         } catch (e) {
             console.warn('Could not load disk list:', e);
+            UINodes.statusText.textContent = 'Error: ' + e.message;
         }
     }
 
@@ -92,7 +94,7 @@ class DataFetcher {
         }
     }
 
-    // ── Fetch disk usage data ─────────────────────────────────────────────────
+    // ── Sync: refresh cache from API, then render active disk ─────────────────
     async startServerSync() {
         if (AppState.isProcessing) return;
         if (!this._activeDisk) {
@@ -104,35 +106,26 @@ class DataFetcher {
             this.setProcessingState(true);
             UINodes.statusText.textContent = 'Connecting to API...';
 
-            const jsonResponse = await callApi({ drive: this._activeDisk });
+            const json = await fetchAllDisks();
 
-            if (jsonResponse.status !== 'success' || !jsonResponse.data || jsonResponse.data.length === 0) {
-                UINodes.statusText.textContent = 'No JSON reports found or API returned an error.';
+            if (json.status !== 'success' || !Array.isArray(json.disks)) {
+                UINodes.statusText.textContent = 'API returned an error.';
                 this.setProcessingState(false);
                 return;
             }
 
-            UINodes.statusText.textContent = 'Loading payload...';
-            AppState.filesTotal = jsonResponse.total_files;
-            UINodes.filesProcessed.textContent = `0/${AppState.filesTotal} files`;
+            // Refresh cache
+            this._cache = json;
 
-            this.dataStore = new DataStore();
+            const disk = json.disks.find(d => d.id === this._activeDisk) ?? json.disks[0];
+            if (!disk) {
+                UINodes.statusText.textContent = 'No disk data found.';
+                this.setProcessingState(false);
+                return;
+            }
 
-            UINodes.statusText.textContent = 'Aggregating metrics...';
-            this.dataStore.processChunk(jsonResponse.data);
-
-            AppState.filesProcessed = AppState.filesTotal;
-            UINodes.progressBar.style.width = '100%';
-            UINodes.filesProcessed.textContent = `${AppState.filesTotal}/${AppState.filesTotal} files`;
-
-            const now = new Date();
-            const dStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            const tStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            const syncEl = document.getElementById('last-sync-time');
-            if (syncEl) syncEl.textContent = `${dStr} ${tStr}`;
-
-            this.handleComplete();
-            this._fetchPermissions();
+            this._activeDisk = disk.id;
+            this._renderDisk(disk);
 
         } catch (error) {
             console.error('Server API Sync Failed:', error);
@@ -143,17 +136,40 @@ class DataFetcher {
         }
     }
 
-    // ── Fetch permission issues ───────────────────────────────────────────────
-    async _fetchPermissions() {
-        try {
-            const json = await callApi({ drive: this._activeDisk, p: '1' });
-            if (json?.status === 'success') {
-                this.dataStore.permissionIssues = json.data ?? null;
-                document.dispatchEvent(new CustomEvent('permissionsLoaded', { detail: json.data }));
-            }
-        } catch (e) {
-            console.warn('Could not load permission issues:', e);
+    // ── Render a disk's data from cache (no API call) ─────────────────────────
+    _renderDisk(disk) {
+        if (!disk?.data?.length) {
+            UINodes.statusText.textContent = 'No JSON reports found for this disk.';
+            this.setProcessingState(false);
+            return;
         }
+
+        UINodes.statusText.textContent = 'Loading payload...';
+        AppState.filesTotal = disk.files;
+        UINodes.filesProcessed.textContent = `0/${AppState.filesTotal} files`;
+
+        this.dataStore = new DataStore();
+
+        UINodes.statusText.textContent = 'Aggregating metrics...';
+        this.dataStore.processChunk(disk.data);
+
+        AppState.filesProcessed = AppState.filesTotal;
+        UINodes.progressBar.style.width = '100%';
+        UINodes.filesProcessed.textContent = `${AppState.filesTotal}/${AppState.filesTotal} files`;
+
+        const now = new Date();
+        const dStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const tStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const syncEl = document.getElementById('last-sync-time');
+        if (syncEl) syncEl.textContent = `${dStr} ${tStr}`;
+
+        // Permissions are bundled in the same response
+        if (disk.perms !== undefined) {
+            this.dataStore.permissionIssues = disk.perms ?? null;
+            document.dispatchEvent(new CustomEvent('permissionsLoaded', { detail: disk.perms }));
+        }
+
+        this.handleComplete();
     }
 
     handleComplete() {
