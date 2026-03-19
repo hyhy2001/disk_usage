@@ -1,8 +1,8 @@
 <?php
 // api.php — Disk Usage Dashboard API
-// POST req=list_drives               → list all configured disks
-// POST req=permissions&drive=<id>    → latest permission_issues*.json for disk
-// POST drive=<id>                    → aggregated disk_usage_report*.json for disk
+// POST do=disks                 → list all configured disks
+// POST do=perms&drive=<id>      → latest permission_issues*.json for disk
+// POST drive=<id>               → aggregated disk_usage_report*.json for disk
 
 // ── Block direct browser access (no params) ───────────────────────────────────
 if (empty($_GET) && empty($_POST)) {
@@ -14,7 +14,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
 // ── Input validation ──────────────────────────────────────────────────────────
-$ALLOWED_ACTIONS = ['list_drives', 'permissions', ''];
+$ALLOWED_ACTIONS = ['disks', 'perms', ''];
 
 function getParam(string $key, string $default = ''): string {
     $val = $_POST[$key] ?? ($_GET[$key] ?? $default);
@@ -32,12 +32,12 @@ function jsonSuccess(array $payload): void {
     exit;
 }
 
-$action = getParam('req');
+$action = getParam('do');
 $diskId = getParam('drive');
 
 // Validate action param
 if (!in_array($action, $ALLOWED_ACTIONS, true)) {
-    jsonError(400, "Unknown action: {$action}");
+    jsonError(400, "Unknown action.");
 }
 
 // Sanitize disk ID: allow only alphanumeric + underscore/hyphen
@@ -82,8 +82,8 @@ if (!is_array($entries) || count($entries) === 0) {
     jsonError(500, "disks.json is empty or invalid.");
 }
 
-// ── Route: list_drives — list all disks (eager, needed for full list) ─────────
-if ($action === 'list_drives') {
+// ── Route: disks — list all disks (eager, needed for full list) ────────────────
+if ($action === 'disks') {
     $out = [];
     foreach ($entries as $i => $e) {
         $rawPath  = $e['path'] ?? "disk_{$i}";
@@ -132,8 +132,8 @@ if (!is_dir($reportDir)) {
     jsonError(404, "Reports directory not found: {$reportDir}");
 }
 
-// ── Route: permissions — latest permission_issues file ───────────────────────
-if ($action === 'permissions') {
+// ── Route: perms — latest permission_issues file ───────────────────────────────
+if ($action === 'perms') {
     $files = getJsonFiles($reportDir, 'permission_issues');
 
     if (empty($files)) {
