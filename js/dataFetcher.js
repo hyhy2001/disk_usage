@@ -24,50 +24,55 @@ class DataFetcher {
     constructor() {
         this.dataStore = new DataStore();
         this._activeDisk = null;
-        this._cache = window.__DISK_DATA__ ?? null; // Data embedded by PHP at page load
-
+        
+        // Initialize charts
         AppState.chartManagerInstance = new ChartManager();
 
+        // Bind events
         if (UINodes.btnFetch) {
-            // "Sync Now" reloads the page — PHP will re-read fresh data
-            UINodes.btnFetch.addEventListener('click', () => window.location.reload());
+            UINodes.btnFetch.addEventListener('click', () => this.startServerSync());
         }
 
+        // Start live clock
         startClock();
-        this._initDiskSelector();
+
+        // Load disk list then auto-fetch
+        this._initDiskSelector().then(() => {
+            setTimeout(() => this.startServerSync(), 300);
+        });
     }
 
-    // ── Populate disk selector from inline data ───────────────────────────────
-    _initDiskSelector() {
-        const json = this._cache;
+    async _initDiskSelector() {
+        try {
+            // Edit this if you want to hardcode to an absolute config URL
+            const configUrl = 'disks.json'; 
+            const res  = await fetch(configUrl);
+            const disks = await res.json();
+            this.disksConfig = disks;
 
-        if (!json || json.status !== 'success' || !Array.isArray(json.disks) || json.disks.length === 0) {
-            UINodes.statusText.textContent = 'No disk data available.';
-            return;
-        }
+            const select = document.getElementById('disk-select');
+            if (!select) return;
 
-        const select = document.getElementById('disk-select');
-        if (select) {
-            select.innerHTML = json.disks.map(d => `
+            select.innerHTML = disks.map(d => `
                 <option value="${d.id}">${d.name}</option>
             `).join('');
-        }
 
-        this._activeDisk = json.disks[0].id;
-        if (select) select.value = json.disks[0].id;
-        this._updateDiskPath(json.disks[0]);
+            // Pick first
+            if (disks.length > 0) {
+                this._activeDisk = disks[0].id;
+                select.value = disks[0].id;
+                this._updateDiskPath(disks[0]);
+            }
 
-        if (select) {
             select.addEventListener('change', () => {
                 this._activeDisk = select.value;
-                const disk = json.disks.find(d => d.id === select.value);
+                const disk = disks.find(d => d.id === select.value);
                 this._updateDiskPath(disk);
-                this._renderDisk(disk);
+                this.startServerSync();
             });
+        } catch (e) {
+            console.warn('Could not load disk list:', e);
         }
-
-        // Auto-render first disk
-        this._renderDisk(json.disks[0]);
     }
 
     _updateDiskPath(disk) {
@@ -78,63 +83,179 @@ class DataFetcher {
         }
     }
 
-    // ── Render a disk's data (all from inline cache) ──────────────────────────
-    _renderDisk(disk) {
-        if (!disk?.data?.length) {
-            UINodes.statusText.textContent = 'No JSON reports found for this disk.';
-            this.setProcessingState(false);
+    async _fetchDirectoryFiles(url) {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status} fetching directory list`);
+        
+        const contentType = res.headers.get('content-type') || '';
+        let fileUrls = [];
+
+        if (contentType.includes('application/json')) {
+            const arr = await res.json();
+            fileUrls = arr.map(f => new URL(f, url).href);
+        } else {
+            // Assume HTML Directory index (Nginx/Apache)
+            const html = await res.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const links = Array.from(doc.querySelectorAll('a'))
+                                .map(a => a.getAttribute('href'))
+                                .filter(href => href && href.endsWith('.json'));
+            
+            // Deduplicate and resolve URLs
+            fileUrls = [...new Set(links.map(href => new URL(href, url).href))];
+        }
+        return fileUrls;
+    }
+
+    async startServerSync() {
+        if (AppState.isProcessing) return;
+        if (!this._activeDisk) {
+            UINodes.statusText.textContent = "No valid disk to scan.";
             return;
         }
+        
+        try {
+            this.setProcessingState(true);
+            
+            const diskConfig = this.disksConfig?.find(d => d.id === this._activeDisk);
+            let jsonResponse;
+            const targetDataUrl = diskConfig?.url || diskConfig?.path;
 
-        this.setProcessingState(true);
-        UINodes.statusText.textContent = 'Loading payload...';
-        AppState.filesTotal = disk.files;
-        UINodes.filesProcessed.textContent = `0/${AppState.filesTotal} files`;
+            if (targetDataUrl) {
+                // Fetch from remote URL directory
+                UINodes.statusText.textContent = "Scanning remote directory...";
+                const allFiles = await this._fetchDirectoryFiles(targetDataUrl);
+                
+                // Filter disk usage reports
+                const reportFiles = allFiles.filter(f => !f.includes('permission_issues'));
+                
+                if (reportFiles.length === 0) {
+                    throw new Error("No JSON reports found in remote directory.");
+                }
 
-        this.dataStore = new DataStore();
-        UINodes.statusText.textContent = 'Aggregating metrics...';
-        this.dataStore.processChunk(disk.data);
+                UINodes.statusText.textContent = `Downloading ${reportFiles.length} reports...`;
+                
+                // Load concurrently
+                const fetchPromises = reportFiles.map(f => fetch(f).then(r => r.ok ? r.json() : null).catch(() => null));
+                const results = await Promise.all(fetchPromises);
+                const validData = results.filter(d => d !== null);
+                
+                jsonResponse = { status: 'success', data: validData, total_files: validData.length };
+            } else {
+                UINodes.statusText.textContent = "Connecting to Local API...";
+                const formData = new FormData();
+                formData.append('drive', this._activeDisk);
+                const response = await fetch('api.php', { method: 'POST', body: formData });
+                if (!response.ok) throw new Error(`HTTP error ${response.status} from api.php.`);
+                jsonResponse = await response.json();
+            }
+            
+            if ((jsonResponse.status && jsonResponse.status !== 'success') || !jsonResponse.data || jsonResponse.data.length === 0) {
+                alert("No JSON reports found or API returned an error.");
+                this.setProcessingState(false);
+                return;
+            }
 
-        AppState.filesProcessed = AppState.filesTotal;
-        UINodes.progressBar.style.width = '100%';
-        UINodes.filesProcessed.textContent = `${AppState.filesTotal}/${AppState.filesTotal} files`;
+            UINodes.statusText.textContent = "Loading payload...";
+            AppState.filesTotal = jsonResponse.total_files;
+            UINodes.filesProcessed.textContent = `0/${AppState.filesTotal} files`;
+            
+            this.dataStore = new DataStore();
+            
+            UINodes.statusText.textContent = "Aggregating metrics...";
+            
+            this.dataStore.processChunk(jsonResponse.data);
+            
+            AppState.filesProcessed = AppState.filesTotal;
+            UINodes.progressBar.style.width = `100%`;
+            UINodes.filesProcessed.textContent = `${AppState.filesTotal}/${AppState.filesTotal} files`;
 
-        const now = new Date();
-        const dStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        const tStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        const syncEl = document.getElementById('last-sync-time');
-        if (syncEl) syncEl.textContent = `${dStr} ${tStr}`;
+            const now = new Date();
+            const dStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const tStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const syncEl = document.getElementById('last-sync-time');
+            if (syncEl) syncEl.textContent = `${dStr} ${tStr}`;
 
-        if (disk.perms !== undefined) {
-            this.dataStore.permissionIssues = disk.perms ?? null;
-            document.dispatchEvent(new CustomEvent('permissionsLoaded', { detail: disk.perms }));
+            this.handleComplete();
+
+            // Also fetch latest permission issues for this disk
+            this._fetchPermissions();
+            
+        } catch (error) {
+            console.error("Server API Sync Failed:", error);
+            this.setProcessingState(false);
+            UINodes.statusText.textContent = "Error: " + error.message;
+            UINodes.statusDot.classList.remove('scanning');
+            UINodes.statusDot.style.backgroundColor = 'var(--rose-500)';
         }
+    }
 
-        this.handleComplete();
+    async _fetchPermissions() {
+        try {
+            const diskConfig = this.disksConfig?.find(d => d.id === this._activeDisk);
+            let json;
+            const targetDataUrl = diskConfig?.url || diskConfig?.path;
+
+            if (targetDataUrl) {
+                const allFiles = await this._fetchDirectoryFiles(targetDataUrl);
+                const permFiles = allFiles.filter(f => f.includes('permission_issues'));
+                
+                if (permFiles.length === 0) return;
+                
+                const fetchPromises = permFiles.map(f => fetch(f).then(r => r.ok ? r.json() : null).catch(() => null));
+                const results = await Promise.all(fetchPromises);
+                
+                const validData = results.filter(d => d !== null);
+                if (validData.length > 0) {
+                    validData.sort((a,b) => (b.date || 0) - (a.date || 0));
+                    json = { status: 'success', data: validData[0] };
+                } else {
+                    json = { status: 'success', data: null };
+                }
+            } else if (diskConfig && diskConfig.permissions_url) {
+                const res = await fetch(diskConfig.permissions_url);
+                const rawData = await res.json();
+                json = { status: 'success', data: rawData };
+            } else {
+                const formData = new FormData();
+                formData.append('req', 'permissions');
+                formData.append('drive', this._activeDisk);
+                const res  = await fetch('api.php', { method: 'POST', body: formData });
+                json = await res.json();
+            }
+
+            if (json?.status === 'success') {
+                this.dataStore.permissionIssues = json.data ?? null;
+                document.dispatchEvent(new CustomEvent('permissionsLoaded', { detail: json.data }));
+            }
+        } catch (e) {
+            console.warn('Could not load permission issues:', e);
+        }
     }
 
     handleComplete() {
         this.setProcessingState(false);
-        UINodes.statusText.textContent = 'System Optimized';
-
+        UINodes.statusText.textContent = "System Optimized";
+        
         this.dataStore.finalizeProcessing();
         this.updateMetricCards();
         AppState.chartManagerInstance.render(this.dataStore);
         renderDetailTables(this.dataStore);
     }
-
+    
     updateMetricCards() {
         const stats = this.dataStore.latestStats;
-
+        
         const totalTB     = bytesToTB(stats.total);
         const usedTB      = bytesToTB(stats.used);
         const availableTB = bytesToTB(stats.available);
         const scannedBytes = (this.dataStore.latestSnapshot?.teams || []).reduce((s, t) => s + (t.used || 0), 0);
         const scannedTB    = bytesToTB(scannedBytes);
 
-        const prevTotal   = parseFloat(UINodes.valTotal.textContent)    || 0;
-        const prevUsed    = parseFloat(UINodes.valUsed.textContent)     || 0;
-        const prevFree    = parseFloat(UINodes.valFree.textContent)     || 0;
+        const prevTotal   = parseFloat(UINodes.valTotal.textContent)   || 0;
+        const prevUsed    = parseFloat(UINodes.valUsed.textContent)    || 0;
+        const prevFree    = parseFloat(UINodes.valFree.textContent)    || 0;
         const prevScanned = parseFloat(UINodes.valScanned?.textContent) || 0;
 
         animateValue(UINodes.valTotal,   prevTotal,   totalTB,     1200);
@@ -142,14 +263,14 @@ class DataFetcher {
         animateValue(UINodes.valFree,    prevFree,    availableTB, 1200);
         if (UINodes.valScanned) animateValue(UINodes.valScanned, prevScanned, scannedTB, 1200);
 
-        // ── Scan Summary Bar ──────────────────────────────────────────────────
-        const gapBytes = Math.max(0, stats.used - scannedBytes);
-        const gapPct   = stats.used ? ((gapBytes / stats.used) * 100).toFixed(1) : '0.0';
-        const fmtBytes = b => {
-            if (b >= 1e12) return (b / 1e12).toFixed(1) + ' TB';
-            if (b >= 1e9)  return (b / 1e9).toFixed(1)  + ' GB';
-            if (b >= 1e6)  return (b / 1e6).toFixed(1)  + ' MB';
-            return (b / 1e3).toFixed(0) + ' KB';
+        // ── Scan Summary Bar ──────────────────────────────────────────
+        const gapBytes   = Math.max(0, stats.used - scannedBytes);
+        const gapPct     = stats.used ? ((gapBytes / stats.used) * 100).toFixed(1) : '0.0';
+        const fmtBytes   = b => {
+            if (b >= 1e12) return (b/1e12).toFixed(1) + ' TB';
+            if (b >= 1e9)  return (b/1e9).toFixed(1)  + ' GB';
+            if (b >= 1e6)  return (b/1e6).toFixed(1)  + ' MB';
+            return (b/1e3).toFixed(0) + ' KB';
         };
         const getEl = id => document.getElementById(id);
         const ssbScan = getEl('ssb-scan-val');
@@ -160,7 +281,7 @@ class DataFetcher {
         if (ssbFill) ssbFill.style.width = `${gapPct}%`;
         if (ssbPct)  ssbPct.textContent  = `${gapPct}%`;
         if (ssbGVal) ssbGVal.textContent  = fmtBytes(gapBytes);
-
+        
         if (stats.date) {
             const d = new Date(stats.date * 1000);
             UINodes.timeRange.textContent = `Latest snapshot from ${d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
@@ -170,14 +291,16 @@ class DataFetcher {
     setProcessingState(isProcessing) {
         AppState.isProcessing = isProcessing;
         UINodes.btnFetch.disabled = isProcessing;
-
+        
         if (isProcessing) {
             UINodes.statusDot.classList.add('scanning');
             UINodes.statusDot.style.backgroundColor = '';
             UINodes.progressBar.style.width = '0%';
         } else {
             UINodes.statusDot.classList.remove('scanning');
-            setTimeout(() => { UINodes.progressBar.style.width = '100%'; }, 300);
+            setTimeout(() => {
+                UINodes.progressBar.style.width = '100%';
+            }, 300);
         }
     }
 }
@@ -187,3 +310,4 @@ document.addEventListener('DOMContentLoaded', () => {
     initRouter();
     window.appFetcher = new DataFetcher();
 });
+
