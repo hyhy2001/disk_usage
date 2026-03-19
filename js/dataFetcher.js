@@ -20,70 +20,54 @@ function startClock() {
     setInterval(tick, 1000);
 }
 
-// ── Single API call — no params, returns all disk data ────────────────────────
-async function fetchAllDisks() {
-    const res = await fetch('api.php');
-    if (!res.ok) throw new Error(`HTTP ${res.status} from api.php`);
-    return res.json();
-}
-
 class DataFetcher {
     constructor() {
         this.dataStore = new DataStore();
         this._activeDisk = null;
-        this._cache = null; // Full API response cached after first load
+        this._cache = window.__DISK_DATA__ ?? null; // Data embedded by PHP at page load
 
         AppState.chartManagerInstance = new ChartManager();
 
         if (UINodes.btnFetch) {
-            UINodes.btnFetch.addEventListener('click', () => this.startServerSync());
+            // "Sync Now" reloads the page — PHP will re-read fresh data
+            UINodes.btnFetch.addEventListener('click', () => window.location.reload());
         }
 
         startClock();
-
-        this._initDiskSelector().then(() => {
-            setTimeout(() => this.startServerSync(), 300);
-        });
+        this._initDiskSelector();
     }
 
-    // ── Load disk list and populate selector ──────────────────────────────────
-    async _initDiskSelector() {
-        try {
-            UINodes.statusText.textContent = 'Connecting to API...';
-            const json = await fetchAllDisks();
+    // ── Populate disk selector from inline data ───────────────────────────────
+    _initDiskSelector() {
+        const json = this._cache;
 
-            if (json.status !== 'success' || !Array.isArray(json.disks)) {
-                console.warn('Unexpected API response:', json);
-                return;
-            }
+        if (!json || json.status !== 'success' || !Array.isArray(json.disks) || json.disks.length === 0) {
+            UINodes.statusText.textContent = 'No disk data available.';
+            return;
+        }
 
-            // Cache the full response
-            this._cache = json;
-
-            const select = document.getElementById('disk-select');
-            if (!select) return;
-
+        const select = document.getElementById('disk-select');
+        if (select) {
             select.innerHTML = json.disks.map(d => `
                 <option value="${d.id}">${d.name}</option>
             `).join('');
+        }
 
-            if (json.disks.length > 0) {
-                this._activeDisk = json.disks[0].id;
-                select.value = json.disks[0].id;
-                this._updateDiskPath(json.disks[0]);
-            }
+        this._activeDisk = json.disks[0].id;
+        if (select) select.value = json.disks[0].id;
+        this._updateDiskPath(json.disks[0]);
 
+        if (select) {
             select.addEventListener('change', () => {
                 this._activeDisk = select.value;
-                const disk = this._cache?.disks?.find(d => d.id === select.value);
+                const disk = json.disks.find(d => d.id === select.value);
                 this._updateDiskPath(disk);
-                // Use cached data — no extra API call needed
                 this._renderDisk(disk);
             });
-        } catch (e) {
-            console.warn('Could not load disk list:', e);
-            UINodes.statusText.textContent = 'Error: ' + e.message;
         }
+
+        // Auto-render first disk
+        this._renderDisk(json.disks[0]);
     }
 
     _updateDiskPath(disk) {
@@ -94,49 +78,7 @@ class DataFetcher {
         }
     }
 
-    // ── Sync: refresh cache from API, then render active disk ─────────────────
-    async startServerSync() {
-        if (AppState.isProcessing) return;
-        if (!this._activeDisk) {
-            UINodes.statusText.textContent = 'No valid disk to scan.';
-            return;
-        }
-
-        try {
-            this.setProcessingState(true);
-            UINodes.statusText.textContent = 'Connecting to API...';
-
-            const json = await fetchAllDisks();
-
-            if (json.status !== 'success' || !Array.isArray(json.disks)) {
-                UINodes.statusText.textContent = 'API returned an error.';
-                this.setProcessingState(false);
-                return;
-            }
-
-            // Refresh cache
-            this._cache = json;
-
-            const disk = json.disks.find(d => d.id === this._activeDisk) ?? json.disks[0];
-            if (!disk) {
-                UINodes.statusText.textContent = 'No disk data found.';
-                this.setProcessingState(false);
-                return;
-            }
-
-            this._activeDisk = disk.id;
-            this._renderDisk(disk);
-
-        } catch (error) {
-            console.error('Server API Sync Failed:', error);
-            this.setProcessingState(false);
-            UINodes.statusText.textContent = 'Error: ' + error.message;
-            UINodes.statusDot.classList.remove('scanning');
-            UINodes.statusDot.style.backgroundColor = 'var(--rose-500)';
-        }
-    }
-
-    // ── Render a disk's data from cache (no API call) ─────────────────────────
+    // ── Render a disk's data (all from inline cache) ──────────────────────────
     _renderDisk(disk) {
         if (!disk?.data?.length) {
             UINodes.statusText.textContent = 'No JSON reports found for this disk.';
@@ -144,12 +86,12 @@ class DataFetcher {
             return;
         }
 
+        this.setProcessingState(true);
         UINodes.statusText.textContent = 'Loading payload...';
         AppState.filesTotal = disk.files;
         UINodes.filesProcessed.textContent = `0/${AppState.filesTotal} files`;
 
         this.dataStore = new DataStore();
-
         UINodes.statusText.textContent = 'Aggregating metrics...';
         this.dataStore.processChunk(disk.data);
 
@@ -163,7 +105,6 @@ class DataFetcher {
         const syncEl = document.getElementById('last-sync-time');
         if (syncEl) syncEl.textContent = `${dStr} ${tStr}`;
 
-        // Permissions are bundled in the same response
         if (disk.perms !== undefined) {
             this.dataStore.permissionIssues = disk.perms ?? null;
             document.dispatchEvent(new CustomEvent('permissionsLoaded', { detail: disk.perms }));
