@@ -7,13 +7,6 @@
 //
 // POST api.php  →  { status, disks: [ { id, name, dir, available, data[], perms } ] }
 
-// Allow GET and POST — block everything else (PUT, DELETE, HEAD, scanners)
-if (!in_array($_SERVER['REQUEST_METHOD'], ['GET', 'POST'], true)) {
-    http_response_code(405);
-    exit;
-}
-
-header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
