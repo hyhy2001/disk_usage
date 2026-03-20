@@ -168,12 +168,12 @@ export class ChartManager {
     renderTimeline(timelineData) {
         const ctx = document.getElementById('timelineChart').getContext('2d');
 
-        // Gradient fill under the Used line
+        // Gradient fill under the Used line — more opaque in light mode for visibility
+        const _light = document.documentElement.dataset.theme === 'light';
         const gradientFill = ctx.createLinearGradient(0, 0, 0, 400);
-        gradientFill.addColorStop(0,   'rgba(251, 191, 36, 0.26)');
-        gradientFill.addColorStop(0.65, 'rgba(251, 191, 36, 0.06)');
-        gradientFill.addColorStop(1,   'rgba(251, 191, 36, 0.02)');
-
+        gradientFill.addColorStop(0,    _light ? 'rgba(251,191,36,0.55)' : 'rgba(251,191,36,0.26)');
+        gradientFill.addColorStop(0.65, _light ? 'rgba(251,191,36,0.15)' : 'rgba(251,191,36,0.06)');
+        gradientFill.addColorStop(1,    _light ? 'rgba(251,191,36,0.03)' : 'rgba(251,191,36,0.02)');
 
         const labels    = timelineData.map(d => new Date(d.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }));
         const usedData  = timelineData.map(d => d.used / 1e12);
@@ -571,9 +571,10 @@ export class ChartManager {
         if (!el) return;
         const ctx = el.getContext('2d');
 
+        const _light2 = document.documentElement.dataset.theme === 'light';
         const grad = ctx.createLinearGradient(0, 0, 0, 220);
-        grad.addColorStop(0,   'rgba(251,191,36,0.28)');
-        grad.addColorStop(0.7, 'rgba(251,191,36,0.04)');
+        grad.addColorStop(0,   _light2 ? 'rgba(251,191,36,0.55)' : 'rgba(251,191,36,0.28)');
+        grad.addColorStop(0.7, _light2 ? 'rgba(251,191,36,0.12)' : 'rgba(251,191,36,0.04)');
         grad.addColorStop(1,   'rgba(251,191,36,0)');
 
         const labels   = timelineData.map(d => new Date(d.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }));

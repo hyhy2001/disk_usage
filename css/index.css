@@ -38,14 +38,14 @@
 /* ── Light Theme ─────────────────────────────────────────────────────────── */
 :root[data-theme='light'] {
     /* Warm cream base — easy on the eyes */
-    --bg-base: #F7F4EF;
-    --bg-surface: rgba(255, 252, 248, 0.88);
-    --bg-surface-elevated: rgba(255, 253, 250, 0.98);
-    --text-primary: #2D3142;       /* Soft navy, not pure black */
-    --text-secondary: #6B7280;     /* Medium gray, readable but calm */
-    --text-accent: #059669;        /* Slightly deeper emerald for contrast */
-    --glass-border: 1px solid rgba(0, 0, 0, 0.06);
-    --glass-shadow: 0 4px 20px rgba(0, 0, 0, 0.07);
+    --bg-base: #F0EDE6;
+    --bg-surface: rgba(255, 253, 250, 0.96);
+    --bg-surface-elevated: rgba(255, 255, 255, 1);
+    --text-primary: #1E2235;       /* Soft navy, not pure black */
+    --text-secondary: #5B6377;     /* Readable medium gray */
+    --text-accent: #059669;        /* Slightly deeper emerald */
+    --glass-border: 1px solid rgba(0, 0, 0, 0.10);
+    --glass-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.05);
 }
 
 * {

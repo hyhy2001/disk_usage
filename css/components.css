@@ -2920,6 +2920,67 @@
 .user-filter-footer .user-bar-btn { flex: 1; text-align: center; }
 
 
+/* ════════════════════════════════════════════════════════════════════════ */
+/* ── History chart cards ─────────────────────────────────────────────────── */
+:root[data-theme='light'] .history-chart-title {
+    color: #374151;
+}
+
+:root[data-theme='light'] .history-chart-card {
+    background: rgba(255,253,250,0.95);
+}
+
+/* ── Light mode chart canvas: give chart area a clean white base ─────────── */
+:root[data-theme='light'] .canvas-wrapper {
+    background: rgba(255,255,255,0.70);
+    border-radius: 10px;
+}
+
+/* ── Glass panels more solid and with clearer shadow in light mode ────────── */
+:root[data-theme='light'] .glass-panel {
+    background: rgba(255,255,255,0.90) !important;
+    border: 1px solid rgba(0,0,0,0.09) !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04) !important;
+}
+
+/* ── Scale toggle button — Light mode ─────────────────────────────────────── */
+.scale-toggle-btn {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding: 2px 7px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.10);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.18s;
+}
+.scale-toggle-btn:hover {
+    background: rgba(255,255,255,0.18);
+    color: var(--text-primary);
+}
+.scale-toggle-btn.active {
+    background: rgba(16,185,129,0.18);
+    border-color: rgba(16,185,129,0.4);
+    color: #10b981;
+}
+
+:root[data-theme='light'] .scale-toggle-btn {
+    border-color: rgba(0,0,0,0.11);
+    background: rgba(0,0,0,0.05);
+    color: #5B6377;
+}
+:root[data-theme='light'] .scale-toggle-btn:hover {
+    background: rgba(0,0,0,0.09);
+    color: #1E2235;
+}
+:root[data-theme='light'] .scale-toggle-btn.active {
+    background: rgba(5,150,105,0.12);
+    border-color: rgba(5,150,105,0.35);
+    color: #059669;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    LIGHT MODE OVERRIDES — All rgba(255,white) borders/bg become visible
    ═══════════════════════════════════════════════════════════════════════════ */
