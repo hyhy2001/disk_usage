@@ -913,9 +913,9 @@
 /* ── Bar Row ── */
 .sbar-row {
     display: grid;
-    grid-template-columns: 120px 1fr 58px 90px;
+    grid-template-columns: minmax(70px, 110px) 1fr 54px 82px;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     min-height: 36px;
     padding: 4px 0;
 }
@@ -970,7 +970,7 @@
 
 /* General row needs a wider value column for "X GB / Y GB" */
 .general-row.sbar-row {
-    grid-template-columns: 120px 1fr 58px minmax(160px, auto);
+    grid-template-columns: minmax(50px, 70px) 1fr 54px minmax(150px, auto);
 }
 
 .general-subrow {
