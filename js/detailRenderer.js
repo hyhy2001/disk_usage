@@ -121,12 +121,21 @@ function renderSnapshotView() {
             </span>
         </div>`;
 
-    document.getElementById('tab-snapshot-body').innerHTML = [
+    const leftCol = [
         section('📦', 'General System', null, stackedBar),
         section('🏷️', 'Team Usage', `${teams.length} teams`, teamRows),
+    ].join('');
+
+    const rightCol = [
         section('👤', 'Top 10 Users', `${users.length} total`, userRows),
         section('📁', 'Other Usage', `${other.length} total`, otherRows),
     ].join('');
+
+    document.getElementById('tab-snapshot-body').innerHTML =
+        `<div class="snapshot-two-col">
+            <div class="snapshot-col">${leftCol}</div>
+            <div class="snapshot-col">${rightCol}</div>
+        </div>`;
 }
 
 // ── TAB 2: History & Analysis ─────────────────────────────────────────────

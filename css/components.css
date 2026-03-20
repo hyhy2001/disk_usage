@@ -1188,6 +1188,26 @@
     gap: 20px;
 }
 
+.snapshot-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.snapshot-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+@media (max-width: 900px) {
+    .snapshot-two-col {
+        grid-template-columns: 1fr;
+    }
+}
+
+
 /* ─────────────────────────────────────────
    Unknown / Inaccessible Section
 ───────────────────────────────────────── */
