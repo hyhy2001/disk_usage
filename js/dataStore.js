@@ -40,11 +40,11 @@ export class DataStore {
             const scannedBytes = (report.team_usage || []).reduce((s, t) => s + (t.used || 0), 0);
             this.timelineData.push({
                 timestamp: (report.date || 0) * 1000,
-                used:     report.general_system.used  || 0,
-                total:    report.general_system.total || 0,
-                scanned:  scannedBytes
+                used: report.general_system.used || 0,
+                total: report.general_system.total || 0,
+                scanned: scannedBytes
             });
-            
+
             // Keep track of the latest report for top-level stats
             if (!this.latestStats.date || report.date > this.latestStats.date) {
                 this.latestStats.date = report.date;
@@ -65,12 +65,12 @@ export class DataStore {
                     timestamp: ts,
                     general: {
                         total: report.general_system.total || 0,
-                        used:  report.general_system.used  || 0,
-                        free:  report.general_system.available || 0,
+                        used: report.general_system.used || 0,
+                        free: report.general_system.available || 0,
                     },
-                    teams: (report.team_usage  || []).slice().sort((a,b) => b.used - a.used),
-                    users: (report.user_usage  || []).slice().sort((a,b) => b.used - a.used),
-                    other: (report.other_usage || []).slice().sort((a,b) => b.used - a.used),
+                    teams: (report.team_usage || []).slice().sort((a, b) => b.used - a.used),
+                    users: (report.user_usage || []).slice().sort((a, b) => b.used - a.used),
+                    other: (report.other_usage || []).slice().sort((a, b) => b.used - a.used),
                 };
             }
 
@@ -113,9 +113,9 @@ export class DataStore {
     }
 
     getTimelineData() { return this.timelineData; }
-    getDateRange()    { return this.dateRange; }
-    getAllUserNames()  { return Array.from(this.userTimelineMap.keys()).sort(); }
-    getAllTeamNames()  { return Array.from(this.teamUsageMap.keys()).sort(); }
+    getDateRange() { return this.dateRange; }
+    getAllUserNames() { return Array.from(this.userTimelineMap.keys()).sort(); }
+    getAllTeamNames() { return Array.from(this.teamUsageMap.keys()).sort(); }
 
     // Returns the full latest snapshot object
     getLatestSnapshot() { return this.latestSnapshot; }
@@ -140,7 +140,7 @@ export class DataStore {
             .map(([name, timeline]) => {
                 const inRange = timeline.filter(p => p.timestamp >= startMs && p.timestamp <= endMs);
                 const first = inRange.length ? inRange[0].used : 0;
-                const last  = inRange.length ? inRange[inRange.length - 1].used : 0;
+                const last = inRange.length ? inRange[inRange.length - 1].used : 0;
                 return { name, used: last, growth: last - first };
             })
             .filter(u => u.growth > 0)
@@ -181,7 +181,8 @@ export class DataStore {
     }
 
     getTopUsers(limit = 10) {
-        return Array.from(this.userUsageMap.entries())
+        const combined = new Map([...this.userUsageMap, ...this.otherUsageMap]);
+        return Array.from(combined.entries())
             .map(([name, used]) => ({ name, used }))
             .sort((a, b) => b.used - a.used)
             .slice(0, limit);
@@ -221,8 +222,8 @@ export class DataStore {
     _sortEntities(arr, sortKey) {
         return arr.sort((a, b) => {
             if (sortKey === 'used_desc') return b.used - a.used;
-            if (sortKey === 'used_asc')  return a.used - b.used;
-            if (sortKey === 'name_asc')  return a.name.localeCompare(b.name);
+            if (sortKey === 'used_asc') return a.used - b.used;
+            if (sortKey === 'name_asc') return a.name.localeCompare(b.name);
             if (sortKey === 'name_desc') return b.name.localeCompare(a.name);
             return 0;
         });
