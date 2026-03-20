@@ -286,7 +286,11 @@ export function applyFilters() {
         chartMgr.renderTopGrowersChart(growers);
     }
 
-    renderPivotView(_store.getPivotData(f.startMs, f.endMs, pivotUsers));
+    // Data Table removed — charts are sufficient
+    const dva = document.getElementById('detail-view-area');
+    if (dva) dva.innerHTML = '';
+
+
 }
 
 function resetFilters() {
