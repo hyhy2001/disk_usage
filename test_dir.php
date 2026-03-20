@@ -3,7 +3,7 @@
 // Usage: test_dir.php?dir=reports/disk_sda
 // If no ?dir param, lists top-level folders in webroot
 
-header('Content-Type: application/json; charset=utf-8');
+header('Content-Type: text/plain; charset=utf-8');
 
 $baseDir = __DIR__;
 $reqDir  = isset($_GET['dir']) ? trim($_GET['dir'], '/\\') : '';
