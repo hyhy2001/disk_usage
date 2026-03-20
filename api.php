@@ -21,27 +21,27 @@ if (!is_dir($rawPath) && !is_link($rawPath)) {
 }
 
 // ── Permissions endpoint ──────────────────────────────────────────────────────
-if (($_GET['type'] ?? '') === 'permissions') {
-    $dh = @opendir($rawPath);
-    $permFiles = [];
-    while ($dh && ($f = readdir($dh)) !== false) {
-        if (strpos($f, 'permission_issues') === 0 && substr($f, -5) === '.json')
-            $permFiles[] = $f;
-    }
-    if ($dh) closedir($dh);
-    sort($permFiles);
-    $latest = !empty($permFiles) ? end($permFiles) : null;
-
-    $data = null;
-    if ($latest) {
-        $content = file_get_contents($rawPath . DIRECTORY_SEPARATOR . $latest);
-        if ($content !== false) $data = json_decode($content, true);
-    }
-
-    header('Content-Type: text/plain; charset=utf-8');
-    echo json_encode(['status' => 'success', 'data' => $data]);
-    exit;
-}
+// if (($_GET['type'] ?? '') === 'permissions') {
+//     $dh = @opendir($rawPath);
+//     $permFiles = [];
+//     while ($dh && ($f = readdir($dh)) !== false) {
+//         if (strpos($f, 'permission_issues') === 0 && substr($f, -5) === '.json')
+//             $permFiles[] = $f;
+//     }
+//     if ($dh) closedir($dh);
+//     sort($permFiles);
+//     $latest = !empty($permFiles) ? end($permFiles) : null;
+//
+//     $data = null;
+//     if ($latest) {
+//         $content = file_get_contents($rawPath . DIRECTORY_SEPARATOR . $latest);
+//         if ($content !== false) $data = json_decode($content, true);
+//     }
+//
+//     header('Content-Type: text/plain; charset=utf-8');
+//     echo json_encode(['status' => 'success', 'data' => $data]);
+//     exit;
+// }
 
 // ── Regular reports endpoint ──────────────────────────────────────────────────
 
