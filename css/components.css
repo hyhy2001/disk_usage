@@ -2522,6 +2522,149 @@
     color: #10b981;
 }
 
+/* ── Chart Expand Button ─────────────────────────────────────────────────── */
+.chart-expand-btn {
+    font-size: 0.85rem;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.chart-expand-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: var(--text-primary);
+    border-color: rgba(255,255,255,0.2);
+}
+
+/* ── Chart Modal Overlay ─────────────────────────────────────────────────── */
+.chart-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.chart-modal-overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.chart-modal-box {
+    background: #0d1117;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 1100px;
+    height: min(80vh, 680px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+    transform: scale(0.96);
+    transition: transform 0.2s ease;
+}
+
+.chart-modal-overlay.visible .chart-modal-box {
+    transform: scale(1);
+}
+
+.chart-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+}
+
+.chart-modal-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.chart-modal-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chart-modal-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.chart-modal-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: var(--text-primary);
+}
+
+.chart-modal-close {
+    font-size: 0.9rem;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    justify-content: center;
+}
+
+.chart-modal-body {
+    flex: 1;
+    min-height: 0;
+    padding: 20px;
+    position: relative;
+}
+
+.chart-modal-body canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.chart-modal-hint {
+    padding: 10px 20px;
+    font-size: 0.7rem;
+    color: #334155;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    flex-shrink: 0;
+}
+
+.chart-modal-hint kbd {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+}
+
 .history-chart-body {
     position: relative;
     height: 340px;

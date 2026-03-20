@@ -249,9 +249,10 @@
                                     <div class="glass-panel history-chart-card">
                                         <div class="history-chart-header">
                                             <span class="history-chart-title">📈 Selected Users Usage</span>
-                                            <div style="display:flex;align-items:center;gap:8px">
+                                            <div style="display:flex;align-items:center;gap:6px">
                                                 <span class="history-chart-stat" id="history-total-stat"></span>
                                                 <button id="btn-scale-toggle" class="scale-toggle-btn" data-scale="linear">Log</button>
+                                                <button class="chart-expand-btn" data-chart="trend" title="Expand chart">⛶</button>
                                             </div>
                                         </div>
                                         <div class="history-chart-body">
@@ -261,7 +262,10 @@
                                     <div class="glass-panel history-chart-card">
                                         <div class="history-chart-header">
                                             <span class="history-chart-title">🔥 Fastest Growing Users</span>
-                                            <span class="history-chart-stat" id="history-growers-stat"></span>
+                                            <div style="display:flex;align-items:center;gap:6px">
+                                                <span class="history-chart-stat" id="history-growers-stat"></span>
+                                                <button class="chart-expand-btn" data-chart="growers" title="Expand chart">⛶</button>
+                                            </div>
                                         </div>
                                         <div class="history-chart-body">
                                             <canvas id="historyGrowersChart"></canvas>
@@ -298,6 +302,7 @@
     <script src="js/chartManager.js" type="module"></script>
     <script src="js/permissionRenderer.js" type="module"></script>
     <script src="js/main.js" type="module"></script>
+    <script src="js/chartModal.js" type="module"></script>
 </body>
 </html>
 
