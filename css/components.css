@@ -976,11 +976,16 @@
 /* General System card */
 .general-subrow {
     display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 10px;
+}
+
+.general-subrow-line {
+    display: flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 6px 10px;
-    margin-top: 8px;
-    font-size: 0.77rem;
+    gap: 8px;
+    font-size: 0.8rem;
     color: var(--text-secondary);
 }
 

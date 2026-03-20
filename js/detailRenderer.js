@@ -113,12 +113,16 @@ function renderSnapshotView() {
             <span class="sbar-val">${fmt(usedByDf)} / ${fmt(sys)}</span>
         </div>
         <div class="general-subrow">
-            <span class="text-sky">Free: ${fmt(general.free)}</span>
-            <span class="sep">·</span>
-            <span>Date: ${fmtDate(snap.timestamp)}</span>
-            <span class="sep">·</span>
-            <span class="legend-dot dot-amber"></span><span>Scanned ${fmt(scannedBytes)}</span>
-            <span class="legend-dot dot-slate"></span><span>Unknown ${fmt(gapBytes)}</span>
+            <div class="general-subrow-line">
+                <span class="text-sky">Free: ${fmt(general.free)}</span>
+                <span class="sep">·</span>
+                <span>Date: ${fmtDate(snap.timestamp)}</span>
+            </div>
+            <div class="general-subrow-line">
+                <span class="legend-dot dot-amber"></span><span>Scanned ${fmt(scannedBytes)}</span>
+                <span class="sep">·</span>
+                <span class="legend-dot dot-slate"></span><span>Unknown ${fmt(gapBytes)}</span>
+            </div>
         </div>`;
 
 
