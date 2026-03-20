@@ -1,84 +1,56 @@
 <?php
 // api.php — Disk Usage Dashboard API
-// ?action=disks                  → list all configured disks
-// ?action=permissions&disk=<id>  → latest *permission_issues*.json for disk
-// ?disk=<id>                     → aggregated *disk_usage_report*.json for disk
-
-// Block direct browser access — return nothing if no recognized parameters
-if (empty($_GET) && empty($_POST)) {
-    http_response_code(200);
-    exit;
-}
+// ?req=list_drives            → list all configured disks
+// ?req=permissions&drive=<id> → latest permission_issues JSON
+// ?drive=<id>                 → aggregated report JSONs for disk
 
 header('Content-Type: text/plain; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
-// ── Helper: resolve path (absolute or relative to this file) ──────────────────
-function resolvePath(string $path): string {
-    if ($path !== '' && ($path[0] === '/' || (strlen($path) > 1 && $path[1] === ':'))) {
-        // Absolute path — use as-is
-        return rtrim($path, '/\\');
-    }
-    // Relative path — join with __DIR__, do NOT use realpath (breaks symlinks)
-    $raw = __DIR__ . DIRECTORY_SEPARATOR . ltrim($path, '/\\');
-    return rtrim($raw, '/\\');
-}
-
-// ── Helper: Read JSON files (symlink-safe, no realpath) ─────────────────────
-function getJsonFiles(string $dir, string $match = ''): array {
-    if (!is_dir($dir) && !is_link($dir)) return [];
-    $dh = @opendir($dir);
-    if ($dh === false) return [];
-
-    $res = [];
-    while (($f = readdir($dh)) !== false) {
-        if ($f === '.' || $f === '..') continue;
-        if (substr($f, -5) !== '.json') continue;
-        if ($match !== '' && strpos($f, $match) === false) continue;
-        $res[] = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . $f;
-    }
-    closedir($dh);
-    return $res;
-}
-
 // ── Load disks.json ───────────────────────────────────────────────────────────
-$disksJsonPath = __DIR__ . '/disks.json';
+$disksJson = __DIR__ . '/disks.json';
+$entries   = json_decode(@file_get_contents($disksJson), true);
 
-if (!is_file($disksJsonPath)) {
+if (!is_array($entries) || !count($entries)) {
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "disks.json not found."]);
+    echo json_encode(['status' => 'error', 'message' => 'disks.json missing or invalid.']);
     exit;
 }
 
-$entries = json_decode(file_get_contents($disksJsonPath), true);
-if (!is_array($entries) || count($entries) === 0) {
-    http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "disks.json is empty or invalid."]);
-    exit;
-}
-
-// Build disk map: id => { name, rawPath, resolvedDir }
+// Build disk map — raw path (no realpath, supports symlinks)
 $disks = [];
-foreach ($entries as $i => $e) {
-    $rawPath  = $e['path'] ?? "disk_{$i}";
-    $id       = $e['id']   ?? preg_replace('/[^a-z0-9]+/', '_', strtolower($rawPath));
-    $resolved = resolvePath($rawPath);
-    $allJson  = getJsonFiles($resolved);
-    $count    = count(array_filter($allJson, fn($f) => strpos(basename($f), 'permission_issues') === false));
+foreach ($entries as $e) {
+    $rawPath = $e['path'] ?? '';
+    // Absolute path kept as-is; relative → join with __DIR__
+    $dir = ($rawPath !== '' && $rawPath[0] === '/')
+        ? rtrim($rawPath, '/')
+        : rtrim(__DIR__ . '/' . ltrim($rawPath, '/'), '/');
+
+    $id = $e['id'] ?? preg_replace('/[^a-z0-9]+/', '_', strtolower(basename($dir)));
+
+    // Count report files (exclude permission_issues)
+    $count = 0;
+    $dh = @opendir($dir);
+    while ($dh && ($f = readdir($dh)) !== false) {
+        if (substr($f, -5) === '.json' && strpos($f, 'permission_issues') === false) $count++;
+    }
+    if ($dh) closedir($dh);
+
     $disks[$id] = [
         'id'        => $id,
         'name'      => $e['name'] ?? $id,
-        'dir'       => basename($rawPath),
-        'resolved'  => $resolved,
+        'dir'       => basename($rawPath ?: $id),
+        'resolved'  => $dir,
         'files'     => $count,
         'available' => $count > 0,
     ];
 }
 
-$action = $_POST['req'] ?? ($_GET['req'] ?? '');
+$req    = $_GET['req']   ?? '';
+$diskId = $_GET['drive'] ?? array_key_first($disks);
 
-// ── Route: list_drives  →  list disks ───────────────────────────────────────────
-if ($action === 'list_drives') {
+// ── Route: list_drives ────────────────────────────────────────────────────────
+if ($req === 'list_drives') {
     $out = array_map(fn($d) => [
         'id'        => $d['id'],
         'name'      => $d['name'],
@@ -86,79 +58,60 @@ if ($action === 'list_drives') {
         'files'     => $d['files'],
         'available' => $d['available'],
     ], array_values($disks));
-    echo json_encode(["status" => "success", "disks" => $out]);
+    echo json_encode(['status' => 'success', 'disks' => $out]);
     exit;
 }
 
-// ── Resolve disk for data routes ──────────────────────────────────────────────
-$diskId = $_POST['drive'] ?? ($_GET['drive'] ?? array_key_first($disks));
-
+// ── Resolve disk ──────────────────────────────────────────────────────────────
 if (!isset($disks[$diskId])) {
     http_response_code(404);
-    echo json_encode(["status" => "error", "message" => "Unknown disk id: {$diskId}"]);
+    echo json_encode(['status' => 'error', 'message' => "Unknown disk: $diskId"]);
     exit;
 }
 
-$disk       = $disks[$diskId];
-$reportDir  = $disk['resolved'];
+$disk = $disks[$diskId];
+$dir  = $disk['resolved'];
 
-if (!is_dir($reportDir)) {
+if (!is_dir($dir) && !is_link($dir)) {
     http_response_code(404);
-    echo json_encode(["status" => "error", "message" => "Reports directory not found: {$reportDir}"]);
+    echo json_encode(['status' => 'error', 'message' => "Dir not found: $dir"]);
     exit;
 }
 
-// ── Route: permissions  →  latest permission_issues file ────────
-if ($action === 'permissions') {
-    $files = getJsonFiles($reportDir, 'permission_issues');
-
-    if (empty($files)) {
-        echo json_encode(["status" => "success", "disk" => ["id" => $diskId, "dir" => $disk['dir']], "data" => null]);
-        exit;
-    }
-
-    // Read all, pick the one with the highest date field
-    $latest     = null;
-    $latestDate = -1;
-
-    foreach ($files as $file) {
-        $content = file_get_contents($file);
+// Helper: read all .json files (optionally filtered by name substring)
+function readJsonFiles(string $dir, string $match = ''): array {
+    $dh  = @opendir($dir);
+    $out = [];
+    while ($dh && ($f = readdir($dh)) !== false) {
+        if (substr($f, -5) !== '.json') continue;
+        if ($match !== '' && strpos($f, $match) === false) continue;
+        $content = @file_get_contents($dir . '/' . $f);
         if ($content === false) continue;
         $json = json_decode($content, true);
-        if (!is_array($json)) continue;
-        $d = $json['date'] ?? 0;
-        if ($d > $latestDate) {
-            $latestDate = $d;
-            $latest     = $json;
-        }
+        if ($json !== null) $out[] = $json;
     }
+    if ($dh) closedir($dh);
+    return $out;
+}
 
-    echo json_encode([
-        "status" => "success",
-        "disk"   => ["id" => $diskId, "dir" => $disk['dir']],
-        "data"   => $latest,
-    ]);
+// ── Route: permissions ────────────────────────────────────────────────────────
+if ($req === 'permissions') {
+    $all    = readJsonFiles($dir, 'permission_issues');
+    $latest = null;
+    foreach ($all as $j) {
+        if (($j['date'] ?? 0) > ($latest['date'] ?? -1)) $latest = $j;
+    }
+    echo json_encode(['status' => 'success', 'disk' => ['id' => $diskId], 'data' => $latest]);
     exit;
 }
 
-// ── Route: ?disk=<id>  →  aggregated disk usage data ────────────────────────
-// Matches any *.json EXCEPT *permission_issues* files
-$allFiles   = getJsonFiles($reportDir);
-$files      = array_filter($allFiles, fn($f) => strpos(basename($f), 'permission_issues') === false);
-$aggregated = [];
-
-foreach ($files as $file) {
-    $content = file_get_contents($file);
-    if ($content !== false) {
-        $json = json_decode($content, true);
-        if ($json !== null) $aggregated[] = $json;
-    }
-}
+// ── Route: disk data ──────────────────────────────────────────────────────────
+$all  = readJsonFiles($dir);
+$data = array_values(array_filter($all, fn($j) => !isset($j['permission_issues'])));
 
 echo json_encode([
-    "status"      => "success",
-    "total_files" => count($files),
-    "disk"        => ["id" => $diskId, "dir" => $disk['dir']],
-    "data"        => $aggregated,
+    'status'      => 'success',
+    'total_files' => count($data),
+    'disk'        => ['id' => $diskId, 'dir' => $disk['dir']],
+    'data'        => $data,
 ]);
-exit;
