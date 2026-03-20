@@ -44,7 +44,6 @@ function renderModalChart(chartType) {
     const titleEl = document.getElementById('chart-modal-title');
     const ctx     = canvas.getContext('2d');
 
-    // Destroy previous modal chart instance
     if (window._modalChart) {
         window._modalChart.destroy();
         window._modalChart = null;
@@ -60,16 +59,31 @@ function renderModalChart(chartType) {
 
     const entry = chartMap[chartType];
     if (!entry) return;
-
     const src = entry.src();
     if (!src) return;
 
     titleEl.textContent = entry.label;
+
+    // Deep clone ONLY the data (plain JSON). Re-use options AS-IS to preserve
+    // all callback functions (formatters, tooltips, etc.)
+    const clonedData = JSON.parse(JSON.stringify(src.config.data));
+
+    // For timeline: rebuild gradient on modal canvas & re-attach to dataset
+    if (chartType === 'timeline') {
+        const h = canvas.parentElement?.offsetHeight || 560;
+        const grad = ctx.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0,   'rgba(251, 191, 36, 0.28)');
+        grad.addColorStop(0.6, 'rgba(251, 191, 36, 0.07)');
+        grad.addColorStop(1,   'rgba(251, 191, 36, 0.02)');
+        if (clonedData.datasets[0]) clonedData.datasets[0].backgroundColor = grad;
+    }
+
     window._modalChart = new Chart(ctx, {
         type: src.config.type,
-        data: JSON.parse(JSON.stringify(src.config.data)),
+        data: clonedData,
+        // Re-use the original options object — keeps all callbacks intact
         options: {
-            ...JSON.parse(JSON.stringify(src.config.options)),
+            ...src.config.options,
             responsive: true,
             maintainAspectRatio: false,
         }

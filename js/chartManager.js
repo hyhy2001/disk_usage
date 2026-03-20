@@ -132,8 +132,9 @@ export class ChartManager {
         // Gradient fill under the Used line
         const gradientFill = ctx.createLinearGradient(0, 0, 0, 400);
         gradientFill.addColorStop(0,   'rgba(251, 191, 36, 0.26)');
-        gradientFill.addColorStop(0.65, 'rgba(251, 191, 36, 0.05)');
-        gradientFill.addColorStop(1,   'rgba(251, 191, 36, 0)');
+        gradientFill.addColorStop(0.65, 'rgba(251, 191, 36, 0.06)');
+        gradientFill.addColorStop(1,   'rgba(251, 191, 36, 0.02)');
+
 
         const labels    = timelineData.map(d => new Date(d.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }));
         const usedData  = timelineData.map(d => d.used / 1e12);
