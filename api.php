@@ -4,20 +4,32 @@
 // ?req=permissions&drive=<id> → latest permission_issues JSON
 // ?drive=<id>                 → aggregated report JSONs for disk
 
-$baseDir   = __DIR__;
+$baseDir = __DIR__;
 
-// disks.json: local file OR remote URL via ?disks=https://...
+// Build base URL from current request (e.g. https://example.com/subdir/)
+$scheme  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$host    = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$dir     = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
+$baseUrl = "$scheme://$host$dir";
+
+// disks.json: fetch from URL (bypasses local file permission issues)
+// Override via ?disks=https://... or ?disks=custom.json
 $disksParam = $_GET['disks'] ?? '';
 if ($disksParam !== '' && (strpos($disksParam, 'http://') === 0 || strpos($disksParam, 'https://') === 0)) {
     $raw = @file_get_contents($disksParam);
 } else {
-    $raw = @file_get_contents($baseDir . '/' . ($disksParam ?: 'disks.json'));
+    $jsonFile = $disksParam ?: 'disks.json';
+    // Try URL first, fallback to local file
+    $raw = @file_get_contents("$baseUrl/$jsonFile");
+    if ($raw === false) $raw = @file_get_contents($baseDir . '/' . $jsonFile);
 }
+
 $entries = json_decode($raw, true);
 if (!is_array($entries)) $entries = [];
 
-echo "[DEBUG] disks.json loaded: " . count($entries) . " entries\n";
+echo "[DEBUG] baseUrl=$baseUrl entries=" . count($entries) . "\n";
 echo json_encode($entries);
+
 
 /*
 // Build disk map — raw path, symlink-safe
