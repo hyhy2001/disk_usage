@@ -44,9 +44,9 @@ class DataFetcher {
 
     async _initDiskSelector() {
         try {
-            const res = await fetch('api.php?req=list_drives');
-            const json = await res.json();
-            const disks = json.disks ?? [];
+            // Fetch disks.json directly as static file — no PHP needed
+            const res = await fetch('disks.json');
+            const disks = await res.json();
             this.disksConfig = disks;
 
             const select = document.getElementById('disk-select');
@@ -93,7 +93,10 @@ class DataFetcher {
             this.setProcessingState(true);
 
             UINodes.statusText.textContent = "Connecting to API...";
-            const response = await fetch(`api.php?drive=${encodeURIComponent(this._activeDisk)}`);
+            // Get disk path from disksConfig
+            const diskConf = this.disksConfig?.find(d => d.id === this._activeDisk);
+            const diskPath = diskConf?.path || this._activeDisk;
+            const response = await fetch(`api.php?dir=${encodeURIComponent(diskPath)}&type=reports`);
             if (!response.ok) throw new Error(`HTTP error ${response.status} from api.php.`);
             const jsonResponse = await response.json();
             
@@ -139,7 +142,9 @@ class DataFetcher {
 
     async _fetchPermissions() {
         try {
-            const res = await fetch(`api.php?req=permissions&drive=${encodeURIComponent(this._activeDisk)}`);
+            const diskConf = this.disksConfig?.find(d => d.id === this._activeDisk);
+            const diskPath = diskConf?.path || this._activeDisk;
+            const res = await fetch(`api.php?dir=${encodeURIComponent(diskPath)}&type=permissions`);
             const json = await res.json();
 
             if (json?.status === 'success') {
