@@ -93,9 +93,7 @@ class DataFetcher {
             this.setProcessingState(true);
 
             UINodes.statusText.textContent = "Connecting to API...";
-            const formData = new FormData();
-            formData.append('drive', this._activeDisk);
-            const response = await fetch('api.php', { method: 'POST', body: formData });
+            const response = await fetch(`api.php?drive=${encodeURIComponent(this._activeDisk)}`);
             if (!response.ok) throw new Error(`HTTP error ${response.status} from api.php.`);
             const jsonResponse = await response.json();
             
@@ -141,10 +139,7 @@ class DataFetcher {
 
     async _fetchPermissions() {
         try {
-            const formData = new FormData();
-            formData.append('req', 'permissions');
-            formData.append('drive', this._activeDisk);
-            const res = await fetch('api.php', { method: 'POST', body: formData });
+            const res = await fetch(`api.php?req=permissions&drive=${encodeURIComponent(this._activeDisk)}`);
             const json = await res.json();
 
             if (json?.status === 'success') {
