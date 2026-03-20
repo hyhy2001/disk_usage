@@ -20,20 +20,24 @@ if (!is_dir($rawPath) && !is_link($rawPath)) {
     exit;
 }
 
-// Find most recent permission_issues_*.json
+// Find most recent permission_issues_*.json (by file modification time)
 $dh = @opendir($rawPath);
 $permFiles = [];
 while ($dh && ($f = readdir($dh)) !== false) {
-    if (strpos($f, 'permission_issues') !== false && substr($f, -5) === '.json')
-        $permFiles[] = $f;
+    if (strpos($f, 'permission_issues') !== false && substr($f, -5) === '.json') {
+        $fullPath = $rawPath . DIRECTORY_SEPARATOR . $f;
+        $permFiles[$fullPath] = @filemtime($fullPath);
+    }
 }
 if ($dh) closedir($dh);
-sort($permFiles);
-$latest = !empty($permFiles) ? end($permFiles) : null;
+
+// Sort by mtime descending, pick newest
+arsort($permFiles);
+$latestPath = !empty($permFiles) ? key($permFiles) : null;
 
 $data = null;
-if ($latest) {
-    $content = file_get_contents($rawPath . DIRECTORY_SEPARATOR . $latest);
+if ($latestPath) {
+    $content = file_get_contents($latestPath);
     if ($content !== false) $data = json_decode($content, true);
 }
 
