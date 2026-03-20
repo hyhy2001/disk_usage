@@ -24,7 +24,7 @@ if (!is_dir($rawPath) && !is_link($rawPath)) {
 $dh = @opendir($rawPath);
 $permFiles = [];
 while ($dh && ($f = readdir($dh)) !== false) {
-    if (strpos($f, 'permission_issues') === 0 && substr($f, -5) === '.json')
+    if (strpos($f, 'permission_issues') !== false && substr($f, -5) === '.json')
         $permFiles[] = $f;
 }
 if ($dh) closedir($dh);
