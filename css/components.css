@@ -2591,7 +2591,7 @@
 .history-main-row {
     display: flex;
     gap: 14px;
-    align-items: flex-start;
+    align-items: stretch;
 }
 
 .history-content {
@@ -2610,8 +2610,7 @@
     flex-direction: column;
     gap: 8px;
     padding: 14px;
-    position: sticky;
-    top: 12px;
+    align-self: stretch;
 }
 
 .user-filter-header {
