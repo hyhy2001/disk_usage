@@ -574,7 +574,7 @@ export class ChartManager {
         });
     }
 
-    renderUserTrendChart(userTimelineMap, selectedUsers, startMs, endMs) {
+    renderUserTrendChart(userTimelineMap, selectedUsers, startMs, endMs, logScale = false) {
         const el = document.getElementById('historyTotalChart');
         if (!el) return;
         const ctx = el.getContext('2d');
@@ -627,7 +627,13 @@ export class ChartManager {
                 },
                 scales: {
                     x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { maxTicksLimit: 8, color: '#475569', font: { size: 10 } } },
-                    y: { position: 'right', grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#475569', font: { size: 10 }, callback: v => `${v}GB` } }
+                    y: {
+                        type: logScale ? 'logarithmic' : 'linear',
+                        position: 'right',
+                        grid: { color: 'rgba(255,255,255,0.04)' },
+                        ticks: { color: '#475569', font: { size: 10 }, callback: v => `${v}GB` },
+                        ...(logScale ? { min: 0.01 } : {})
+                    }
                 }
             }
         });

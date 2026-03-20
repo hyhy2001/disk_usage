@@ -253,6 +253,19 @@ function renderPivotView(pivotData) {
         </div>`;
 }
 
+let _logScale = false;
+
+export function initScaleToggle() {
+    const btn = document.getElementById('btn-scale-toggle');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        _logScale = !_logScale;
+        btn.textContent = _logScale ? 'Linear' : 'Log';
+        btn.classList.toggle('active', _logScale);
+        applyFilters();
+    });
+}
+
 export function applyFilters() {
     const f        = readFilters();
     const chartMgr = AppState.chartManagerInstance;
@@ -271,12 +284,8 @@ export function applyFilters() {
     // ── History charts ──────────────────────────────────────────────────────
     if (chartMgr) {
         if (pivotUsers && f.selectedUsers && f.selectedUsers.length > 0) {
-            const histTitle = document.querySelector('#historyTotalChart')?.parentElement?.previousElementSibling?.querySelector('.history-chart-title');
-            if (histTitle) histTitle.textContent = '📈 Selected Users Usage';
-            chartMgr.renderUserTrendChart(_store.userTimelineMap, pivotUsers, f.startMs, f.endMs);
+            chartMgr.renderUserTrendChart(_store.userTimelineMap, pivotUsers, f.startMs, f.endMs, _logScale);
         } else {
-            const histTitle = document.querySelector('#historyTotalChart')?.parentElement?.previousElementSibling?.querySelector('.history-chart-title');
-            if (histTitle) histTitle.textContent = '📈 Total Disk Usage';
             const filtered = (_store.getTimelineData() || [])
                 .filter(d => d.timestamp >= f.startMs && d.timestamp <= f.endMs);
             chartMgr.renderHistoryTotalChart(filtered);
@@ -289,7 +298,6 @@ export function applyFilters() {
     // Data Table removed — charts are sufficient
     const dva = document.getElementById('detail-view-area');
     if (dva) dva.innerHTML = '';
-
 
 }
 

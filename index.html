@@ -244,8 +244,11 @@
                                 <div class="history-charts-row">
                                     <div class="glass-panel history-chart-card">
                                         <div class="history-chart-header">
-                                            <span class="history-chart-title">📈 Total Disk Usage</span>
-                                            <span class="history-chart-stat" id="history-total-stat"></span>
+                                            <span class="history-chart-title">📈 Selected Users Usage</span>
+                                            <div style="display:flex;align-items:center;gap:8px">
+                                                <span class="history-chart-stat" id="history-total-stat"></span>
+                                                <button id="btn-scale-toggle" class="scale-toggle-btn" data-scale="linear">Log</button>
+                                            </div>
                                         </div>
                                         <div class="history-chart-body">
                                             <canvas id="historyTotalChart"></canvas>

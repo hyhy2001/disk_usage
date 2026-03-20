@@ -2,7 +2,7 @@ import { UINodes, AppState, animateValue, bytesToTB } from './main.js';
 import { DataStore } from './dataStore.js';
 import { ChartManager } from './chartManager.js';
 import { initRouter } from './router.js';
-import { renderDetailTables } from './detailRenderer.js';
+import { renderDetailTables, initScaleToggle } from './detailRenderer.js';
 
 // ── Sidebar live clock ────────────────────────────────────────────────────────
 function startClock() {
@@ -255,6 +255,7 @@ class DataFetcher {
 // Bootstrap
 document.addEventListener('DOMContentLoaded', () => {
     initRouter();
+    initScaleToggle();
     window.appFetcher = new DataFetcher();
 });
 
