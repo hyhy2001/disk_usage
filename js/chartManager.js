@@ -11,6 +11,22 @@ function smartFmt(bytes, decimals = 2) {
 }
 
 /**
+ * Compact tick label — short suffix, no space: "23.6G", "1.1T", "450M"
+ * Use for axis ticks only (tooltips use smartFmt for full readability).
+ */
+function smartFmtTick(bytes) {
+    if (bytes === 0) return '0';
+    const abs = Math.abs(bytes);
+    const sign = bytes < 0 ? '-' : '';
+    if (abs >= 1e15) return sign + (abs / 1e15).toFixed(1) + 'P';
+    if (abs >= 1e12) return sign + (abs / 1e12).toFixed(1) + 'T';
+    if (abs >= 1e9)  return sign + (abs / 1e9).toFixed(1) + 'G';
+    if (abs >= 1e6)  return sign + (abs / 1e6).toFixed(1) + 'M';
+    if (abs >= 1e3)  return sign + (abs / 1e3).toFixed(1) + 'K';
+    return sign + abs.toFixed(0) + 'B';
+}
+
+/**
  * Pick a consistent unit for a whole chart based on the max absolute value.
  * Returns { divisor, unit } so all data in chart uses the same unit.
  * @param {number[]} bytesArray - array of raw byte values
@@ -549,13 +565,13 @@ export class ChartManager {
                     maxRotation: 0,
                     callback: v => {
                         const log = Math.log10(v);
-                        if (Math.abs(log - Math.round(log)) < 1e-9) return `${v} ${unit}`;
+                        if (Math.abs(log - Math.round(log)) < 1e-9) return smartFmtTick(v * divisor);
                         const nice = [1,2,5,10,15,20,25,30,40,50,60,70,80,90,100];
-                        return nice.includes(Math.round(v)) ? `${Math.round(v)} ${unit}` : null;
+                        return nice.includes(Math.round(v)) ? smartFmtTick(Math.round(v) * divisor) : null;
                     }
                 }
               }
-            : { type: 'linear', grid: { color: ct().grid }, ticks: { maxTicksLimit: 8, callback: v => `${v} ${unit}` } };
+            : { type: 'linear', grid: { color: ct().grid }, ticks: { autoSkip: true, maxRotation: 0, maxTicksLimit: 6, callback: v => smartFmtTick(v * divisor) } };
 
         // Cache for theme re-render
         this._usersData = userData;
@@ -636,7 +652,7 @@ export class ChartManager {
                 },
                 scales: {
                     x: { grid: { color: ct().gridXs }, ticks: { maxTicksLimit: 6, color: ct().tick, font: { size: 10 } } },
-                    y: { position: 'right', grid: { color: ct().gridSm }, ticks: { color: ct().tick, font: { size: 10 }, callback: v => smartFmt(v * 1e12, 1) } }
+                    y: { position: 'right', grid: { color: ct().gridSm }, ticks: { autoSkip: true, maxRotation: 0, color: ct().tick, font: { size: 10 }, callback: v => smartFmtTick(v * 1e12) } }
                 }
             }
         });
@@ -674,14 +690,14 @@ export class ChartManager {
                     maxRotation: 0,
                     callback: v => {
                         const log = Math.log10(v);
-                        const str = smartFmt(v * divisor, 0);
+                        const str = smartFmtTick(v * divisor);
                         if (Math.abs(log - Math.round(log)) < 1e-9) return `+${str}`;
                         const nice = [1,2,5,10,15,20,25,30,40,50,60,70,80,90,100,150,200,300,400,500];
                         return nice.includes(Math.round(v)) ? `+${str}` : null;
                     }
                 }
               }
-            : { type: 'linear', grid: { color: ct().gridSm }, ticks: { color: ct().tick, font: { size: 10 }, maxTicksLimit: 8, callback: v => `${v>0?'+':''}${smartFmt(v * divisor, 1)}` } };
+            : { type: 'linear', grid: { color: ct().gridSm }, ticks: { autoSkip: true, maxRotation: 0, maxTicksLimit: 6, color: ct().tick, font: { size: 10 }, callback: v => `${v>0?'+':''}${smartFmtTick(v * divisor)}` } };
 
         if (this._histGrowersChart) this._histGrowersChart.destroy();
         this._histGrowersChart = new Chart(ctx, {
