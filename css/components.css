@@ -974,22 +974,32 @@
 }
 
 /* General System card */
-.general-subrow {
+.general-val-col {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    margin-top: 10px;
+    align-items: flex-end;
+    gap: 1px;
+    min-width: 0;
 }
 
-.general-subrow-line {
+.general-free {
+    font-size: 0.74rem;
+    font-family: 'JetBrains Mono', monospace;
+    opacity: 0.85;
+}
+
+.general-legend-row {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--text-secondary);
+    margin-top: 8px;
+    padding-left: calc(minmax(70px, 110px) + 10px);
+    padding-left: 90px; /* aligns roughly below bar */
 }
 
-.general-subrow .sep {
+.general-legend-row .sep {
     opacity: 0.3;
 }
 

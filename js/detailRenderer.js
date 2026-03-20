@@ -110,20 +110,18 @@ function renderSnapshotView() {
                      title="Unknown: ${fmt(gapBytes)} (${gapOfUsed}% of used)"></div>
             </div>
             <span class="sbar-pct ${pctCls}">${usedPct}%</span>
-            <span class="sbar-val">${fmt(usedByDf)} / ${fmt(sys)}</span>
+            <div class="general-val-col">
+                <span class="sbar-val">${fmt(usedByDf)} / ${fmt(sys)}</span>
+                <span class="general-free text-sky">Free: ${fmt(general.free)}</span>
+            </div>
         </div>
-        <div class="general-subrow">
-            <div class="general-subrow-line">
-                <span class="text-sky">Free: ${fmt(general.free)}</span>
-                <span class="sep">·</span>
-                <span>Date: ${fmtDate(snap.timestamp)}</span>
-            </div>
-            <div class="general-subrow-line">
-                <span class="legend-dot dot-amber"></span><span>Scanned ${fmt(scannedBytes)}</span>
-                <span class="sep">·</span>
-                <span class="legend-dot dot-slate"></span><span>Unknown ${fmt(gapBytes)}</span>
-            </div>
+        <div class="general-legend-row">
+            <span class="legend-dot dot-amber"></span><span>Scanned ${fmt(scannedBytes)}</span>
+            <span class="sep">·</span>
+            <span class="legend-dot dot-slate"></span><span>Unknown ${fmt(gapBytes)}</span>
         </div>`;
+
+
 
 
     const leftCol = [
