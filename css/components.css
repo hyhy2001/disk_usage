@@ -973,54 +973,19 @@
     grid-template-columns: minmax(50px, 70px) 1fr 54px minmax(150px, auto);
 }
 
-/* General System card redesign */
-.general-stats-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 14px;
-}
-
-.gstat-chip {
-    display: flex;
-    flex-direction: column;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 8px;
-    padding: 6px 12px;
-    min-width: 90px;
-    flex: 1;
-}
-
-.gstat-label {
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #475569;
-    font-weight: 600;
-    margin-bottom: 2px;
-}
-
-.gstat-val {
-    font-size: 0.88rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    font-family: 'JetBrains Mono', monospace;
-    white-space: nowrap;
-}
-
-.general-main-bar {
-    height: 12px !important;
-    border-radius: 6px !important;
-    margin-bottom: 10px;
-}
-
-.general-legend {
+/* General System card */
+.general-subrow {
     display: flex;
     align-items: center;
-    gap: 12px;
-    font-size: 0.76rem;
     flex-wrap: wrap;
+    gap: 6px 10px;
+    margin-top: 8px;
+    font-size: 0.77rem;
+    color: var(--text-secondary);
+}
+
+.general-subrow .sep {
+    opacity: 0.3;
 }
 
 
