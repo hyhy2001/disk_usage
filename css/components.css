@@ -99,29 +99,64 @@
     margin-bottom: 6px;
 }
 
-.disk-select {
-    width: 100%;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: var(--text-primary);
+.disk-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 240px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+.disk-list::-webkit-scrollbar { width: 4px; }
+.disk-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+
+.disk-list-item {
+    padding: 8px 10px;
+    border-radius: 7px;
     font-size: 0.8rem;
-    font-family: inherit;
-    padding: 6px 10px;
-    border-radius: 8px;
+    color: var(--text-secondary);
     cursor: pointer;
-    outline: none;
-    transition: border-color 0.15s;
+    transition: background 0.15s, color 0.15s;
+    border: 1px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 7px;
 }
 
-.disk-select:focus,
-.disk-select:hover {
-    border-color: rgba(245,158,11,0.5);
+.disk-list-item::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.4;
+    flex-shrink: 0;
 }
 
-.disk-select option {
-    background: #0f1115;
-    color: #e2e8f0;
+.disk-list-item:hover {
+    background: rgba(255,255,255,0.06);
+    color: var(--text-primary);
 }
+
+.disk-list-item.active {
+    background: rgba(16,185,129,0.12);
+    border-color: rgba(16,185,129,0.25);
+    color: var(--emerald-400);
+}
+
+.disk-list-item.active::before {
+    opacity: 1;
+    background: var(--emerald-400);
+}
+
+.disk-list-item.loading {
+    color: #475569;
+    cursor: default;
+    font-style: italic;
+}
+
 
 .status-monitor {
     padding: 20px;

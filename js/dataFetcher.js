@@ -49,25 +49,32 @@ class DataFetcher {
             const disks = await res.json();
             this.disksConfig = disks;
 
-            const select = document.getElementById('disk-select');
-            if (!select) return;
+            const list = document.getElementById('disk-list');
+            if (!list) return;
 
-            select.innerHTML = disks.map(d => `
-                <option value="${d.id}">${d.name}</option>
+            list.innerHTML = disks.map(d => `
+                <div class="disk-list-item" data-id="${d.id}">${d.name}</div>
             `).join('');
 
-            if (disks.length > 0) {
-                this._activeDisk = disks[0].id;
-                select.value = disks[0].id;
-                this._updateDiskPath(disks[0]);
-            }
+            const items = list.querySelectorAll('.disk-list-item');
 
-            select.addEventListener('change', () => {
-                this._activeDisk = select.value;
-                const disk = disks.find(d => d.id === select.value);
+            const activate = (id) => {
+                items.forEach(el => el.classList.toggle('active', el.dataset.id === id));
+                this._activeDisk = id;
+                const disk = disks.find(d => d.id === id);
                 this._updateDiskPath(disk);
-                this.startServerSync();
+            };
+
+            items.forEach(el => {
+                el.addEventListener('click', () => {
+                    if (el.dataset.id === this._activeDisk) return;
+                    activate(el.dataset.id);
+                    this.startServerSync();
+                });
             });
+
+            if (disks.length > 0) activate(disks[0].id);
+
         } catch (e) {
             console.warn('Could not load disk list:', e);
         }
