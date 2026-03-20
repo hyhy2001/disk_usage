@@ -2610,7 +2610,8 @@
     flex-direction: column;
     gap: 8px;
     padding: 14px;
-    align-self: stretch;
+    max-height: 420px;
+    align-self: flex-start;
 }
 
 .user-filter-header {
@@ -2657,6 +2658,7 @@
     flex: 1;
     overflow-y: auto;
     min-height: 0;
+    max-height: 280px;
     display: flex;
     flex-direction: column;
     gap: 1px;
