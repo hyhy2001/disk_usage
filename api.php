@@ -1,35 +1,48 @@
 <?php
-// api.php — Read & aggregate .json files from a directory
-// Usage: ?dir=reports/disk_sda  (relative to webroot)
-// Returns all .json files (except permission_issues) as aggregated array
+// api.php — Read & aggregate .json report files from a directory
+// Usage: ?dir=reports/disk_sda
+// DELETE debug lines after testing!
 
 $baseDir = __DIR__;
-$reqDir  = $_GET['dir'] ?? '';
-$type    = $_GET['type'] ?? 'reports'; // 'reports' or 'permissions'
+$reqDir  = isset($_GET['dir']) ? trim($_GET['dir'], '/\\') : '';
 
 // Block traversal
 if (strpos($reqDir, '..') !== false || $reqDir === '') {
-    echo json_encode(['status' => 'error', 'message' => 'Invalid dir']);
+    http_response_code(403);
+    echo "Access denied.";
     exit;
 }
 
-$rawPath = $baseDir . '/' . ltrim($reqDir, '/');
+$rawPath = $baseDir . DIRECTORY_SEPARATOR . $reqDir;
 
 if (!is_dir($rawPath) && !is_link($rawPath)) {
-    echo json_encode(['status' => 'error', 'message' => "Not found: $reqDir"]);
+    http_response_code(404);
+    echo "Directory not found: $reqDir";
     exit;
 }
 
+// List .json files (exclude permission_issues)
 $dh = @opendir($rawPath);
-$data = [];
+$files = [];
 while ($dh && ($f = readdir($dh)) !== false) {
-    if (substr($f, -5) !== '.json') continue;
-    $isPermission = strpos($f, 'permission_issues') !== false;
-    if ($type === 'permissions' && !$isPermission) continue;
-    if ($type === 'reports' && $isPermission) continue;
-    $j = json_decode(@file_get_contents($rawPath . '/' . $f), true);
-    if ($j !== null) $data[] = $j;
+    if (substr($f, -5) === '.json' && strpos($f, 'permission_issues') === false)
+        $files[] = $rawPath . DIRECTORY_SEPARATOR . $f;
 }
 if ($dh) closedir($dh);
+sort($files);
 
-echo json_encode(['status' => 'success', 'total_files' => count($data), 'data' => $data]);
+// Read & aggregate
+$aggregated = [];
+foreach ($files as $file) {
+    $content = file_get_contents($file);
+    if ($content === false) continue;
+    $json = json_decode($content, true);
+    if ($json !== null) $aggregated[] = $json;
+}
+
+header('Content-Type: text/plain; charset=utf-8');
+echo json_encode([
+    'status'      => 'success',
+    'total_files' => count($aggregated),
+    'data'        => $aggregated,
+]);
