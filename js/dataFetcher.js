@@ -44,10 +44,9 @@ class DataFetcher {
 
     async _initDiskSelector() {
         try {
-            // Edit this if you want to hardcode to an absolute config URL
-            const configUrl = 'disks.json'; 
-            const res  = await fetch(configUrl);
-            const disks = await res.json();
+            const res = await fetch('api.php?req=list_drives');
+            const json = await res.json();
+            const disks = json.disks ?? [];
             this.disksConfig = disks;
 
             const select = document.getElementById('disk-select');
@@ -57,7 +56,6 @@ class DataFetcher {
                 <option value="${d.id}">${d.name}</option>
             `).join('');
 
-            // Pick first
             if (disks.length > 0) {
                 this._activeDisk = disks[0].id;
                 select.value = disks[0].id;
@@ -83,30 +81,6 @@ class DataFetcher {
         }
     }
 
-    async _fetchDirectoryFiles(url) {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status} fetching directory list`);
-        
-        const contentType = res.headers.get('content-type') || '';
-        let fileUrls = [];
-
-        if (contentType.includes('application/json')) {
-            const arr = await res.json();
-            fileUrls = arr.map(f => new URL(f, url).href);
-        } else {
-            // Assume HTML Directory index (Nginx/Apache)
-            const html = await res.text();
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const links = Array.from(doc.querySelectorAll('a'))
-                                .map(a => a.getAttribute('href'))
-                                .filter(href => href && href.endsWith('.json'));
-            
-            // Deduplicate and resolve URLs
-            fileUrls = [...new Set(links.map(href => new URL(href, url).href))];
-        }
-        return fileUrls;
-    }
 
     async startServerSync() {
         if (AppState.isProcessing) return;
@@ -117,39 +91,13 @@ class DataFetcher {
         
         try {
             this.setProcessingState(true);
-            
-            const diskConfig = this.disksConfig?.find(d => d.id === this._activeDisk);
-            let jsonResponse;
-            const targetDataUrl = diskConfig?.url || diskConfig?.path;
 
-            if (targetDataUrl) {
-                // Fetch from remote URL directory
-                UINodes.statusText.textContent = "Scanning remote directory...";
-                const allFiles = await this._fetchDirectoryFiles(targetDataUrl);
-                
-                // Filter disk usage reports
-                const reportFiles = allFiles.filter(f => !f.includes('permission_issues'));
-                
-                if (reportFiles.length === 0) {
-                    throw new Error("No JSON reports found in remote directory.");
-                }
-
-                UINodes.statusText.textContent = `Downloading ${reportFiles.length} reports...`;
-                
-                // Load concurrently
-                const fetchPromises = reportFiles.map(f => fetch(f).then(r => r.ok ? r.json() : null).catch(() => null));
-                const results = await Promise.all(fetchPromises);
-                const validData = results.filter(d => d !== null);
-                
-                jsonResponse = { status: 'success', data: validData, total_files: validData.length };
-            } else {
-                UINodes.statusText.textContent = "Connecting to Local API...";
-                const formData = new FormData();
-                formData.append('drive', this._activeDisk);
-                const response = await fetch('api.php', { method: 'POST', body: formData });
-                if (!response.ok) throw new Error(`HTTP error ${response.status} from api.php.`);
-                jsonResponse = await response.json();
-            }
+            UINodes.statusText.textContent = "Connecting to API...";
+            const formData = new FormData();
+            formData.append('drive', this._activeDisk);
+            const response = await fetch('api.php', { method: 'POST', body: formData });
+            if (!response.ok) throw new Error(`HTTP error ${response.status} from api.php.`);
+            const jsonResponse = await response.json();
             
             if ((jsonResponse.status && jsonResponse.status !== 'success') || !jsonResponse.data || jsonResponse.data.length === 0) {
                 alert("No JSON reports found or API returned an error.");
@@ -193,37 +141,11 @@ class DataFetcher {
 
     async _fetchPermissions() {
         try {
-            const diskConfig = this.disksConfig?.find(d => d.id === this._activeDisk);
-            let json;
-            const targetDataUrl = diskConfig?.url || diskConfig?.path;
-
-            if (targetDataUrl) {
-                const allFiles = await this._fetchDirectoryFiles(targetDataUrl);
-                const permFiles = allFiles.filter(f => f.includes('permission_issues'));
-                
-                if (permFiles.length === 0) return;
-                
-                const fetchPromises = permFiles.map(f => fetch(f).then(r => r.ok ? r.json() : null).catch(() => null));
-                const results = await Promise.all(fetchPromises);
-                
-                const validData = results.filter(d => d !== null);
-                if (validData.length > 0) {
-                    validData.sort((a,b) => (b.date || 0) - (a.date || 0));
-                    json = { status: 'success', data: validData[0] };
-                } else {
-                    json = { status: 'success', data: null };
-                }
-            } else if (diskConfig && diskConfig.permissions_url) {
-                const res = await fetch(diskConfig.permissions_url);
-                const rawData = await res.json();
-                json = { status: 'success', data: rawData };
-            } else {
-                const formData = new FormData();
-                formData.append('req', 'permissions');
-                formData.append('drive', this._activeDisk);
-                const res  = await fetch('api.php', { method: 'POST', body: formData });
-                json = await res.json();
-            }
+            const formData = new FormData();
+            formData.append('req', 'permissions');
+            formData.append('drive', this._activeDisk);
+            const res = await fetch('api.php', { method: 'POST', body: formData });
+            const json = await res.json();
 
             if (json?.status === 'success') {
                 this.dataStore.permissionIssues = json.data ?? null;
@@ -246,27 +168,45 @@ class DataFetcher {
     
     updateMetricCards() {
         const stats = this.dataStore.latestStats;
-        
+
         const totalTB     = bytesToTB(stats.total);
         const usedTB      = bytesToTB(stats.used);
         const availableTB = bytesToTB(stats.available);
         const scannedBytes = (this.dataStore.latestSnapshot?.teams || []).reduce((s, t) => s + (t.used || 0), 0);
         const scannedTB    = bytesToTB(scannedBytes);
+        const usagePct     = stats.total ? ((stats.used / stats.total) * 100) : 0;
 
-        const prevTotal   = parseFloat(UINodes.valTotal.textContent)   || 0;
-        const prevUsed    = parseFloat(UINodes.valUsed.textContent)    || 0;
-        const prevFree    = parseFloat(UINodes.valFree.textContent)    || 0;
-        const prevScanned = parseFloat(UINodes.valScanned?.textContent) || 0;
+        const setText = (el, val) => { if (el) el.textContent = val; };
+        const animateEl = (el, prev, next) => { if (el) animateValue(el, prev, next, 1200); };
 
-        animateValue(UINodes.valTotal,   prevTotal,   totalTB,     1200);
-        animateValue(UINodes.valUsed,    prevUsed,    usedTB,      1200);
-        animateValue(UINodes.valFree,    prevFree,    availableTB, 1200);
-        if (UINodes.valScanned) animateValue(UINodes.valScanned, prevScanned, scannedTB, 1200);
+        animateEl(UINodes.valTotal,   parseFloat(UINodes.valTotal?.textContent)   || 0, totalTB);
+        animateEl(UINodes.valUsed,    parseFloat(UINodes.valUsed?.textContent)    || 0, usedTB);
+        animateEl(UINodes.valFree,    parseFloat(UINodes.valFree?.textContent)    || 0, availableTB);
+        animateEl(UINodes.valScanned, parseFloat(UINodes.valScanned?.textContent) || 0, scannedTB);
+
+        // Usage % (formatted separately — not TB)
+        if (UINodes.valPct) {
+            UINodes.valPct.textContent = usagePct.toFixed(1) + '%';
+            UINodes.valPct.style.color = usagePct > 80 ? '#f43f5e' : '';
+        }
+
+        // Update disk path from the actual report directory
+        const dirPath = this.dataStore.latestSnapshot?.directory;
+        const activeDisk = this.disksConfig?.find(d => d.id === this._activeDisk);
+        const diskPathEl = document.getElementById('header-disk-path');
+        if (diskPathEl) {
+            const label = activeDisk?.name || this._activeDisk || '';
+            diskPathEl.textContent = dirPath ? `${label}: ${dirPath}` : label;
+        }
+
+        // Update page title based on active page
+        const titleEl = document.getElementById('shared-page-title');
+        if (titleEl && activeDisk) titleEl.textContent = activeDisk.name || 'Disk Usage';
 
         // ── Scan Summary Bar ──────────────────────────────────────────
-        const gapBytes   = Math.max(0, stats.used - scannedBytes);
-        const gapPct     = stats.used ? ((gapBytes / stats.used) * 100).toFixed(1) : '0.0';
-        const fmtBytes   = b => {
+        const gapBytes = Math.max(0, stats.used - scannedBytes);
+        const gapPct   = stats.used ? ((gapBytes / stats.used) * 100).toFixed(1) : '0.0';
+        const fmtBytes = b => {
             if (b >= 1e12) return (b/1e12).toFixed(1) + ' TB';
             if (b >= 1e9)  return (b/1e9).toFixed(1)  + ' GB';
             if (b >= 1e6)  return (b/1e6).toFixed(1)  + ' MB';
@@ -281,7 +221,7 @@ class DataFetcher {
         if (ssbFill) ssbFill.style.width = `${gapPct}%`;
         if (ssbPct)  ssbPct.textContent  = `${gapPct}%`;
         if (ssbGVal) ssbGVal.textContent  = fmtBytes(gapBytes);
-        
+
         if (stats.date) {
             const d = new Date(stats.date * 1000);
             UINodes.timeRange.textContent = `Latest snapshot from ${d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;

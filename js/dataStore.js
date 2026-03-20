@@ -63,6 +63,7 @@ export class DataStore {
                 this._latestTs = ts;
                 this.latestSnapshot = {
                     timestamp: ts,
+                    directory: report.directory || null,
                     general: {
                         total: report.general_system.total || 0,
                         used: report.general_system.used || 0,

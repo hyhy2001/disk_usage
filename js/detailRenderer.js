@@ -328,21 +328,21 @@ function initDetailTabs() {
 function renderGeneralSystem() {
     const s  = _store.latestStats;
     const p  = s.total ? ((s.used / s.total) * 100).toFixed(1) : '0';
-    const cl = parseFloat(p) > 85 ? 'text-rose' : parseFloat(p) > 65 ? 'text-amber' : 'text-emerald';
-    const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+    const cl = parseFloat(p) > 85 ? '#f43f5e' : '';
     const scanned = (_store.latestSnapshot?.teams || []).reduce((sum, t) => sum + (t.used || 0), 0);
-    set('detail-stat-total', `<span class="stat-number">${fmt(s.total)}</span><span class="stat-label">Total Capacity</span>`);
-    // Used + Scan merged row
-    document.getElementById('detail-stat-used').className = 'stat-block stat-block-scan';
-    set('detail-stat-used',
-        `<div class="stat-numbers-row">
-            <span class="stat-number text-rose">${fmt(s.used)}</span>
-            <span class="stat-scan-div">/</span>
-            <span class="stat-subscan">${fmt(scanned)}</span>
-         </div>
-         <span class="stat-label">Used / Scan</span>`);
-    set('detail-stat-free',  `<span class="stat-number text-sky">${fmt(s.available)}</span><span class="stat-label">Free</span>`);
-    set('detail-stat-pct',   `<span class="stat-number ${cl}">${p}%</span><span class="stat-label">Usage</span>`);
+
+    const setNum = (id, text, color) => {
+        const el = document.querySelector(`#${id} .stat-number`);
+        if (!el) return;
+        el.textContent = text;
+        if (color !== undefined) el.style.color = color;
+    };
+
+    setNum('shared-stat-total',   fmt(s.total));
+    setNum('shared-stat-used',    fmt(s.used));
+    setNum('shared-stat-scanned', fmt(scanned));
+    setNum('shared-stat-free',    fmt(s.available));
+    setNum('shared-stat-pct',     `${p}%`, cl);
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────

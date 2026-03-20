@@ -7,12 +7,14 @@ export const UINodes = {
     progressBar: document.getElementById('scan-progress-bar'),
     filesProcessed: document.getElementById('files-processed'),
     btnFetch: document.getElementById('btn-fetch'),
-    
-    valTotal: document.getElementById('val-total'),
-    valUsed: document.getElementById('val-used'),
-    valFree: document.getElementById('val-free'),
-    valScanned: document.getElementById('val-scanned'),
-    timeRange: document.getElementById('data-timerange')
+
+    // Shared header stat bar
+    valTotal:   document.querySelector('#shared-stat-total   .stat-number'),
+    valUsed:    document.querySelector('#shared-stat-used    .stat-number'),
+    valFree:    document.querySelector('#shared-stat-free    .stat-number'),
+    valScanned: document.querySelector('#shared-stat-scanned .stat-number'),
+    valPct:     document.querySelector('#shared-stat-pct     .stat-number'),
+    timeRange:  document.getElementById('data-timerange')
 };
 
 // Global Store
