@@ -39,12 +39,12 @@ export function animateValue(obj, start, end, duration) {
         
         // Format to 2 decimal points TB (assume input is TB)
         const currentVal = (progress * (end - start) + start);
-        obj.innerHTML = currentVal.toFixed(2);
+        obj.innerHTML = currentVal.toFixed(2) + '<span class="stat-unit"> TB</span>';
         
         if (progress < 1) {
             window.requestAnimationFrame(step);
         } else {
-            obj.innerHTML = end.toFixed(2);
+            obj.innerHTML = end.toFixed(2) + '<span class="stat-unit"> TB</span>';
         }
     };
     window.requestAnimationFrame(step);
