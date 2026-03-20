@@ -559,6 +559,13 @@
     white-space: nowrap;
 }
 
+/* Inline row: big number + small unit side-by-side */
+.stat-num-row {
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
+}
+
 .stat-number {
     font-size: 1.25rem;
     font-weight: 700;
