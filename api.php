@@ -5,8 +5,15 @@
 // ?drive=<id>                 → aggregated report JSONs for disk
 
 $baseDir   = __DIR__;
-$disksJson = $baseDir . '/disks.json';
-$entries   = json_decode(@file_get_contents($disksJson), true);
+
+// disks.json: local file OR remote URL via ?disks=https://...
+$disksParam = $_GET['disks'] ?? '';
+if ($disksParam !== '' && (strpos($disksParam, 'http://') === 0 || strpos($disksParam, 'https://') === 0)) {
+    $raw = @file_get_contents($disksParam);
+} else {
+    $raw = @file_get_contents($baseDir . '/' . ($disksParam ?: 'disks.json'));
+}
+$entries = json_decode($raw, true);
 if (!is_array($entries)) $entries = [];
 
 // Build disk map — raw path, symlink-safe
