@@ -75,6 +75,19 @@ class DataFetcher {
 
             if (disks.length > 0) activate(disks[0].id);
 
+            // Disk search filter
+            const searchInput = document.getElementById('disk-search');
+            if (searchInput) {
+                searchInput.addEventListener('input', () => {
+                    const q = searchInput.value.toLowerCase().trim();
+                    list.querySelectorAll('.disk-list-item').forEach(el => {
+                        const match = el.textContent.toLowerCase().includes(q);
+                        el.style.display = match ? '' : 'none';
+                    });
+                });
+            }
+
+
         } catch (e) {
             console.warn('Could not load disk list:', e);
         }

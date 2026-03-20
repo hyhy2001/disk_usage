@@ -112,6 +112,36 @@
 .disk-list::-webkit-scrollbar { width: 4px; }
 .disk-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
 
+.disk-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 7px;
+    padding: 5px 10px;
+    margin-bottom: 6px;
+}
+
+.disk-search-icon {
+    color: #475569;
+    flex-shrink: 0;
+}
+
+.disk-search-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    width: 100%;
+    font-family: inherit;
+}
+
+.disk-search-input::placeholder {
+    color: #475569;
+}
+
 .disk-list-item {
     padding: 8px 10px;
     border-radius: 7px;
