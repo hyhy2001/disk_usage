@@ -68,9 +68,10 @@ function renderModalChart(chartType) {
     // all callback functions (formatters, tooltips, etc.)
     const clonedData = JSON.parse(JSON.stringify(src.config.data));
 
-    // For timeline: rebuild gradient on modal canvas & re-attach to dataset
-    if (chartType === 'timeline') {
-        const h = canvas.parentElement?.offsetHeight || 560;
+    // Rebuild gradient for charts that use CanvasGradient as backgroundColor
+    // (CanvasGradient is canvas-bound and can't transfer to a different canvas)
+    if (chartType === 'timeline' || chartType === 'trend') {
+        const h = canvas.parentElement?.offsetHeight || 520;
         const grad = ctx.createLinearGradient(0, 0, 0, h);
         grad.addColorStop(0,   'rgba(251, 191, 36, 0.28)');
         grad.addColorStop(0.6, 'rgba(251, 191, 36, 0.07)');
