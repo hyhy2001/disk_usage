@@ -80,6 +80,7 @@ function renderModalChart(chartType) {
 
     window._modalChart = new Chart(ctx, {
         type: src.config.type,
+        plugins: src.config.plugins || [],   // inline plugins (centerText, refLine, etc.)
         data: clonedData,
         // Re-use the original options object — keeps all callbacks intact
         options: {
