@@ -164,7 +164,7 @@ class DataFetcher {
         try {
             const diskConf = this.disksConfig?.find(d => d.id === this._activeDisk);
             const diskPath = diskConf?.path || this._activeDisk;
-            const res = await fetch(`api.php?dir=${encodeURIComponent(diskPath)}&type=permissions`);
+            const res = await fetch(`permission_api.php?dir=${encodeURIComponent(diskPath)}`);
             const json = await res.json();
 
             if (json?.status === 'success') {
