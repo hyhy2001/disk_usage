@@ -1,13 +1,34 @@
+/** Chart theme — returns appropriate colors based on current light/dark mode */
+function ct() {
+    const light = document.documentElement.dataset.theme === 'light';
+    return {
+        grid:    light ? 'rgba(0,0,0,0.065)' : 'rgba(255,255,255,0.05)',
+        gridSm:  light ? 'rgba(0,0,0,0.05)'  : 'rgba(255,255,255,0.04)',
+        gridXs:  light ? 'rgba(0,0,0,0.04)'  : 'rgba(255,255,255,0.03)',
+        tick:    light ? '#6B7280'            : '#475569',
+        tickDim: light ? '#9CA3AF'            : '#94a3b8',
+        tipBg:   light ? 'rgba(250,249,246,0.97)' : 'rgba(10,14,20,0.94)',
+        tipTitle:light ? '#1F2937'            : '#fbbf24',
+        tipBody: light ? '#374151'            : '#cbd5e1',
+        tipBdr:  light ? 'rgba(0,0,0,0.08)'  : 'rgba(251,191,36,0.3)',
+    };
+}
+
 export class ChartManager {
     constructor() {
         this.timelineChart = null;
         this.teamChart = null;
         this.usersChart = null;
-        this._histTotalChart = null;
+        this._histTotalChart   = null;
         this._histGrowersChart = null;
         // Scale states for the two horizontal bar charts
-        this._usersLogScale = false;
+        this._usersLogScale   = false;
         this._growersLogScale = false;
+        // Cached datasets for theme-change re-renders
+        this._usersData   = null;
+        this._growersData = null;
+        this._teamData    = null;
+        this._teamTotal   = 0;
         
         // Brand Colors
         this.colors = {
@@ -18,8 +39,21 @@ export class ChartManager {
             slate: '#94a3b8'
         };
 
-        Chart.defaults.color = this.colors.slate;
         Chart.defaults.font.family = "'Inter', sans-serif";
+        this._updateChartDefaults();
+
+        // Re-render all charts when user toggles theme
+        document.addEventListener('themeChanged', () => {
+            this._updateChartDefaults();
+            if (this._fullTimeline)  this.renderTimeline(this._fullTimeline);
+            if (this._usersData)     this.renderUsersChart(this._usersData, this._usersLogScale);
+            if (this._teamData)      this.renderTeamChart(this._teamData, this._teamTotal);
+        });
+    }
+
+    _updateChartDefaults() {
+        const light = document.documentElement.dataset.theme === 'light';
+        Chart.defaults.color = light ? '#6B7280' : '#94a3b8';
     }
 
     render(dataStore) {
@@ -338,13 +372,13 @@ export class ChartManager {
                     legend: {
                         position: 'top',
                         align: 'end',
-                        labels: { boxWidth: 18, padding: 14, color: '#64748b' }
+        labels: { boxWidth: 18, padding: 14, color: ct().tickDim }
                     },
                     tooltip: {
-                        backgroundColor: 'rgba(10,14,20,0.94)',
-                        titleColor: '#fbbf24',
-                        bodyColor: '#cbd5e1',
-                        borderColor: 'rgba(251,191,36,0.3)',
+                        backgroundColor: ct().tipBg,
+                        titleColor: ct().tipTitle,
+                        bodyColor: ct().tipBody,
+                        borderColor: ct().tipBdr,
                         borderWidth: 1,
                         padding: 12,
                         callbacks: {
@@ -359,16 +393,16 @@ export class ChartManager {
                 layout: { padding: { right: 30 } },
                 scales: {
                     x: {
-                        grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false },
-                        ticks: { maxTicksLimit: 10, color: '#475569', font: { size: 11 } }
+                        grid: { color: ct().gridXs, drawBorder: false },
+                        ticks: { maxTicksLimit: 10, color: ct().tick, font: { size: 11 } }
                     },
                     y: {
                         position: 'right',
                         beginAtZero: false,
-                        grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                        grid: { color: ct().gridSm, drawBorder: false },
                         afterFit(scale) { scale.width = 65; },
                         ticks: {
-                            color: '#475569',
+                            color: ct().tick,
                             font: { size: 11 },
                             callback: v => formatBytesDynamically(v)
                         }
@@ -383,6 +417,9 @@ export class ChartManager {
 
     renderTeamChart(teamData, totalUsed = 0) {
         const ctx = document.getElementById('teamChart').getContext('2d');
+        // Cache for theme re-render
+        this._teamData  = teamData;
+        this._teamTotal = totalUsed;
 
         // Compute Unknown = df-h total used minus sum of all detailed-scan teams
         const sumTeams = teamData.reduce((s, t) => s + t.used, 0);
@@ -490,7 +527,10 @@ export class ChartManager {
                     }
                 }
               }
-            : { type: 'linear', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { maxTicksLimit: 8, callback: v => `${v} GB` } };
+            : { type: 'linear', grid: { color: ct().grid }, ticks: { maxTicksLimit: 8, callback: v => `${v} GB` } };
+
+        // Cache for theme re-render
+        this._usersData = userData;
 
         this.usersChart = new Chart(ctx, {
             type: 'bar',
@@ -500,8 +540,8 @@ export class ChartManager {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: 'rgba(15,17,21,0.9)', titleColor: '#fff', bodyColor: '#e2e8f0',
-                        borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+                        backgroundColor: ct().tipBg, titleColor: ct().tipBody, bodyColor: ct().tipBody,
+                        borderColor: ct().tipBdr, borderWidth: 1,
                         callbacks: { label: ctx => ` ${ctx.raw.toFixed(1)} GB` }
                     }
                 },
@@ -560,14 +600,14 @@ export class ChartManager {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: 'rgba(10,14,20,0.94)', titleColor: '#fbbf24',
-                        bodyColor: '#cbd5e1', borderColor: 'rgba(251,191,36,0.3)', borderWidth: 1, padding: 10,
+                        backgroundColor: ct().tipBg, titleColor: ct().tipTitle,
+                        bodyColor: ct().tipBody, borderColor: ct().tipBdr, borderWidth: 1, padding: 10,
                         callbacks: { label: i => ` ${i.raw.toFixed(3)} TB` }
                     }
                 },
                 scales: {
-                    x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { maxTicksLimit: 6, color: '#475569', font: { size: 10 } } },
-                    y: { position: 'right', grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#475569', font: { size: 10 }, callback: v => `${v.toFixed(2)}T` } }
+                    x: { grid: { color: ct().gridXs }, ticks: { maxTicksLimit: 6, color: ct().tick, font: { size: 10 } } },
+                    y: { position: 'right', grid: { color: ct().gridSm }, ticks: { color: ct().tick, font: { size: 10 }, callback: v => `${v.toFixed(2)}T` } }
                 }
             }
         });
@@ -609,7 +649,7 @@ export class ChartManager {
                     }
                 }
               }
-            : { type: 'linear', grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#475569', font: { size: 10 }, maxTicksLimit: 8, callback: v => `${v>0?'+':''}${v}G` } };
+            : { type: 'linear', grid: { color: ct().gridSm }, ticks: { color: ct().tick, font: { size: 10 }, maxTicksLimit: 8, callback: v => `${v>0?'+':''}${v}G` } };
 
         if (this._histGrowersChart) this._histGrowersChart.destroy();
         this._histGrowersChart = new Chart(ctx, {
@@ -620,14 +660,14 @@ export class ChartManager {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: 'rgba(10,14,20,0.94)', titleColor: '#fff',
-                        bodyColor: '#cbd5e1', borderWidth: 0, padding: 10,
+                        backgroundColor: ct().tipBg, titleColor: ct().tipBody,
+                        bodyColor: ct().tipBody, borderWidth: 0, padding: 10,
                         callbacks: { label: i => ` ${i.raw >= 0 ? '+' : ''}${i.raw.toFixed(2)} GB` }
                     }
                 },
                 scales: {
                     x: xScaleCfg,
-                    y: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                    y: { grid: { display: false }, ticks: { color: ct().tickDim, font: { size: 10 } } }
                 }
             }
         });
@@ -692,18 +732,18 @@ export class ChartManager {
                         labels: { boxWidth: 10, padding: 10, color: '#94a3b8', font: { size: 10 } }
                     },
                     tooltip: {
-                        backgroundColor: 'rgba(10,14,20,0.94)', titleColor: '#fff',
-                        bodyColor: '#cbd5e1', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, padding: 10,
+                        backgroundColor: ct().tipBg, titleColor: ct().tipBody,
+                        bodyColor: ct().tipBody, borderColor: ct().tipBdr, borderWidth: 1, padding: 10,
                         callbacks: { label: i => ` ${i.dataset.label}: ${i.raw?.toFixed(2) ?? '—'} GB` }
                     }
                 },
                 scales: {
-                    x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { maxTicksLimit: 8, color: '#475569', font: { size: 10 } } },
+                    x: { grid: { color: ct().gridXs }, ticks: { maxTicksLimit: 8, color: ct().tick, font: { size: 10 } } },
                     y: {
                         type: logScale ? 'logarithmic' : 'linear',
                         position: 'right',
-                        grid: { color: 'rgba(255,255,255,0.04)' },
-                        ticks: { color: '#475569', font: { size: 10 }, callback: v => `${v}GB` },
+                        grid: { color: ct().gridSm },
+                        ticks: { color: ct().tick, font: { size: 10 }, callback: v => `${v}GB` },
                         ...(logScale ? { min: 0.01 } : {})
                     }
                 }

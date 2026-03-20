@@ -7,6 +7,8 @@ const STORAGE_KEY = 'disk-usage-theme';
 function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem(STORAGE_KEY, theme);
+    // Notify chart manager (and anything else) to re-render with updated colors
+    document.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme } }));
 }
 
 function initThemeToggle() {
