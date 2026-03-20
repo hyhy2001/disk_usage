@@ -16,6 +16,10 @@ if ($disksParam !== '' && (strpos($disksParam, 'http://') === 0 || strpos($disks
 $entries = json_decode($raw, true);
 if (!is_array($entries)) $entries = [];
 
+echo "[DEBUG] disks.json loaded: " . count($entries) . " entries\n";
+echo json_encode($entries);
+
+/*
 // Build disk map — raw path, symlink-safe
 $disks = [];
 foreach ($entries as $e) {
@@ -82,3 +86,5 @@ $all  = $read($dir);
 $data = array_values(array_filter($all, fn($j)=>!isset($j['permission_issues'])));
 echo "[DEBUG] files=" . count($all) . " reports=" . count($data) . "\n";
 echo json_encode(['status'=>'success','total_files'=>count($data),'disk'=>['id'=>$diskId,'dir'=>$disk['dir']],'data'=>$data]);
+*/
+
