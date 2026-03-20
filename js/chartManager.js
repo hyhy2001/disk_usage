@@ -1,3 +1,30 @@
+/** Auto unit formatter — takes bytes, returns human-readable string */
+function smartFmt(bytes, decimals = 2) {
+    if (bytes === 0) return '0 B';
+    const abs = Math.abs(bytes);
+    if (abs >= 1e15) return (bytes / 1e15).toFixed(decimals) + ' PB';
+    if (abs >= 1e12) return (bytes / 1e12).toFixed(decimals) + ' TB';
+    if (abs >= 1e9)  return (bytes / 1e9).toFixed(decimals) + ' GB';
+    if (abs >= 1e6)  return (bytes / 1e6).toFixed(decimals) + ' MB';
+    if (abs >= 1e3)  return (bytes / 1e3).toFixed(decimals) + ' KB';
+    return bytes.toFixed(decimals) + ' B';
+}
+
+/**
+ * Pick a consistent unit for a whole chart based on the max absolute value.
+ * Returns { divisor, unit } so all data in chart uses the same unit.
+ * @param {number[]} bytesArray - array of raw byte values
+ */
+function pickUnit(bytesArray) {
+    const maxAbs = Math.max(...bytesArray.map(Math.abs));
+    if (maxAbs >= 1e15) return { divisor: 1e15, unit: 'PB' };
+    if (maxAbs >= 1e12) return { divisor: 1e12, unit: 'TB' };
+    if (maxAbs >= 1e9)  return { divisor: 1e9,  unit: 'GB' };
+    if (maxAbs >= 1e6)  return { divisor: 1e6,  unit: 'MB' };
+    if (maxAbs >= 1e3)  return { divisor: 1e3,  unit: 'KB' };
+    return { divisor: 1, unit: 'B' };
+}
+
 /** Chart theme — returns appropriate colors based on current light/dark mode */
 function ct() {
     const light = document.documentElement.dataset.theme === 'light';
@@ -493,8 +520,7 @@ export class ChartManager {
                         borderWidth: 1,
                         callbacks: {
                             label: ctx => {
-                                const GB = (ctx.raw * 1024).toFixed(1);
-                                return ` ${ctx.label}: ${ctx.raw.toFixed(2)} TB (${GB} GB)`;
+                                return ` ${ctx.label}: ${smartFmt(ctx.raw * 1e12)}`;
                             }
                         }
                     }
@@ -506,8 +532,10 @@ export class ChartManager {
 
     renderUsersChart(userData, logScale = false) {
         const ctx = document.getElementById('usersChart').getContext('2d');
-        const labels = userData.map(u => u.name);
-        const data   = userData.map(u => u.used / 1e9);
+        const labels  = userData.map(u => u.name);
+        const bytes   = userData.map(u => u.used);
+        const { divisor, unit } = pickUnit(bytes);
+        const data    = bytes.map(b => +(b / divisor).toFixed(3));
 
         if (this.usersChart) this.usersChart.destroy();
 
@@ -520,22 +548,21 @@ export class ChartManager {
                     maxTicksLimit: 6,
                     maxRotation: 0,
                     callback: v => {
-                        // Only show clean powers: 1, 2, 5, 10, 20, 50, 100...
                         const log = Math.log10(v);
-                        if (Math.abs(log - Math.round(log)) < 1e-9) return `${v} GB`;
+                        if (Math.abs(log - Math.round(log)) < 1e-9) return `${v} ${unit}`;
                         const nice = [1,2,5,10,15,20,25,30,40,50,60,70,80,90,100];
-                        return nice.includes(Math.round(v)) ? `${Math.round(v)} GB` : null;
+                        return nice.includes(Math.round(v)) ? `${Math.round(v)} ${unit}` : null;
                     }
                 }
               }
-            : { type: 'linear', grid: { color: ct().grid }, ticks: { maxTicksLimit: 8, callback: v => `${v} GB` } };
+            : { type: 'linear', grid: { color: ct().grid }, ticks: { maxTicksLimit: 8, callback: v => `${v} ${unit}` } };
 
         // Cache for theme re-render
         this._usersData = userData;
 
         this.usersChart = new Chart(ctx, {
             type: 'bar',
-            data: { labels, datasets: [{ label: 'Consumed (GB)', data, backgroundColor: this.colors.sky, borderRadius: 4 }] },
+            data: { labels, datasets: [{ label: `Consumed (${unit})`, data, backgroundColor: this.colors.sky, borderRadius: 4 }] },
             options: {
                 responsive: true, maintainAspectRatio: false, indexAxis: 'y',
                 plugins: {
@@ -543,7 +570,7 @@ export class ChartManager {
                     tooltip: {
                         backgroundColor: ct().tipBg, titleColor: ct().tipBody, bodyColor: ct().tipBody,
                         borderColor: ct().tipBdr, borderWidth: 1,
-                        callbacks: { label: ctx => ` ${ctx.raw.toFixed(1)} GB` }
+                        callbacks: { label: c => ` ${smartFmt(bytes[c.dataIndex])}` }
                     }
                 },
                 scales: {
@@ -604,12 +631,12 @@ export class ChartManager {
                     tooltip: {
                         backgroundColor: ct().tipBg, titleColor: ct().tipTitle,
                         bodyColor: ct().tipBody, borderColor: ct().tipBdr, borderWidth: 1, padding: 10,
-                        callbacks: { label: i => ` ${i.raw.toFixed(3)} TB` }
+                        callbacks: { label: i => ` ${smartFmt(i.raw * 1e12)}` }
                     }
                 },
                 scales: {
                     x: { grid: { color: ct().gridXs }, ticks: { maxTicksLimit: 6, color: ct().tick, font: { size: 10 } } },
-                    y: { position: 'right', grid: { color: ct().gridSm }, ticks: { color: ct().tick, font: { size: 10 }, callback: v => `${v.toFixed(2)}T` } }
+                    y: { position: 'right', grid: { color: ct().gridSm }, ticks: { color: ct().tick, font: { size: 10 }, callback: v => smartFmt(v * 1e12, 1) } }
                 }
             }
         });
@@ -620,14 +647,16 @@ export class ChartManager {
         if (!el) return;
         const ctx = el.getContext('2d');
 
-        const labels = growersData.map(u => u.name);
-        const deltas = growersData.map(u => +((u.growth || 0) / 1e9).toFixed(2));
+        const labels     = growersData.map(u => u.name);
+        const growBytes  = growersData.map(u => u.growth || 0);
+        const { divisor, unit } = pickUnit(growBytes);
+        const deltas = growBytes.map(b => +(b / divisor).toFixed(3));
         const colors = deltas.map(d => d >= 0 ? 'rgba(52,211,153,0.7)' : 'rgba(251,113,133,0.7)');
 
         const el2 = document.getElementById('history-growers-stat');
         if (el2 && growersData[0]) {
             const top = growersData[0];
-            el2.textContent = `${top.name}: +${((top.growth||0)/1e9).toFixed(1)} GB`;
+            el2.textContent = `${top.name}: +${smartFmt(top.growth || 0, 1)}`;
         }
 
         // For log scale: use absolute values (negatives can't be logged)
@@ -645,13 +674,14 @@ export class ChartManager {
                     maxRotation: 0,
                     callback: v => {
                         const log = Math.log10(v);
-                        if (Math.abs(log - Math.round(log)) < 1e-9) return `+${v}G`;
+                        const str = smartFmt(v * divisor, 0);
+                        if (Math.abs(log - Math.round(log)) < 1e-9) return `+${str}`;
                         const nice = [1,2,5,10,15,20,25,30,40,50,60,70,80,90,100,150,200,300,400,500];
-                        return nice.includes(Math.round(v)) ? `+${Math.round(v)}G` : null;
+                        return nice.includes(Math.round(v)) ? `+${str}` : null;
                     }
                 }
               }
-            : { type: 'linear', grid: { color: ct().gridSm }, ticks: { color: ct().tick, font: { size: 10 }, maxTicksLimit: 8, callback: v => `${v>0?'+':''}${v}G` } };
+            : { type: 'linear', grid: { color: ct().gridSm }, ticks: { color: ct().tick, font: { size: 10 }, maxTicksLimit: 8, callback: v => `${v>0?'+':''}${smartFmt(v * divisor, 1)}` } };
 
         if (this._histGrowersChart) this._histGrowersChart.destroy();
         this._histGrowersChart = new Chart(ctx, {
@@ -664,7 +694,7 @@ export class ChartManager {
                     tooltip: {
                         backgroundColor: ct().tipBg, titleColor: ct().tipBody,
                         bodyColor: ct().tipBody, borderWidth: 0, padding: 10,
-                        callbacks: { label: i => ` ${i.raw >= 0 ? '+' : ''}${i.raw.toFixed(2)} GB` }
+                        callbacks: { label: i => ` ${i.raw >= 0 ? '+' : ''}${smartFmt(i.raw * divisor)}` }
                     }
                 },
                 scales: {
