@@ -37,13 +37,15 @@
 
 /* ── Light Theme ─────────────────────────────────────────────────────────── */
 :root[data-theme='light'] {
-    --bg-base: #f1f5f9;
-    --bg-surface: rgba(255, 255, 255, 0.85);
-    --bg-surface-elevated: rgba(255, 255, 255, 0.97);
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --glass-border: 1px solid rgba(0, 0, 0, 0.08);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.10);
+    /* Warm cream base — easy on the eyes */
+    --bg-base: #F7F4EF;
+    --bg-surface: rgba(255, 252, 248, 0.88);
+    --bg-surface-elevated: rgba(255, 253, 250, 0.98);
+    --text-primary: #2D3142;       /* Soft navy, not pure black */
+    --text-secondary: #6B7280;     /* Medium gray, readable but calm */
+    --text-accent: #059669;        /* Slightly deeper emerald for contrast */
+    --glass-border: 1px solid rgba(0, 0, 0, 0.06);
+    --glass-shadow: 0 4px 20px rgba(0, 0, 0, 0.07);
 }
 
 * {
@@ -69,13 +71,13 @@ body.dark-theme {
     transition: background-color 0.25s, color 0.25s;
 }
 
-/* Light mode background gradient */
+/* Light mode background gradient — warm cream, not stark white */
 :root[data-theme='light'] .background-mesh {
-    background: radial-gradient(circle at 50% 0%, #e2e8f0 0%, #f1f5f9 100%) !important;
+    background: radial-gradient(ellipse at 60% 0%, #EDE8E0 0%, #F7F4EF 60%, #F2EFE8 100%) !important;
 }
 
 :root[data-theme='light'] .glow-orb {
-    opacity: 0.06;
+    opacity: 0.04;
 }
 
 /* Theme toggle button */
