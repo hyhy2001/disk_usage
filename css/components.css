@@ -576,11 +576,13 @@
 }
 
 .stat-unit {
-    font-size: 0.65rem;
-    font-weight: 500;
-    letter-spacing: 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
     color: var(--text-secondary);
-    opacity: 0.7;
+    opacity: 0.8;
+    vertical-align: middle;
+    display: inline;
 }
 
 .stat-divider {
