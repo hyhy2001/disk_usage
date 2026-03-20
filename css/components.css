@@ -973,13 +973,56 @@
     grid-template-columns: minmax(50px, 70px) 1fr 54px minmax(150px, auto);
 }
 
-.general-subrow {
-    font-size: 0.78rem;
-    color: var(--text-secondary);
-    padding-left: 4px;
+/* General System card redesign */
+.general-stats-row {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
+    margin-bottom: 14px;
 }
+
+.gstat-chip {
+    display: flex;
+    flex-direction: column;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 8px;
+    padding: 6px 12px;
+    min-width: 90px;
+    flex: 1;
+}
+
+.gstat-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #475569;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.gstat-val {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    white-space: nowrap;
+}
+
+.general-main-bar {
+    height: 12px !important;
+    border-radius: 6px !important;
+    margin-bottom: 10px;
+}
+
+.general-legend {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.76rem;
+    flex-wrap: wrap;
+}
+
 
 /* ─────────────────────────────────────────
    Pivot Table View

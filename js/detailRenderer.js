@@ -101,24 +101,21 @@ function renderSnapshotView() {
     const scannedOfUsed  = usedByDf ? ((scannedBytes / usedByDf) * 100).toFixed(1) : 0;
     const gapOfUsed      = usedByDf ? ((gapBytes     / usedByDf) * 100).toFixed(1) : 0;
     const stackedBar = `
-        <div class="sbar-row general-row">
-            <div class="sbar-name">Used</div>
-            <div class="sbar-track sbar-track-stacked">
-                <div class="sbar-seg seg-amber" style="width:${scannedOfTotal}%"
-                     title="Scanned: ${fmt(scannedBytes)} (${scannedOfUsed}% of used)"></div>
-                <div class="sbar-seg seg-slate"  style="width:${gapOfTotal}%"
-                     title="Unknown: ${fmt(gapBytes)} (${gapOfUsed}% of used)"></div>
-            </div>
-            <span class="sbar-pct ${pctCls}">${usedPct}%</span>
-            <span class="sbar-val">${fmt(usedByDf)} / ${fmt(sys)}</span>
+        <div class="general-stats-row">
+            <span class="gstat-chip"><span class="gstat-label">Used</span><span class="gstat-val ${pctCls}">${usedPct}%</span></span>
+            <span class="gstat-chip"><span class="gstat-label">Used</span><span class="gstat-val">${fmt(usedByDf)} / ${fmt(sys)}</span></span>
+            <span class="gstat-chip"><span class="gstat-label">Free</span><span class="gstat-val text-sky">${fmt(general.free)}</span></span>
+            <span class="gstat-chip"><span class="gstat-label">Date</span><span class="gstat-val">${fmtDate(snap.timestamp)}</span></span>
         </div>
-        <div class="general-subrow">
-            <span class="text-sky">Free: ${fmt(general.free)}</span>
-            <span class="text-secondary"> · Date: ${fmtDate(snap.timestamp)}</span>
-            <span class="sbar-legend">
-                <span class="legend-dot dot-amber"></span><span class="text-secondary">Scanned ${fmt(scannedBytes)}</span>
-                <span class="legend-dot dot-slate"></span><span class="text-secondary">Unknown ${fmt(gapBytes)}</span>
-            </span>
+        <div class="sbar-track sbar-track-stacked general-main-bar">
+            <div class="sbar-seg seg-amber" style="width:${scannedOfTotal}%"
+                 title="Scanned: ${fmt(scannedBytes)} (${scannedOfUsed}% of used)"></div>
+            <div class="sbar-seg seg-slate"  style="width:${gapOfTotal}%"
+                 title="Unknown: ${fmt(gapBytes)} (${gapOfUsed}% of used)"></div>
+        </div>
+        <div class="general-legend">
+            <span class="legend-dot dot-amber"></span><span class="text-secondary">Scanned ${fmt(scannedBytes)}</span>
+            <span class="legend-dot dot-slate"></span><span class="text-secondary">Unknown ${fmt(gapBytes)}</span>
         </div>`;
 
     const leftCol = [
