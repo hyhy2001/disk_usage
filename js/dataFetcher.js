@@ -215,8 +215,7 @@ class DataFetcher {
         const activeDisk = this.disksConfig?.find(d => d.id === this._activeDisk);
         const diskPathEl = document.getElementById('header-disk-path');
         if (diskPathEl) {
-            const label = activeDisk?.name || this._activeDisk || '';
-            diskPathEl.textContent = dirPath ? `${label}: ${dirPath}` : label;
+            diskPathEl.textContent = dirPath || activeDisk?.name || '';
         }
 
         // Update page title based on active page

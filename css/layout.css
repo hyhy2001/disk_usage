@@ -84,42 +84,64 @@
 .top-header {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 4px;
 }
 
-.header-left {
+/* Row 1: disk name + path + stats on one line */
+.header-top-row {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.header-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.header-sep {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    opacity: 0.4;
+    flex-shrink: 0;
 }
 
 .top-header h1 {
-    font-size: 2rem;
-    font-weight: 600;
+    font-size: 1.35rem;
+    font-weight: 700;
     letter-spacing: -0.02em;
-    margin-bottom: 4px;
+    white-space: nowrap;
 }
 
 .subtitle {
     color: var(--text-secondary);
-    font-size: 0.95rem;
+    font-size: 0.8rem;
+    padding-left: 2px;
 }
 
 .header-disk-path {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.78rem;
     color: #f59e0b;
-    opacity: 0.8;
+    opacity: 0.85;
     letter-spacing: 0.02em;
-    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
 
-/* Shared Stat Bar (5 blocks) */
+/* Shared Stat Bar — compact inline variant */
 .page-stat-bar {
     display: flex;
     align-items: center;
-    padding: 16px 28px;
+    padding: 8px 20px;
     gap: 0;
+    flex-shrink: 0;
 }
 
 /* Metrics Grid - 3 Columns (kept for legacy if needed) */

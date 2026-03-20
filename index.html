@@ -105,37 +105,42 @@
         <main class="main-content">
         <!-- ===== SHARED HEADER (always visible) ===== -->
         <header id="shared-header" class="top-header">
-            <div class="header-left">
-                <h1 id="shared-page-title">Disk Usage Overview</h1>
-                <p id="header-disk-path" class="header-disk-path">Selecting disk…</p>
-                <p class="subtitle" id="data-timerange">Waiting for data payload...</p>
+            <!-- Row 1: disk name · path · quick stats (all inline) -->
+            <div class="header-top-row">
+                <div class="header-identity">
+                    <h1 id="shared-page-title">Disk Usage Overview</h1>
+                    <span class="header-sep">·</span>
+                    <p id="header-disk-path" class="header-disk-path">—</p>
+                </div>
+                <div class="page-stat-bar glass-panel">
+                    <div class="stat-block" id="shared-stat-total">
+                        <span class="stat-number" id="val-total">—</span>
+                        <span class="stat-label">Total</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-block" id="shared-stat-used">
+                        <span class="stat-number text-rose" id="val-used">—</span>
+                        <span class="stat-label">Used</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-block" id="shared-stat-scanned">
+                        <span class="stat-number" style="color:#f59e0b" id="val-scanned">—</span>
+                        <span class="stat-label">Scanned</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-block" id="shared-stat-free">
+                        <span class="stat-number" id="val-free">—</span>
+                        <span class="stat-label">Free</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-block" id="shared-stat-pct">
+                        <span class="stat-number" id="val-pct">—</span>
+                        <span class="stat-label">Usage %</span>
+                    </div>
+                </div>
             </div>
-            <div class="page-stat-bar glass-panel">
-                <div class="stat-block" id="shared-stat-total">
-                    <span class="stat-number">—</span>
-                    <span class="stat-label">Total</span>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="stat-block" id="shared-stat-used">
-                    <span class="stat-number text-rose">—</span>
-                    <span class="stat-label">Used</span>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="stat-block" id="shared-stat-scanned">
-                    <span class="stat-number" style="color:#f59e0b">—</span>
-                    <span class="stat-label">Scanned</span>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="stat-block" id="shared-stat-free">
-                    <span class="stat-number">—</span>
-                    <span class="stat-label">Free</span>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="stat-block" id="shared-stat-pct">
-                    <span class="stat-number">—</span>
-                    <span class="stat-label">Usage %</span>
-                </div>
-            </div>
+            <!-- Row 2: timestamp -->
+            <p class="subtitle" id="data-timerange">Waiting for data payload...</p>
         </header>
 
             <!-- ===== OVERVIEW PAGE ===== -->
