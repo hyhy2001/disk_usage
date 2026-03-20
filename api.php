@@ -10,23 +10,26 @@ if (empty($_GET) && empty($_POST)) {
     exit;
 }
 
-header('Content-Type: application/json; charset=utf-8');
+header('Content-Type: text/plain; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
 // ── Helper: resolve path (absolute or relative to this file) ──────────────────
 function resolvePath(string $path): string {
     if ($path !== '' && ($path[0] === '/' || (strlen($path) > 1 && $path[1] === ':'))) {
+        // Absolute path — use as-is
         return rtrim($path, '/\\');
     }
-    return rtrim(__DIR__ . DIRECTORY_SEPARATOR . $path, '/\\');
+    // Relative path — join with __DIR__, do NOT use realpath (breaks symlinks)
+    $raw = __DIR__ . DIRECTORY_SEPARATOR . ltrim($path, '/\\');
+    return rtrim($raw, '/\\');
 }
 
-// ── Helper: Read JSON files (Bypass WAF glob() block) ─────────────────────────
+// ── Helper: Read JSON files (symlink-safe, no realpath) ─────────────────────
 function getJsonFiles(string $dir, string $match = ''): array {
-    if (!is_dir($dir)) return [];
+    if (!is_dir($dir) && !is_link($dir)) return [];
     $dh = @opendir($dir);
     if ($dh === false) return [];
-    
+
     $res = [];
     while (($f = readdir($dh)) !== false) {
         if ($f === '.' || $f === '..') continue;
