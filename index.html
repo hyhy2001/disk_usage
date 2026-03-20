@@ -146,13 +146,16 @@
                             <h2>Capacity Over Time</h2>
                             <div id="timeline-stat-header" class="timeline-stat-header"></div>
                         </div>
-                        <div class="chart-range-btns">
-                            <button class="range-btn" data-range="7">7D</button>
-                            <button class="range-btn" data-range="30">30D</button>
-                            <button class="range-btn" data-range="180">6M</button>
-                            <button class="range-btn" data-range="365">1Y</button>
-                            <button class="range-btn" data-range="1825">5Y</button>
-                            <button class="range-btn active" data-range="all">All</button>
+                        <div style="display:flex;align-items:center;gap:8px">
+                            <div class="chart-range-btns">
+                                <button class="range-btn" data-range="7">7D</button>
+                                <button class="range-btn" data-range="30">30D</button>
+                                <button class="range-btn" data-range="180">6M</button>
+                                <button class="range-btn" data-range="365">1Y</button>
+                                <button class="range-btn" data-range="1825">5Y</button>
+                                <button class="range-btn active" data-range="all">All</button>
+                            </div>
+                            <button class="chart-expand-btn" data-chart="timeline" title="Expand chart">⛶</button>
                         </div>
                     </div>
                     <div class="canvas-wrapper">
@@ -166,6 +169,7 @@
                 <div class="chart-container glass-panel">
                     <div class="panel-header">
                         <h2>Usage by Teams</h2>
+                        <button class="chart-expand-btn" data-chart="team" title="Expand chart">⛶</button>
                     </div>
                     <div class="canvas-wrapper">
                         <canvas id="teamChart"></canvas>
@@ -176,6 +180,7 @@
                 <div class="chart-container glass-panel">
                     <div class="panel-header">
                         <h2>Top Consuming Users</h2>
+                        <button class="chart-expand-btn" data-chart="users" title="Expand chart">⛶</button>
                     </div>
                     <div class="canvas-wrapper">
                         <canvas id="usersChart"></canvas>

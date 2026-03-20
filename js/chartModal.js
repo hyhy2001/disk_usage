@@ -50,45 +50,30 @@ function renderModalChart(chartType) {
         window._modalChart = null;
     }
 
-    if (chartType === 'trend') {
-        // Copy config from the live trend chart
-        const src = chartMgr._histTotalChart;
-        if (!src) return;
-        titleEl.textContent = '📈 Selected Users Usage — Full View';
-        window._modalChart = new Chart(ctx, {
-            type: src.config.type,
-            data: JSON.parse(JSON.stringify(src.config.data)),
-            options: {
-                ...JSON.parse(JSON.stringify(src.config.options)),
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    ...src.config.options.plugins,
-                    legend: {
-                        ...src.config.options.plugins?.legend,
-                        labels: { ...src.config.options.plugins?.legend?.labels, font: { size: 12 } }
-                    }
-                }
-            }
-        });
-    } else if (chartType === 'growers') {
-        const src = chartMgr._histGrowersChart;
-        if (!src) return;
-        titleEl.textContent = '🔥 Fastest Growing Users — Full View';
-        window._modalChart = new Chart(ctx, {
-            type: src.config.type,
-            data: JSON.parse(JSON.stringify(src.config.data)),
-            options: {
-                ...JSON.parse(JSON.stringify(src.config.options)),
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    ...src.config.options.plugins,
-                    legend: { display: false }
-                }
-            }
-        });
-    }
+    const chartMap = {
+        trend:    { src: () => chartMgr._histTotalChart,    label: '📈 Selected Users Usage — Full View' },
+        growers:  { src: () => chartMgr._histGrowersChart,  label: '🔥 Fastest Growing Users — Full View' },
+        timeline: { src: () => chartMgr.timelineChart,      label: '📊 Capacity Over Time — Full View' },
+        team:     { src: () => chartMgr.teamChart,          label: '🍩 Usage by Teams — Full View' },
+        users:    { src: () => chartMgr.usersChart,         label: '👤 Top Consuming Users — Full View' },
+    };
+
+    const entry = chartMap[chartType];
+    if (!entry) return;
+
+    const src = entry.src();
+    if (!src) return;
+
+    titleEl.textContent = entry.label;
+    window._modalChart = new Chart(ctx, {
+        type: src.config.type,
+        data: JSON.parse(JSON.stringify(src.config.data)),
+        options: {
+            ...JSON.parse(JSON.stringify(src.config.options)),
+            responsive: true,
+            maintainAspectRatio: false,
+        }
+    });
 }
 
 // ── Open / Close ─────────────────────────────────────────────────────────────
