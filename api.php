@@ -4,8 +4,7 @@
 // ?req=permissions&drive=<id> → latest permission_issues JSON
 // ?drive=<id>                 → aggregated report JSONs for disk
 
-header('Content-Type: text/plain; charset=utf-8');
-header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+
 
 // ── Load disks.json ───────────────────────────────────────────────────────────
 $disksJson = __DIR__ . '/disks.json';
