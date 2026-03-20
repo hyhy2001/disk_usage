@@ -2930,6 +2930,46 @@
     background: rgba(255,253,250,0.95);
 }
 
+/* ── Light mode: scrollbars use dark-on-light color ─────────────────────── */
+:root[data-theme='light'] * {
+    scrollbar-color: rgba(0,0,0,0.18) transparent;
+}
+
+/* ── Donut chart canvas background (keeps chart readable on white panels) ── */
+:root[data-theme='light'] #teamChart {
+    background: transparent;
+}
+
+/* ── Usage bars track background in light mode ───────────────────────────── */
+:root[data-theme='light'] .usage-bar-track,
+:root[data-theme='light'] .pivot-mini-bar {
+    background: rgba(0,0,0,0.08) !important;
+}
+
+/* ── Code inline text in unknown notes ───────────────────────────────────── */
+:root[data-theme='light'] .unknown-note code {
+    color: #4338ca;
+    background: rgba(67,56,202,0.07);
+}
+
+/* ── Separator bars between panels: make visible ────────────────────────── */
+:root[data-theme='light'] .stat-divider {
+    background: rgba(0,0,0,0.12) !important;
+}
+
+/* ── Period trend table header cells ─────────────────────────────────────── */
+:root[data-theme='light'] .period-table th {
+    color: #5B6377;
+    background: rgba(0,0,0,0.03);
+}
+
+/* ── Team usage country chips in detail ─────────────────────────────────── */
+:root[data-theme='light'] .country-chip {
+    background: rgba(0,0,0,0.06);
+    border-color: rgba(0,0,0,0.10);
+    color: #374151;
+}
+
 /* ── Light mode chart canvas: give chart area a clean white base ─────────── */
 :root[data-theme='light'] .canvas-wrapper {
     background: rgba(255,255,255,0.70);

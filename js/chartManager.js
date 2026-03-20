@@ -449,16 +449,17 @@ export class ChartManager {
                 const { ctx: c, chartArea: { top, bottom, left, right } } = chart;
                 const cx = (left + right) / 2;
                 const cy = (top + bottom) / 2;
+                const isLight = document.documentElement.dataset.theme === 'light';
                 c.save();
                 // Main value
                 c.font = 'bold 22px Inter, sans-serif';
-                c.fillStyle = '#ffffff';
+                c.fillStyle = isLight ? '#1E2235' : '#ffffff';
                 c.textAlign = 'center';
                 c.textBaseline = 'middle';
                 c.fillText(`${totalTB} TB`, cx, cy - 12);
                 // Sub-label
                 c.font = '500 12px Inter, sans-serif';
-                c.fillStyle = '#94a3b8';
+                c.fillStyle = isLight ? '#5B6377' : '#94a3b8';
                 c.fillText(`${totalGB} GB used`, cx, cy + 12);
                 c.restore();
             }
