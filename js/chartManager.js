@@ -3,6 +3,11 @@ export class ChartManager {
         this.timelineChart = null;
         this.teamChart = null;
         this.usersChart = null;
+        this._histTotalChart = null;
+        this._histGrowersChart = null;
+        // Scale states for the two horizontal bar charts
+        this._usersLogScale = false;
+        this._growersLogScale = false;
         
         // Brand Colors
         this.colors = {
@@ -461,12 +466,16 @@ export class ChartManager {
     }
 
 
-    renderUsersChart(userData) {
+    renderUsersChart(userData, logScale = false) {
         const ctx = document.getElementById('usersChart').getContext('2d');
         const labels = userData.map(u => u.name);
         const data   = userData.map(u => u.used / 1e9);
 
         if (this.usersChart) this.usersChart.destroy();
+
+        const xScaleCfg = logScale
+            ? { type: 'logarithmic', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { callback: v => `${v} GB` } }
+            : { type: 'linear',      grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { callback: v => `${v} GB` } };
 
         this.usersChart = new Chart(ctx, {
             type: 'bar',
@@ -482,11 +491,22 @@ export class ChartManager {
                     }
                 },
                 scales: {
-                    x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { callback: v => `${v} GB` } },
+                    x: xScaleCfg,
                     y: { grid: { display: false } }
                 }
             }
         });
+
+        // Wire toggle button
+        const btn = document.getElementById('users-scale-btn');
+        if (btn) {
+            btn.textContent = logScale ? 'Log' : 'Lin';
+            btn.classList.toggle('active', logScale);
+            btn.onclick = () => {
+                this._usersLogScale = !this._usersLogScale;
+                this.renderUsersChart(userData, this._usersLogScale);
+            };
+        }
     }
 
     // ── History Tab Charts ────────────────────────────────────────────────────
@@ -538,7 +558,7 @@ export class ChartManager {
         });
     }
 
-    renderTopGrowersChart(growersData) {
+    renderTopGrowersChart(growersData, logScale = false) {
         const el = document.getElementById('historyGrowersChart');
         if (!el) return;
         const ctx = el.getContext('2d');
@@ -552,6 +572,14 @@ export class ChartManager {
             const top = growersData[0];
             el2.textContent = `${top.name}: +${((top.growth||0)/1e9).toFixed(1)} GB`;
         }
+
+        // For log scale: use absolute values (negatives can't be logged)
+        const hasNegative = deltas.some(d => d < 0);
+        const useLog = logScale && !hasNegative;
+
+        const xScaleCfg = useLog
+            ? { type: 'logarithmic', grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#475569', font: { size: 10 }, callback: v => `${v>0?'+':''}${v}G` } }
+            : { type: 'linear',      grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#475569', font: { size: 10 }, callback: v => `${v>0?'+':''}${v}G` } };
 
         if (this._histGrowersChart) this._histGrowersChart.destroy();
         this._histGrowersChart = new Chart(ctx, {
@@ -568,11 +596,24 @@ export class ChartManager {
                     }
                 },
                 scales: {
-                    x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#475569', font: { size: 10 }, callback: v => `${v>0?'+':''}${v}G` } },
+                    x: xScaleCfg,
                     y: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 } } }
                 }
             }
         });
+
+        // Wire toggle button
+        const btn = document.getElementById('growers-scale-btn');
+        if (btn) {
+            const effective = useLog;
+            btn.textContent = effective ? 'Log' : 'Lin';
+            btn.classList.toggle('active', effective);
+            btn.title = hasNegative && logScale ? 'Log unavailable (negative values)' : 'Toggle log/linear scale';
+            btn.onclick = () => {
+                this._growersLogScale = !this._growersLogScale;
+                this.renderTopGrowersChart(growersData, this._growersLogScale);
+            };
+        }
     }
 
     renderUserTrendChart(userTimelineMap, selectedUsers, startMs, endMs, logScale = false) {

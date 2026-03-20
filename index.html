@@ -189,7 +189,10 @@
                 <div class="chart-container glass-panel">
                     <div class="panel-header">
                         <h2>Top Consuming Users</h2>
-                        <button class="chart-expand-btn" data-chart="users" title="Expand chart">⛶</button>
+                        <div style="display:flex;align-items:center;gap:6px">
+                            <button id="users-scale-btn" class="scale-toggle-btn" title="Toggle log/linear scale">Lin</button>
+                            <button class="chart-expand-btn" data-chart="users" title="Expand chart">⛶</button>
+                        </div>
                     </div>
                     <div class="canvas-wrapper">
                         <canvas id="usersChart"></canvas>
@@ -277,6 +280,7 @@
                                         <div class="history-chart-header">
                                             <span class="history-chart-title">🔥 Fastest Growing Users</span>
                                             <div style="display:flex;align-items:center;gap:6px">
+                                                <button id="growers-scale-btn" class="scale-toggle-btn" title="Toggle log/linear scale">Lin</button>
                                                 <span class="history-chart-stat" id="history-growers-stat"></span>
                                                 <button class="chart-expand-btn" data-chart="growers" title="Expand chart">⛶</button>
                                             </div>
