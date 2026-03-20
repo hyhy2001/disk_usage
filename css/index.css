@@ -35,6 +35,17 @@
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ── Light Theme ─────────────────────────────────────────────────────────── */
+:root[data-theme='light'] {
+    --bg-base: #f1f5f9;
+    --bg-surface: rgba(255, 255, 255, 0.85);
+    --bg-surface-elevated: rgba(255, 255, 255, 0.97);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --glass-border: 1px solid rgba(0, 0, 0, 0.08);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.10);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -45,10 +56,62 @@ body.dark-theme {
     background-color: var(--bg-base);
     color: var(--text-primary);
     font-family: 'Inter', -apple-system, sans-serif;
-    line-height: 1.5; /* UX audit fix: Add standard line height */
+    line-height: 1.5;
     min-height: 100vh;
     overflow-x: hidden;
     position: relative;
+}
+
+
+/* Override body bg for light mode */
+:root[data-theme='light'] body.dark-theme,
+body.dark-theme {
+    transition: background-color 0.25s, color 0.25s;
+}
+
+/* Light mode background gradient */
+:root[data-theme='light'] .background-mesh {
+    background: radial-gradient(circle at 50% 0%, #e2e8f0 0%, #f1f5f9 100%) !important;
+}
+
+:root[data-theme='light'] .glow-orb {
+    opacity: 0.06;
+}
+
+/* Theme toggle button */
+.theme-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.06);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: 6px;
+    flex-shrink: 0;
+}
+
+.theme-toggle-btn:hover {
+    background: rgba(255,255,255,0.12);
+    color: var(--text-primary);
+}
+
+/* Dark mode → show moon, hide sun */
+.theme-toggle-btn .icon-sun { display: none; }
+.theme-toggle-btn .icon-moon { display: block; }
+
+/* Light mode → show sun, hide moon */
+:root[data-theme='light'] .theme-toggle-btn .icon-sun { display: block; }
+:root[data-theme='light'] .theme-toggle-btn .icon-moon { display: none; }
+
+:root[data-theme='light'] .theme-toggle-btn {
+    border-color: rgba(0,0,0,0.1);
+    background: rgba(0,0,0,0.05);
+    color: #475569;
 }
 
 /* Background Effects */
