@@ -474,8 +474,23 @@ export class ChartManager {
         if (this.usersChart) this.usersChart.destroy();
 
         const xScaleCfg = logScale
-            ? { type: 'logarithmic', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { callback: v => `${v} GB` } }
-            : { type: 'linear',      grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { callback: v => `${v} GB` } };
+            ? {
+                type: 'logarithmic',
+                grid: { color: 'rgba(255,255,255,0.05)' },
+                ticks: {
+                    autoSkip: true,
+                    maxTicksLimit: 6,
+                    maxRotation: 0,
+                    callback: v => {
+                        // Only show clean powers: 1, 2, 5, 10, 20, 50, 100...
+                        const log = Math.log10(v);
+                        if (Math.abs(log - Math.round(log)) < 1e-9) return `${v} GB`;
+                        const nice = [1,2,5,10,15,20,25,30,40,50,60,70,80,90,100];
+                        return nice.includes(Math.round(v)) ? `${Math.round(v)} GB` : null;
+                    }
+                }
+              }
+            : { type: 'linear', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { maxTicksLimit: 8, callback: v => `${v} GB` } };
 
         this.usersChart = new Chart(ctx, {
             type: 'bar',
@@ -578,8 +593,23 @@ export class ChartManager {
         const useLog = logScale && !hasNegative;
 
         const xScaleCfg = useLog
-            ? { type: 'logarithmic', grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#475569', font: { size: 10 }, callback: v => `${v>0?'+':''}${v}G` } }
-            : { type: 'linear',      grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#475569', font: { size: 10 }, callback: v => `${v>0?'+':''}${v}G` } };
+            ? {
+                type: 'logarithmic',
+                grid: { color: 'rgba(255,255,255,0.04)' },
+                ticks: {
+                    color: '#475569', font: { size: 10 },
+                    autoSkip: true,
+                    maxTicksLimit: 6,
+                    maxRotation: 0,
+                    callback: v => {
+                        const log = Math.log10(v);
+                        if (Math.abs(log - Math.round(log)) < 1e-9) return `+${v}G`;
+                        const nice = [1,2,5,10,15,20,25,30,40,50,60,70,80,90,100,150,200,300,400,500];
+                        return nice.includes(Math.round(v)) ? `+${Math.round(v)}G` : null;
+                    }
+                }
+              }
+            : { type: 'linear', grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#475569', font: { size: 10 }, maxTicksLimit: 8, callback: v => `${v>0?'+':''}${v}G` } };
 
         if (this._histGrowersChart) this._histGrowersChart.destroy();
         this._histGrowersChart = new Chart(ctx, {
