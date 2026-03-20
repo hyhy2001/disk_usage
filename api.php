@@ -20,11 +20,8 @@ if (!is_dir($rawPath) && !is_link($rawPath)) {
     exit;
 }
 
-header('Content-Type: application/json; charset=utf-8');
-
 // ── Permissions endpoint ──────────────────────────────────────────────────────
 if (($_GET['type'] ?? '') === 'permissions') {
-    // Find the most recently named permission_issues_*.json file
     $dh = @opendir($rawPath);
     $permFiles = [];
     while ($dh && ($f = readdir($dh)) !== false) {
@@ -32,16 +29,17 @@ if (($_GET['type'] ?? '') === 'permissions') {
             $permFiles[] = $f;
     }
     if ($dh) closedir($dh);
-    sort($permFiles);  // alphabetical → latest is last
+    sort($permFiles);
     $latest = !empty($permFiles) ? end($permFiles) : null;
 
+    $data = null;
     if ($latest) {
         $content = file_get_contents($rawPath . DIRECTORY_SEPARATOR . $latest);
-        $data    = $content !== false ? json_decode($content, true) : null;
-        echo json_encode(['status' => 'success', 'data' => $data]);
-    } else {
-        echo json_encode(['status' => 'success', 'data' => null]);
+        if ($content !== false) $data = json_decode($content, true);
     }
+
+    header('Content-Type: text/plain; charset=utf-8');
+    echo json_encode(['status' => 'success', 'data' => $data]);
     exit;
 }
 
@@ -66,6 +64,7 @@ foreach ($files as $file) {
     if ($json !== null) $aggregated[] = $json;
 }
 
+header('Content-Type: text/plain; charset=utf-8');
 echo json_encode([
     'status'      => 'success',
     'total_files' => count($aggregated),
