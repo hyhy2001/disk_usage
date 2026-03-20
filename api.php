@@ -48,6 +48,9 @@ foreach ($entries as $e) {
 $req    = $_GET['req']   ?? '';
 $diskId = $_GET['drive'] ?? array_key_first($disks);
 
+echo "[DEBUG] req=$req disk=$diskId\n";
+echo "[DEBUG] disks.json loaded: " . count($disks) . " disks\n";
+
 // ── Route: list_drives ────────────────────────────────────────────────────────
 if ($req === 'list_drives') {
     $out = array_map(fn($d) => [
@@ -76,6 +79,9 @@ if (!is_dir($dir) && !is_link($dir)) {
     echo json_encode(['status' => 'error', 'message' => "Dir not found: $dir"]);
     exit;
 }
+
+echo "[DEBUG] resolved dir: $dir\n";
+echo "[DEBUG] is_dir=" . (is_dir($dir) ? 'yes' : 'no') . " is_link=" . (is_link($dir) ? 'yes' : 'no') . "\n";
 
 // Helper: read all .json files (optionally filtered by name substring)
 function readJsonFiles(string $dir, string $match = ''): array {
@@ -107,6 +113,8 @@ if ($req === 'permissions') {
 // ── Route: disk data ──────────────────────────────────────────────────────────
 $all  = readJsonFiles($dir);
 $data = array_values(array_filter($all, fn($j) => !isset($j['permission_issues'])));
+
+echo "[DEBUG] files read: " . count($all) . " total, " . count($data) . " reports\n";
 
 echo json_encode([
     'status'      => 'success',
