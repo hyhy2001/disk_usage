@@ -193,15 +193,13 @@ export class DataStore {
             .sort((a, b) => b.used - a.used);
     }
 
-    /** Return users of a team + other_usage (system users), sorted by usage desc */
+    /** Return only users belonging to a given team_id, sorted by usage desc */
     getUsersByTeamId(teamId) {
         const names = this.teamUserMap.get(teamId);
-        const teamUsers = names
-            ? Array.from(names).map(name => ({ name, used: this.userUsageMap.get(name) ?? 0 }))
-            : [];
-        const otherUsers = Array.from(this.otherUsageMap.entries())
-            .map(([name, used]) => ({ name, used }));
-        return [...teamUsers, ...otherUsers].sort((a, b) => b.used - a.used);
+        if (!names || !names.size) return [];
+        return Array.from(names)
+            .map(name => ({ name, used: this.userUsageMap.get(name) ?? 0 }))
+            .sort((a, b) => b.used - a.used);
     }
 
     getTopUsers(limit = 10) {
