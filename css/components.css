@@ -3181,6 +3181,11 @@
     background: transparent;
 }
 
+/* -- Team pie chart is clickable -- */
+#teamChart {
+    cursor: pointer;
+}
+
 /* -- Usage bars track background in light mode ----------------------------- */
 :root[data-theme='light'] .usage-bar-track,
 :root[data-theme='light'] .pivot-mini-bar {

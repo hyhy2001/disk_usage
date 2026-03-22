@@ -9,15 +9,21 @@ export class DataStore {
         this.otherUsageMap = new Map();
 
         // Lightweight per-entity timelines
-        this.userTimelineMap = new Map(); // username → [{timestamp, used}]
-        this.teamTimelineMap = new Map(); // teamname → [{timestamp, used}]
+        this.userTimelineMap = new Map(); // username -> [{timestamp, used}]
+        this.teamTimelineMap = new Map(); // teamname -> [{timestamp, used}]
+
+        // team_id -> Set<username> (built from user_usage.team_id in latest report)
+        this.teamUserMap = new Map();
+        // username -> team_id
+        this.userTeamIdMap = new Map();
+        // team name -> team_id
+        this.teamIdMap = new Map();
 
         this.dateRange = { min: Infinity, max: -Infinity };
 
-        // Full snapshot object for the latest report
         this.latestSnapshot = null;
         this._latestTs = -Infinity;
-        this.permissionIssues = null;  // latest *permission_issues*.json
+        this.permissionIssues = null;
 
         this.latestStats = {
             total: 0,
@@ -75,19 +81,25 @@ export class DataStore {
                 };
             }
 
-            // Aggregate Teams
+            // Aggregate Teams (store team_id alongside)
             if (report.team_usage) {
                 report.team_usage.forEach(team => {
                     this.teamUsageMap.set(team.name, team.used);
+                    if (team.team_id !== undefined) this.teamIdMap.set(team.name, team.team_id);
                     if (!this.teamTimelineMap.has(team.name)) this.teamTimelineMap.set(team.name, []);
                     this.teamTimelineMap.get(team.name).push({ timestamp: ts, used: team.used });
                 });
             }
 
-            // Aggregate Users
+            // Aggregate Users (store team_id for team-user linking)
             if (report.user_usage) {
                 report.user_usage.forEach(user => {
                     this.userUsageMap.set(user.name, user.used);
+                    if (user.team_id !== undefined) {
+                        this.userTeamIdMap.set(user.name, user.team_id);
+                        if (!this.teamUserMap.has(user.team_id)) this.teamUserMap.set(user.team_id, new Set());
+                        this.teamUserMap.get(user.team_id).add(user.name);
+                    }
                     if (!this.userTimelineMap.has(user.name)) this.userTimelineMap.set(user.name, []);
                     this.userTimelineMap.get(user.name).push({ timestamp: ts, used: user.used });
                 });
@@ -177,7 +189,16 @@ export class DataStore {
 
     getTeamDistribution() {
         return Array.from(this.teamUsageMap.entries())
-            .map(([name, used]) => ({ name, used }))
+            .map(([name, used]) => ({ name, used, team_id: this.teamIdMap.get(name) }))
+            .sort((a, b) => b.used - a.used);
+    }
+
+    /** Return usernames belonging to a given team_id, sorted by usage desc */
+    getUsersByTeamId(teamId) {
+        const names = this.teamUserMap.get(teamId);
+        if (!names || !names.size) return [];
+        return Array.from(names)
+            .map(name => ({ name, used: this.userUsageMap.get(name) ?? 0 }))
             .sort((a, b) => b.used - a.used);
     }
 

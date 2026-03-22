@@ -224,12 +224,14 @@ export class ChartManager {
     }
 
     render(dataStore) {
-        this._fullTimeline = dataStore.getTimelineData();   // store full dataset
+        this._fullTimeline = dataStore.getTimelineData();
+        this._dataStore    = dataStore;               // keep ref for team-click
         this.renderTimeline(this._fullTimeline);
         this.renderPeriodTable(this._fullTimeline);
         this.renderTeamChart(
             dataStore.getTeamDistribution(),
-            dataStore.latestStats.used
+            dataStore.latestStats.used,
+            dataStore
         );
         this.renderUsersChart(dataStore.getTopUsers(10));
         this._bindRangeBtns();
@@ -575,18 +577,16 @@ export class ChartManager {
     }
 
 
-    renderTeamChart(teamData, totalUsed = 0) {
+    renderTeamChart(teamData, totalUsed = 0, dataStore = null) {
         const ctx = document.getElementById('teamChart').getContext('2d');
         // Cache for theme re-render
         this._teamData  = teamData;
         this._teamTotal = totalUsed;
 
-        // Compute Unknown = df-h total used minus sum of all detailed-scan teams
-        const sumTeams = teamData.reduce((s, t) => s + t.used, 0);
+        const sumTeams    = teamData.reduce((s, t) => s + t.used, 0);
         const unknownBytes = Math.max(0, totalUsed - sumTeams);
-
-        const allTeams = [...teamData];
-        const bgColors = [
+        const allTeams    = [...teamData];
+        const bgColors    = [
             this.colors.sky, this.colors.emerald, this.colors.amber,
             this.colors.rose, '#8b5cf6', this.colors.slate, '#06b6d4', '#a78bfa'
         ];
@@ -600,8 +600,8 @@ export class ChartManager {
         const data   = allTeams.map(t => t.used / 1e12);
 
         // Center text plugin
-        const totalTB  = (totalUsed / 1e12).toFixed(2);
-        const totalGB  = (totalUsed / 1e9).toFixed(0);
+        const totalTB = (totalUsed / 1e12).toFixed(2);
+        const totalGB = (totalUsed / 1e9).toFixed(0);
         const centerTextPlugin = {
             id: 'centerText',
             afterDraw(chart) {
@@ -611,13 +611,11 @@ export class ChartManager {
                 const cy = (top + bottom) / 2;
                 const isLight = document.documentElement.dataset.theme === 'light';
                 c.save();
-                // Main value
                 c.font = 'bold 22px Inter, sans-serif';
                 c.fillStyle = isLight ? '#1E2235' : '#ffffff';
                 c.textAlign = 'center';
                 c.textBaseline = 'middle';
                 c.fillText(`${totalTB} TB`, cx, cy - 12);
-                // Sub-label
                 c.font = '500 12px Inter, sans-serif';
                 c.fillStyle = isLight ? '#5B6377' : '#94a3b8';
                 c.fillText(`${totalGB} GB used`, cx, cy + 12);
@@ -627,13 +625,16 @@ export class ChartManager {
 
         if (this.teamChart) this.teamChart.destroy();
 
+        // Track which team is currently selected (for toggle)
+        this._selectedTeamIdx = null;
+
         this.teamChart = new Chart(ctx, {
             type: 'doughnut',
             plugins: [centerTextPlugin],
             data: {
-                labels: labels,
+                labels,
                 datasets: [{
-                    data: data,
+                    data,
                     backgroundColor: bgColors.slice(0, allTeams.length),
                     borderWidth: 0,
                     hoverOffset: 4
@@ -652,17 +653,64 @@ export class ChartManager {
                         borderColor: 'rgba(255,255,255,0.1)',
                         borderWidth: 1,
                         callbacks: {
-                            label: ctx => {
-                                return ` ${ctx.label}: ${smartFmt(ctx.raw * 1e12)}`;
-                            }
+                            label: c => ` ${c.label}: ${smartFmt(c.raw * 1e12)}`
                         }
                     }
+                },
+                onClick: (evt, elements) => {
+                    if (!dataStore || !elements.length) return;
+                    const idx = elements[0].index;
+                    const team = allTeams[idx];
+                    if (!team || team.team_id === undefined) {
+                        // Unknown team clicked — reset
+                        this._clearTeamFilter(dataStore);
+                        return;
+                    }
+                    if (this._selectedTeamIdx === idx) {
+                        // Same slice clicked again — reset filter
+                        this._clearTeamFilter(dataStore);
+                        return;
+                    }
+                    this._selectedTeamIdx = idx;
+                    const teamUsers = dataStore.getUsersByTeamId(team.team_id);
+                    this.renderUsersChart(teamUsers);
+                    this._showTeamFilterBadge(team.name, () => this._clearTeamFilter(dataStore));
                 }
             }
         });
 
         const teamCanvas = document.getElementById('teamChart');
         this._watchResize(teamCanvas, this.teamChart);
+    }
+
+    /** Show a dismissible "Filtered: TeamName" badge above the users chart */
+    _showTeamFilterBadge(teamName, onClear) {
+        let badge = document.getElementById('team-filter-badge');
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.id = 'team-filter-badge';
+            badge.style.cssText = [
+                'display:inline-flex', 'align-items:center', 'gap:6px',
+                'padding:4px 10px', 'border-radius:20px', 'font-size:12px',
+                'font-weight:600', 'background:rgba(14,165,233,0.15)',
+                'color:#38bdf8', 'border:1px solid rgba(14,165,233,0.35)',
+                'cursor:pointer', 'user-select:none', 'margin-bottom:8px'
+            ].join(';');
+            // Insert before usersChart canvas
+            const usersCanvas = document.getElementById('usersChart');
+            if (usersCanvas) usersCanvas.parentElement.insertBefore(badge, usersCanvas);
+        }
+        badge.innerHTML = `Team: ${teamName} <span style="opacity:.7;font-size:14px;line-height:1">&times;</span>`;
+        badge.style.display = 'inline-flex';
+        badge.onclick = onClear;
+    }
+
+    /** Clear team filter — restore all-users chart and hide badge */
+    _clearTeamFilter(dataStore) {
+        this._selectedTeamIdx = null;
+        this.renderUsersChart(dataStore.getTopUsers(10));
+        const badge = document.getElementById('team-filter-badge');
+        if (badge) badge.style.display = 'none';
     }
 
     renderUsersChart(userData, logScale = false) {
