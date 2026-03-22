@@ -670,7 +670,7 @@ export class ChartManager {
                     this._selectedTeamIdx = idx;
 
                     if (!team || team.team_id === undefined) {
-                        // "Unknown" / "Other" slice — show system/unregistered users
+                        // No team_id = auto-generated "Other" catchall -> show other_usage
                         const otherUsers = dataStore.getOtherUsers();
                         if (otherUsers.length) {
                             this.renderUsersChart(otherUsers);
@@ -681,17 +681,12 @@ export class ChartManager {
                         return;
                     }
 
+                    // Named team -> show its members (empty state if no users assigned)
                     const teamUsers = dataStore.getUsersByTeamId(team.team_id);
                     if (teamUsers.length) {
                         this.renderUsersChart(teamUsers);
                     } else {
-                        // Team has no registered users — show system/other_usage users
-                        const fallback = dataStore.getOtherUsers();
-                        if (fallback.length) {
-                            this.renderUsersChart(fallback);
-                        } else {
-                            this._showNoDataUsersChart();
-                        }
+                        this._showNoDataUsersChart();
                     }
                     this._showTeamFilterBadge(team.name, () => this._clearTeamFilter(dataStore));
                 }
