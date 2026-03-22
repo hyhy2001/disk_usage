@@ -682,7 +682,17 @@ export class ChartManager {
                     }
 
                     const teamUsers = dataStore.getUsersByTeamId(team.team_id);
-                    this.renderUsersChart(teamUsers);
+                    if (teamUsers.length) {
+                        this.renderUsersChart(teamUsers);
+                    } else {
+                        // Team has no registered users — show system/other_usage users
+                        const fallback = dataStore.getOtherUsers();
+                        if (fallback.length) {
+                            this.renderUsersChart(fallback);
+                        } else {
+                            this._showNoDataUsersChart();
+                        }
+                    }
                     this._showTeamFilterBadge(team.name, () => this._clearTeamFilter(dataStore));
                 }
             }
