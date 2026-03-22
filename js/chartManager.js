@@ -671,7 +671,7 @@ export class ChartManager {
 
                     if (!team || team.team_id === undefined) {
                         // "Unknown" slice — no user mapping available
-                        this._showNoDataUsersChart('Unknown');
+                        this._showNoDataUsersChart();
                         this._showTeamFilterBadge('Unknown', () => this._clearTeamFilter(dataStore));
                         return;
                     }
@@ -718,24 +718,66 @@ export class ChartManager {
         if (badge) badge.style.display = 'none';
     }
 
-    /** Show an empty-state placeholder in the users chart area */
-    _showNoDataUsersChart(teamName) {
+    /** Show a premium empty-state overlay over the users chart canvas */
+    _showNoDataUsersChart() {
         if (this.usersChart) { this.usersChart.destroy(); this.usersChart = null; }
+
+        // Clear any leftover pixels on the raw canvas
         const canvas = document.getElementById('usersChart');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const isLight = document.documentElement.dataset.theme === 'light';
-        ctx.save();
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = isLight ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.15)';
-        ctx.font = '500 14px Inter, sans-serif';
-        ctx.fillText(`No user data for "${teamName}"`, canvas.width / 2, canvas.height / 2);
-        ctx.restore();
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Reuse or create the overlay inside canvas-wrapper (positioned absolute)
+        const wrapper = canvas?.parentElement;
+        if (!wrapper) return;
+        wrapper.style.position = 'relative'; // ensure stacking context
+
+        let overlay = document.getElementById('users-no-data-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'users-no-data-overlay';
+            overlay.style.cssText = [
+                'position:absolute', 'inset:0', 'display:flex',
+                'flex-direction:column', 'align-items:center', 'justify-content:center',
+                'gap:10px', 'pointer-events:none'
+            ].join(';');
+            wrapper.appendChild(overlay);
+        }
+
+        overlay.innerHTML = `
+            <div style="
+                width:44px;height:44px;border-radius:14px;
+                background:rgba(100,116,139,0.12);border:1px solid rgba(100,116,139,0.25);
+                display:flex;align-items:center;justify-content:center;
+                color:#64748b;margin-bottom:2px">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+            </div>
+            <span style="font:600 13px/1 Inter,sans-serif;color:var(--text-primary,#e2e8f0)">
+                No consumer data
+            </span>
+            <span style="font:400 11.5px/1.5 Inter,sans-serif;color:var(--text-secondary,#64748b);max-width:180px;text-align:center">
+                Usage in this segment is untracked<br>or belongs to the system
+            </span>`;
+
+        overlay.style.display = 'flex';
+    }
+
+    /** Hide the no-data overlay (called whenever a real chart is rendered) */
+    _hideNoDataOverlay() {
+        const overlay = document.getElementById('users-no-data-overlay');
+        if (overlay) overlay.style.display = 'none';
     }
 
     renderUsersChart(userData, logScale = false) {
+        this._hideNoDataOverlay(); // clear any empty-state overlay first
         const ctx = document.getElementById('usersChart').getContext('2d');
         const labels  = userData.map(u => u.name);
         const bytes   = userData.map(u => u.used);
