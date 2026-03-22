@@ -683,24 +683,25 @@ export class ChartManager {
         this._watchResize(teamCanvas, this.teamChart);
     }
 
-    /** Show a dismissible "Filtered: TeamName" badge above the users chart */
+    /** Show a dismissible "Filtered: TeamName" badge in the users chart panel-header */
     _showTeamFilterBadge(teamName, onClear) {
         let badge = document.getElementById('team-filter-badge');
         if (!badge) {
-            badge = document.createElement('div');
+            badge = document.createElement('span');
             badge.id = 'team-filter-badge';
             badge.style.cssText = [
-                'display:inline-flex', 'align-items:center', 'gap:6px',
-                'padding:4px 10px', 'border-radius:20px', 'font-size:12px',
+                'display:inline-flex', 'align-items:center', 'gap:5px',
+                'padding:2px 9px', 'border-radius:20px', 'font-size:11px',
                 'font-weight:600', 'background:rgba(14,165,233,0.15)',
-                'color:#38bdf8', 'border:1px solid rgba(14,165,233,0.35)',
-                'cursor:pointer', 'user-select:none', 'margin-bottom:8px'
+                'color:#38bdf8', 'border:1px solid rgba(14,165,233,0.3)',
+                'cursor:pointer', 'user-select:none'
             ].join(';');
-            // Insert before usersChart canvas
+            // Insert into panel-header of usersChart (OUTSIDE canvas-wrapper — no layout impact)
             const usersCanvas = document.getElementById('usersChart');
-            if (usersCanvas) usersCanvas.parentElement.insertBefore(badge, usersCanvas);
+            const headerRow = usersCanvas?.closest('.chart-container')?.querySelector('.flex-row-g6');
+            if (headerRow) headerRow.prepend(badge);
         }
-        badge.innerHTML = `Team: ${teamName} <span style="opacity:.7;font-size:14px;line-height:1">&times;</span>`;
+        badge.innerHTML = `${teamName} <span style="opacity:.6;font-size:13px;line-height:1">&times;</span>`;
         badge.style.display = 'inline-flex';
         badge.onclick = onClear;
     }
