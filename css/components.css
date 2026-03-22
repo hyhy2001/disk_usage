@@ -4148,26 +4148,107 @@
     font-size: 0.8rem;
     color: var(--text-muted);
     white-space: nowrap;
+    flex-shrink: 0;
 }
-.ud-picker-select {
+
+/* Custom dropdown (replaces native <select>) */
+.ud-dropdown {
+    position: relative;
     flex: 1;
-    min-width: 160px;
-    max-width: 280px;
-    padding: 7px 12px;
+    min-width: 180px;
+    max-width: 300px;
+}
+.ud-dropdown-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 8px 12px;
     border-radius: 8px;
     border: 1px solid var(--border);
-    background: var(--bg-glass);
+    background: rgba(255,255,255,0.04);
     color: var(--text);
     font-size: 0.85rem;
     cursor: pointer;
-    outline: none;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, background 0.15s;
+    gap: 8px;
+    text-align: left;
 }
-.ud-picker-select:focus { border-color: var(--sky-400); }
+.ud-dropdown-btn:hover,
+.ud-dropdown-btn:focus {
+    border-color: var(--sky-400, #38bdf8);
+    background: rgba(56, 189, 248, 0.06);
+    outline: none;
+}
+.ud-dropdown-btn.open {
+    border-color: var(--sky-400, #38bdf8);
+    background: rgba(56, 189, 248, 0.08);
+    border-radius: 8px 8px 0 0;
+}
+.ud-dropdown-btn-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ud-dropdown-btn-text.placeholder { color: var(--text-muted); }
+.ud-dropdown-chevron {
+    flex-shrink: 0;
+    transition: transform 0.18s;
+    color: var(--text-muted);
+}
+.ud-dropdown-btn.open .ud-dropdown-chevron { transform: rotate(180deg); }
+.ud-dropdown-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 200;
+    background: var(--bg-panel, #1e293b);
+    border: 1px solid var(--sky-400, #38bdf8);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    max-height: 260px;
+    overflow-y: auto;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    display: none;
+}
+.ud-dropdown-list.visible { display: block; }
+.ud-dropdown-search {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.04);
+    border: none;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    font-size: 0.82rem;
+    outline: none;
+    box-sizing: border-box;
+}
+.ud-dropdown-search::placeholder { color: var(--text-muted); }
+.ud-dropdown-option {
+    padding: 8px 14px;
+    font-size: 0.83rem;
+    cursor: pointer;
+    color: var(--text);
+    transition: background 0.1s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ud-dropdown-option:hover { background: rgba(56,189,248,0.1); }
+.ud-dropdown-option.selected {
+    background: rgba(56,189,248,0.15);
+    color: var(--sky-400, #38bdf8);
+    font-weight: 500;
+}
+.ud-dropdown-option.hidden { display: none; }
+
 .ud-picker-hint {
     font-size: 0.75rem;
     color: var(--text-muted);
     margin-left: auto;
+    white-space: nowrap;
 }
 
 /* Two-column grid for cards */
@@ -4218,18 +4299,19 @@
 }
 .ud-path-row {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr 90px 60px;
     align-items: center;
     gap: 8px;
     padding: 5px 4px;
     border-radius: 6px;
     transition: background 0.12s;
+    min-width: 0;
 }
 .ud-path-row:hover { background: var(--bg-hover, rgba(255,255,255,0.04)); }
 
-/* When file card (has ext badge) use 4-col layout */
+/* When file card has ext badge: 4-col layout */
 .ud-path-row:has(.ud-ext-badge) {
-    grid-template-columns: auto 1fr auto auto;
+    grid-template-columns: auto 1fr 90px 60px;
 }
 .ud-path-name {
     font-size: 0.76rem;
@@ -4238,6 +4320,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-family: 'JetBrains Mono', monospace;
+    min-width: 0;
+    flex: 1;
 }
 .ud-path-bar-wrap {
     width: 70px;

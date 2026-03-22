@@ -110,20 +110,27 @@ function _renderSkeleton() {
 }
 
 function _renderPicker(users) {
+    const selectedLabel = _selectedUser || 'choose a user...';
     const opts = users.map(u =>
-        `<option value="${u}"${u === _selectedUser ? ' selected' : ''}>${u}</option>`
+        `<div class="ud-dropdown-option${u === _selectedUser ? ' selected' : ''}" data-value="${u}">${u}</div>`
     ).join('');
 
     return `
     <div class="ud-picker-wrap glass-panel">
-        <label class="ud-picker-label" for="ud-user-select">
+        <span class="ud-picker-label">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             Select User
-        </label>
-        <select id="ud-user-select" class="ud-picker-select" aria-label="Select user to view detail">
-            <option value="">-- choose a user --</option>
-            ${opts}
-        </select>
+        </span>
+        <div class="ud-dropdown" id="ud-dropdown">
+            <button class="ud-dropdown-btn" id="ud-dropdown-btn" aria-haspopup="listbox" aria-expanded="false">
+                <span class="ud-dropdown-btn-text${_selectedUser ? '' : ' placeholder'}" id="ud-dropdown-label">${selectedLabel}</span>
+                <svg class="ud-dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="ud-dropdown-list" id="ud-dropdown-list" role="listbox">
+                <input class="ud-dropdown-search" id="ud-dropdown-search" placeholder="Search user..." autocomplete="off">
+                <div id="ud-dropdown-options">${opts}</div>
+            </div>
+        </div>
         <span class="ud-picker-hint">${users.length} users available</span>
     </div>`;
 }
@@ -195,24 +202,54 @@ async function _loadAndRender(user) {
 }
 
 function _attachPickerEvents(root) {
-    root.querySelector('#ud-user-select')?.addEventListener('change', e => {
-        const user = e.target.value;
-        if (!user) {
-            const contentEl = root.querySelector('#ud-content');
-            if (contentEl) contentEl.innerHTML = _renderEmptyState();
-            _selectedUser = null;
-            return;
-        }
+    const btn     = root.querySelector('#ud-dropdown-btn');
+    const list    = root.querySelector('#ud-dropdown-list');
+    const label   = root.querySelector('#ud-dropdown-label');
+    const search  = root.querySelector('#ud-dropdown-search');
+    const options = root.querySelector('#ud-dropdown-options');
+    if (!btn || !list) return;
+
+    const open  = () => { btn.classList.add('open'); list.classList.add('visible'); btn.setAttribute('aria-expanded', 'true'); search?.focus(); };
+    const close = () => { btn.classList.remove('open'); list.classList.remove('visible'); btn.setAttribute('aria-expanded', 'false'); if (search) search.value = ''; _filterOptions(''); };
+    const toggle = () => list.classList.contains('visible') ? close() : open();
+
+    btn.addEventListener('click', e => { e.stopPropagation(); toggle(); });
+
+    // Search filter
+    const _filterOptions = (q) => {
+        options?.querySelectorAll('.ud-dropdown-option').forEach(el => {
+            el.classList.toggle('hidden', q.length > 0 && !el.dataset.value.toLowerCase().includes(q.toLowerCase()));
+        });
+    };
+    search?.addEventListener('input', e => _filterOptions(e.target.value));
+
+    // Option click
+    options?.addEventListener('click', e => {
+        const opt = e.target.closest('.ud-dropdown-option');
+        if (!opt) return;
+        const user = opt.dataset.value;
+        // Update label + styles
+        options.querySelectorAll('.ud-dropdown-option').forEach(el => el.classList.remove('selected'));
+        opt.classList.add('selected');
+        if (label) { label.textContent = user; label.classList.remove('placeholder'); }
+        close();
         _loadAndRender(user);
     });
+
+    // Close on outside click
+    document.addEventListener('click', e => {
+        if (!root.querySelector('#ud-dropdown')?.contains(e.target)) close();
+    }, { once: false, capture: false });
+
+    // Keyboard: Escape to close
+    list.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
 }
 
 async function _renderRoot(diskDir) {
     const root = _getRoot();
     if (!root) return;
 
-    // Show loading while fetching user list
-    root.innerHTML = `<div class="ud-loading">Loading users…</div>`;
+    root.innerHTML = `<div class="ud-loading">Loading users...</div>`;
 
     const users = await _fetchUserList(diskDir);
 
@@ -226,17 +263,14 @@ async function _renderRoot(diskDir) {
         return;
     }
 
-    // Build layout: picker + content area
     root.innerHTML = `
         ${_renderPicker(users)}
         <div id="ud-content">${_renderEmptyState()}</div>`;
 
     _attachPickerEvents(root);
 
-    // If a user was previously selected and is still in list, restore
+    // Restore previously selected user
     if (_selectedUser && users.includes(_selectedUser)) {
-        const sel = root.querySelector('#ud-user-select');
-        if (sel) sel.value = _selectedUser;
         _loadAndRender(_selectedUser);
     }
 }
