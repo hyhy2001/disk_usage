@@ -338,53 +338,90 @@ def _fake_files(base_path, user, total_used, n=30):
 
 
 def generate_detail_reports():
-    """Create detail_users/ folder per disk with per-user dir+file snapshots."""
+    """Create detail_users/ folder per disk with per-user dir+file snapshots.
+
+    Covers both regular (team) users and 'other' system users.
+    """
     user_names = [f"user{i}" for i in range(1, 21)]
-    # Use a fixed "latest" timestamp (last simulated date)
-    last_ts = int((datetime(2025, 1, 1) + timedelta(days=499)).timestamp())
+    last_ts    = int((datetime(2025, 1, 1) + timedelta(days=499)).timestamp())
 
     for disk in DISK_CONFIGS:
-        output_dir    = disk["dir"]
-        detail_dir    = os.path.join(output_dir, "detail_users")
-        total_space   = disk["total_gb"] * 1024 * 1024 * 1024
-        # Rough user budget: 60% of disk split across users
+        output_dir  = disk["dir"]
+        detail_dir  = os.path.join(output_dir, "detail_users")
+        total_space = disk["total_gb"] * 1024 * 1024 * 1024
         budget_per_user = int(total_space * 0.60 / len(user_names))
 
         if not os.path.exists(detail_dir):
             os.makedirs(detail_dir)
 
+        # ── Regular (team) users ───────────────────────────────────────────
         for user in user_names:
-            # Randomise each user's actual usage (±40%)
-            user_total = random.randint(
-                int(budget_per_user * 0.60),
-                int(budget_per_user * 1.40),
-            )
+            user_total        = random.randint(int(budget_per_user * 0.60),
+                                               int(budget_per_user * 1.40))
             total_files_count = random.randint(500, 50_000)
 
             dirs  = _fake_dirs(disk["path"], user, user_total, n=20)
             files = _fake_files(disk["path"], user, user_total, n=30)
 
-            dir_report = {
-                "date":      last_ts,
-                "directory": disk["path"],
-                "user":      user,
-                "total_used": user_total,
-                "dirs":      dirs,
-            }
-            file_report = {
-                "date":        last_ts,
-                "user":        user,
-                "total_files": total_files_count,
-                "total_used":  user_total,
-                "files":       files,
-            }
+            dir_report  = {"date": last_ts, "directory": disk["path"],
+                           "user": user, "total_used": user_total, "dirs": dirs}
+            file_report = {"date": last_ts, "user": user,
+                           "total_files": total_files_count,
+                           "total_used":  user_total, "files": files}
 
-            dir_path  = os.path.join(detail_dir, f"detail_report_dir_{user}.json")
-            file_path = os.path.join(detail_dir, f"detail_report_file_{user}.json")
-            with open(dir_path,  "w") as f: json.dump(dir_report,  f, indent=2)
-            with open(file_path, "w") as f: json.dump(file_report, f, indent=2)
+            with open(os.path.join(detail_dir, f"detail_report_dir_{user}.json"),  "w") as f:
+                json.dump(dir_report,  f, indent=2)
+            with open(os.path.join(detail_dir, f"detail_report_file_{user}.json"), "w") as f:
+                json.dump(file_report, f, indent=2)
 
-        print(f"[detail] {len(user_names)*2} files -> {detail_dir}/")
+        # ── Other (system) users ───────────────────────────────────────────
+        # Read the latest report to discover which other users exist and their usage
+        latest_report_path = None
+        for fname in sorted(os.listdir(output_dir), reverse=True):
+            if fname.startswith("report_") and fname.endswith(".json"):
+                latest_report_path = os.path.join(output_dir, fname)
+                break
+
+        other_entries = []
+        if latest_report_path:
+            try:
+                with open(latest_report_path) as f:
+                    latest = json.load(f)
+                other_entries = latest.get("other_usage", [])
+            except (OSError, json.JSONDecodeError):
+                pass
+
+        # Fallback: use the global other_users list with random budget
+        if not other_entries:
+            for u in other_users:
+                other_entries.append({
+                    "name": u,
+                    "used": random.randint(1 * 1024**3, 50 * 1024**3),
+                })
+
+        for entry in other_entries:
+            user       = entry["name"]
+            user_total = entry["used"]
+            total_files_count = random.randint(50, 5_000)
+
+            # Other users have fewer dirs/files — smaller budget scope
+            dirs  = _fake_dirs(disk["path"], user, user_total, n=5)
+            files = _fake_files(disk["path"], user, user_total, n=10)
+
+            dir_report  = {"date": last_ts, "directory": disk["path"],
+                           "user": user, "total_used": user_total, "dirs": dirs}
+            file_report = {"date": last_ts, "user": user,
+                           "total_files": total_files_count,
+                           "total_used":  user_total, "files": files}
+
+            with open(os.path.join(detail_dir, f"detail_report_dir_{user}.json"),  "w") as f:
+                json.dump(dir_report,  f, indent=2)
+            with open(os.path.join(detail_dir, f"detail_report_file_{user}.json"), "w") as f:
+                json.dump(file_report, f, indent=2)
+
+        total_users = len(user_names) + len(other_entries)
+        print(f"[detail] {total_users * 2} files -> {detail_dir}/"
+              f"  ({len(user_names)} regular + {len(other_entries)} other users)")
 
 
 if __name__ == "__main__":
