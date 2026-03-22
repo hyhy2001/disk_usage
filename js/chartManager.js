@@ -670,9 +670,14 @@ export class ChartManager {
                     this._selectedTeamIdx = idx;
 
                     if (!team || team.team_id === undefined) {
-                        // "Unknown" slice — no user mapping available
-                        this._showNoDataUsersChart();
-                        this._showTeamFilterBadge('Unknown', () => this._clearTeamFilter(dataStore));
+                        // "Unknown" / "Other" slice — show system/unregistered users
+                        const otherUsers = dataStore.getOtherUsers();
+                        if (otherUsers.length) {
+                            this.renderUsersChart(otherUsers);
+                        } else {
+                            this._showNoDataUsersChart();
+                        }
+                        this._showTeamFilterBadge(team?.name ?? 'Other', () => this._clearTeamFilter(dataStore));
                         return;
                     }
 

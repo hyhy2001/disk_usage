@@ -202,6 +202,13 @@ export class DataStore {
             .sort((a, b) => b.used - a.used);
     }
 
+    /** Return other_usage (system/unregistered users), sorted by usage desc */
+    getOtherUsers() {
+        return Array.from(this.otherUsageMap.entries())
+            .map(([name, used]) => ({ name, used }))
+            .sort((a, b) => b.used - a.used);
+    }
+
     getTopUsers(limit = 10) {
         const combined = new Map([...this.userUsageMap, ...this.otherUsageMap]);
         return Array.from(combined.entries())
