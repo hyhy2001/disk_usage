@@ -4140,6 +4140,8 @@
     margin-bottom: 18px;
     border-radius: 12px;
     flex-wrap: wrap;
+    position: relative;
+    z-index: 10;
 }
 .ud-picker-label {
     display: flex;
@@ -4203,7 +4205,7 @@
     top: 100%;
     left: 0;
     right: 0;
-    z-index: 200;
+    z-index: 300;
     background: var(--bg-surface-elevated);
     border: 1px solid var(--sky-400, #38bdf8);
     border-top: none;
