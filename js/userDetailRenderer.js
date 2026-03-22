@@ -9,6 +9,8 @@ let _selectedUser   = null;
 let _currentDisk    = null;
 let _abortCtrl      = null;
 let _otherUsers     = [];   // [{ name, used }] from snapshot
+let _fileOffset     = 0;    // current pagination offset for file report
+const FILE_PAGE     = 500;  // rows per page
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -63,11 +65,11 @@ function _renderDirCard(dirData) {
     </div>`;
 }
 
-function _renderFileCard(fileData) {
+function _renderFileCard(fileData, isAppend = false) {
     if (!fileData || !fileData.files?.length) return '';
-    const total = fileData.total_used || 1;
-    const rows  = fileData.files.map(f => {
-        const pct = Math.min((f.size / total) * 100, 100).toFixed(1);
+    const grandTotal = fileData.total_used || 1;
+    const rows = fileData.files.map(f => {
+        const pct = Math.min((f.size / grandTotal) * 100, 100).toFixed(1);
         const ext = _ext(f.path);
         const clr = _extColor(ext);
         return `
@@ -81,20 +83,36 @@ function _renderFileCard(fileData) {
         </div>`;
     }).join('');
 
-    const totalFiles = fileData.total_files
-        ? `${fileData.total_files.toLocaleString()} files total`
-        : '';
+    const shown   = (fileData.offset ?? 0) + fileData.files.length;
+    const total   = fileData.total_files ?? shown;
+    const hasMore = fileData.has_more ?? (shown < total);
+    const badge   = `Showing ${shown.toLocaleString()} of ${total.toLocaleString()} files`;
+
+    const loadMore = hasMore ? `
+        <div class="ud-load-more-wrap">
+            <button class="ud-load-more-btn" id="ud-load-more"
+                    data-offset="${shown}" aria-label="Load more files">
+                Load ${FILE_PAGE.toLocaleString()} more
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+        </div>` : '';
+
+    if (isAppend) {
+        // Return only the new rows + updated load-more (caller handles DOM surgery)
+        return { rows, loadMore, shown, total };
+    }
 
     return `
-    <div class="ud-card glass-panel">
+    <div class="ud-card glass-panel" id="ud-file-card">
         <div class="ud-card-header">
             <span class="ud-card-title">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                 Top Files
             </span>
-            <span class="ud-card-badge">${fileData.files.length} shown &middot; ${totalFiles}</span>
+            <span class="ud-card-badge" id="ud-file-badge">${badge}</span>
         </div>
-        <div class="ud-path-list">${rows}</div>
+        <div class="ud-path-list" id="ud-file-list">${rows}</div>
+        ${loadMore}
     </div>`;
 }
 
@@ -160,17 +178,24 @@ function _renderError(msg) {
 
 // ── API fetch ─────────────────────────────────────────────────────────────────
 
-async function _fetchDetail(diskDir, user) {
+async function _fetchDir(diskDir, user) {
     if (_abortCtrl) _abortCtrl.abort();
     _abortCtrl = new AbortController();
-    const { signal } = _abortCtrl;
-
-    const url = `user_detail_api.php?dir=${encodeURIComponent(diskDir)}&user=${encodeURIComponent(user)}&type=both`;
-    const res = await fetch(url, { signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const url = `user_detail_api.php?dir=${encodeURIComponent(diskDir)}&user=${encodeURIComponent(user)}&type=dir`;
+    const res = await fetch(url, { signal: _abortCtrl.signal });
+    if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     const json = await res.json();
     if (json.status !== 'success') throw new Error(json.message || 'API error');
-    return json.data; // { dir: {...}, file: {...} }
+    return json.data.dir;
+}
+
+async function _fetchFilePage(diskDir, user, offset = 0, limit = FILE_PAGE) {
+    const url = `user_detail_api.php?dir=${encodeURIComponent(diskDir)}&user=${encodeURIComponent(user)}&type=file&offset=${offset}&limit=${limit}`;
+    const res = await fetch(url);
+    if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
+    const json = await res.json();
+    if (json.status !== 'success') throw new Error(json.message || 'API error');
+    return json.data.file;
 }
 
 async function _fetchUserList(diskDir) {
@@ -190,23 +215,30 @@ async function _loadAndRender(user) {
     if (!root || !_currentDisk) return;
 
     _selectedUser = user;
+    _fileOffset   = 0;
 
     const contentEl = root.querySelector('#ud-content');
     if (contentEl) contentEl.innerHTML = _renderSkeleton();
 
     try {
-        const data = await _fetchDetail(_currentDisk, user);
+        // Fetch dir (full) and first page of files in parallel
+        const [dirData, fileData] = await Promise.all([
+            _fetchDir(_currentDisk, user),
+            _fetchFilePage(_currentDisk, user, 0, FILE_PAGE),
+        ]);
+        _fileOffset = fileData.files.length;
+
         if (contentEl) {
             contentEl.innerHTML = `<div class="ud-grid">
-                ${_renderDirCard(data.dir)}
-                ${_renderFileCard(data.file)}
+                ${_renderDirCard(dirData)}
+                ${_renderFileCard(fileData)}
             </div>`;
+            _attachLoadMore(contentEl, fileData);
         }
     } catch (err) {
         if (err.name === 'AbortError') return;
-        // No detail report — check if it's an other user with snapshot usage
         const otherUser = _otherUsers.find(o => o.name === user);
-        if (otherUser && err.message.includes('404')) {
+        if (otherUser && err.status === 404) {
             if (contentEl) contentEl.innerHTML = `
                 <div class="ud-empty-state">
                     <div class="ud-empty-icon">
@@ -219,6 +251,49 @@ async function _loadAndRender(user) {
         } else {
             if (contentEl) contentEl.innerHTML = _renderError(`Failed to load detail for "${user}": ${err.message}`);
         }
+    }
+}
+
+function _attachLoadMore(root, firstPage) {
+    const btn = root.querySelector('#ud-load-more');
+    if (!btn) return;
+    btn.addEventListener('click', () => _loadMoreFiles(root, firstPage.total_files));
+}
+
+async function _loadMoreFiles(root, grandTotal) {
+    const btn = root.querySelector('#ud-load-more');
+    if (!btn || !_currentDisk || !_selectedUser) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Loading...';
+
+    try {
+        const fileData = await _fetchFilePage(_currentDisk, _selectedUser, _fileOffset, FILE_PAGE);
+        _fileOffset += fileData.files.length;
+
+        const list   = root.querySelector('#ud-file-list');
+        const badge  = root.querySelector('#ud-file-badge');
+        const oldBtn = root.querySelector('#ud-load-more');
+
+        // Append new rows
+        if (list) {
+            const { rows, loadMore, shown } = _renderFileCard(fileData, true);
+            list.insertAdjacentHTML('beforeend', rows);
+
+            // Update badge
+            if (badge) badge.textContent = `Showing ${shown.toLocaleString()} of ${(grandTotal || shown).toLocaleString()} files`;
+
+            // Replace load-more button (remove old, inject new)
+            const wrap = oldBtn?.closest('.ud-load-more-wrap');
+            if (wrap) wrap.remove();
+            if (loadMore) list.insertAdjacentHTML('afterend', loadMore);
+
+            // Re-attach click on new button
+            const newBtn = root.querySelector('#ud-load-more');
+            if (newBtn) newBtn.addEventListener('click', () => _loadMoreFiles(root, grandTotal));
+        }
+    } catch (err) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Retry'; }
     }
 }
 

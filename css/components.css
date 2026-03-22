@@ -4450,3 +4450,38 @@
     opacity: 0.65;
     margin-top: 4px !important;
 }
+
+/* Load More button for file pagination */
+.ud-load-more-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 12px 0 4px;
+    border-top: 1px solid rgba(148,163,184,0.1);
+    margin-top: 4px;
+}
+.ud-load-more-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 18px;
+    border: 1px solid rgba(148,163,184,0.25);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s, border-color 0.18s;
+}
+.ud-load-more-btn:hover:not(:disabled) {
+    background: rgba(148,163,184,0.1);
+    color: var(--text-primary);
+    border-color: rgba(148,163,184,0.45);
+}
+.ud-load-more-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.ud-load-more-btn svg {
+    flex-shrink: 0;
+}
