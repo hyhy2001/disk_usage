@@ -6,9 +6,9 @@ import { AppState } from './main.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _selectedUser   = null;
-let _currentDisk    = null;   // dir param used for API calls
-let _abortCtrl      = null;   // cancel in-flight fetch on rapid user-switch
-let _initialized    = false;
+let _currentDisk    = null;
+let _abortCtrl      = null;
+let _otherUsers     = [];   // [{ name, used }] from snapshot
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -109,11 +109,20 @@ function _renderSkeleton() {
     </div>`;
 }
 
-function _renderPicker(users) {
+function _renderPicker(users, otherUsers) {
     const selectedLabel = _selectedUser || 'choose a user...';
-    const opts = users.map(u =>
-        `<div class="ud-dropdown-option${u === _selectedUser ? ' selected' : ''}" data-value="${u}">${u}</div>`
-    ).join('');
+    const total = users.length + otherUsers.length;
+
+    const makeOpt = (name, cls = '') =>
+        `<div class="ud-dropdown-option${name === _selectedUser ? ' selected' : ''}${cls}" data-value="${name}">${name}</div>`;
+
+    const regularOpts = users.length
+        ? `<div class="ud-dropdown-group-label">Detail Reports (${users.length})</div>${users.map(u => makeOpt(u)).join('')}`
+        : '';
+
+    const otherOpts = otherUsers.length
+        ? `<div class="ud-dropdown-group-label">Other Users (${otherUsers.length})</div>${otherUsers.map(o => makeOpt(o.name, ' ud-opt-other')).join('')}`
+        : '';
 
     return `
     <div class="ud-picker-wrap glass-panel">
@@ -128,10 +137,10 @@ function _renderPicker(users) {
             </button>
             <div class="ud-dropdown-list" id="ud-dropdown-list" role="listbox">
                 <input class="ud-dropdown-search" id="ud-dropdown-search" placeholder="Search user..." autocomplete="off">
-                <div id="ud-dropdown-options">${opts}</div>
+                <div id="ud-dropdown-options">${regularOpts}${otherOpts}</div>
             </div>
         </div>
-        <span class="ud-picker-hint">${users.length} users available</span>
+        <span class="ud-picker-hint">${total} users available</span>
     </div>`;
 }
 
@@ -183,7 +192,6 @@ async function _loadAndRender(user) {
 
     _selectedUser = user;
 
-    // Show skeleton while loading
     const contentEl = root.querySelector('#ud-content');
     if (contentEl) contentEl.innerHTML = _renderSkeleton();
 
@@ -196,8 +204,22 @@ async function _loadAndRender(user) {
             </div>`;
         }
     } catch (err) {
-        if (err.name === 'AbortError') return; // User switched — ignore
-        if (contentEl) contentEl.innerHTML = _renderError(`Failed to load detail for "${user}": ${err.message}`);
+        if (err.name === 'AbortError') return;
+        // No detail report — check if it's an other user with snapshot usage
+        const otherUser = _otherUsers.find(o => o.name === user);
+        if (otherUser && err.message.includes('404')) {
+            if (contentEl) contentEl.innerHTML = `
+                <div class="ud-empty-state">
+                    <div class="ud-empty-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <h3>${user}</h3>
+                    <p>Total disk usage: <strong>${fmt(otherUser.used)}</strong></p>
+                    <p class="ud-no-report-hint">No detailed breakdown available for this user.</p>
+                </div>`;
+        } else {
+            if (contentEl) contentEl.innerHTML = _renderError(`Failed to load detail for "${user}": ${err.message}`);
+        }
     }
 }
 
@@ -252,8 +274,9 @@ async function _renderRoot(diskDir) {
     root.innerHTML = `<div class="ud-loading">Loading users...</div>`;
 
     const users = await _fetchUserList(diskDir);
+    const total = users.length + _otherUsers.length;
 
-    if (!users.length) {
+    if (!total) {
         root.innerHTML = `
             <div class="ud-empty-state">
                 <div class="ud-empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
@@ -264,13 +287,14 @@ async function _renderRoot(diskDir) {
     }
 
     root.innerHTML = `
-        ${_renderPicker(users)}
+        ${_renderPicker(users, _otherUsers)}
         <div id="ud-content">${_renderEmptyState()}</div>`;
 
     _attachPickerEvents(root);
 
     // Restore previously selected user
-    if (_selectedUser && users.includes(_selectedUser)) {
+    const allNames = [...users, ..._otherUsers.map(o => o.name)];
+    if (_selectedUser && allNames.includes(_selectedUser)) {
         _loadAndRender(_selectedUser);
     }
 }
@@ -281,12 +305,12 @@ async function _renderRoot(diskDir) {
  * Called once when the Detail User tab button is clicked.
  * Pass the current disk directory (e.g. "mock_reports/disk_sda").
  */
-export async function initUserDetailTab(diskDir) {
+export async function initUserDetailTab(diskDir, otherUsers = []) {
     const isNewDisk = diskDir !== _currentDisk;
     _currentDisk = diskDir;
+    _otherUsers  = otherUsers;
 
     if (isNewDisk) {
-        // Reset user selection when disk changes
         _selectedUser = null;
         if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null; }
     }

@@ -4416,3 +4416,37 @@
 .ud-skeleton-card { padding: 14px 16px; gap: 10px; display: flex; flex-direction: column; }
 .ud-sk-title { height: 16px; width: 40%; border-radius: 4px; }
 .ud-sk-row   { height: 10px; border-radius: 4px; }
+
+/* Dropdown group labels */
+.ud-dropdown-group-label {
+    padding: 6px 12px 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    pointer-events: none;
+    border-top: 1px solid rgba(148,163,184,0.1);
+}
+.ud-dropdown-group-label:first-child { border-top: none; }
+
+/* Other user option — subdued style */
+.ud-dropdown-option.ud-opt-other {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+.ud-dropdown-option.ud-opt-other:hover { background: rgba(148,163,184,0.08); }
+.ud-dropdown-option.ud-opt-other.selected {
+    background: rgba(148,163,184,0.15);
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* No report hint in empty state */
+.ud-no-report-hint {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    opacity: 0.65;
+    margin-top: 4px !important;
+}

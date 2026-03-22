@@ -54,7 +54,9 @@ class DataFetcher {
                 if (this._activeDisk) {
                     const diskConf = this.disksConfig?.find(d => d.id === this._activeDisk);
                     const diskPath = diskConf?.path || this._activeDisk;
-                    initUserDetailTab(diskPath);
+                    const otherUsers = (this.dataStore?.latestSnapshot?.other || [])
+                        .map(o => ({ name: o.name, used: o.used }));
+                    initUserDetailTab(diskPath, otherUsers);
                 }
             });
         }
