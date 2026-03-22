@@ -361,7 +361,7 @@ def generate_detail_reports():
             total_files_count = random.randint(500, 50_000)
 
             dirs  = _fake_dirs(disk["path"], user, user_total, n=20)
-            files = _fake_files(disk["path"], user, user_total, n=30)
+            files = _fake_files(disk["path"], user, user_total, n=2500)
 
             dir_report  = {"date": last_ts, "directory": disk["path"],
                            "user": user, "total_used": user_total, "dirs": dirs}
@@ -406,7 +406,7 @@ def generate_detail_reports():
 
             # Other users have fewer dirs/files — smaller budget scope
             dirs  = _fake_dirs(disk["path"], user, user_total, n=5)
-            files = _fake_files(disk["path"], user, user_total, n=10)
+            files = _fake_files(disk["path"], user, user_total, n=600)
 
             dir_report  = {"date": last_ts, "directory": disk["path"],
                            "user": user, "total_used": user_total, "dirs": dirs}
