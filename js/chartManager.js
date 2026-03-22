@@ -745,7 +745,7 @@ export class ChartManager {
 
         this.usersChart = new Chart(ctx, {
             type: 'bar',
-            data: { labels, datasets: [{ label: `Consumed (${unit})`, data, backgroundColor: this.colors.sky, borderRadius: 4 }] },
+            data: { labels, datasets: [{ label: `Consumed (${unit})`, data, backgroundColor: this.colors.sky, borderRadius: 4, maxBarThickness: 32 }] },
             options: {
                 responsive: true, maintainAspectRatio: false, indexAxis: 'y',
                 plugins: {
