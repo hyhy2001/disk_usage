@@ -4485,3 +4485,53 @@
 .ud-load-more-btn svg {
     flex-shrink: 0;
 }
+
+/* ── File pagination ─────────────────────────────────────────────── */
+.ud-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 12px 0 4px;
+    border-top: 1px solid rgba(148,163,184,0.1);
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+.ud-page-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid rgba(148,163,184,0.2);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.ud-page-btn:hover:not(.disabled):not(.active) {
+    background: rgba(148,163,184,0.12);
+    color: var(--text-primary);
+    border-color: rgba(148,163,184,0.4);
+}
+.ud-page-btn.active {
+    background: var(--accent, #3b82f6);
+    border-color: var(--accent, #3b82f6);
+    color: #fff;
+    cursor: default;
+    font-weight: 600;
+}
+.ud-page-btn.disabled {
+    opacity: 0.32;
+    cursor: not-allowed;
+}
+.ud-page-ellipsis {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    padding: 0 2px;
+    user-select: none;
+}

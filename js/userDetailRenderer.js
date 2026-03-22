@@ -9,7 +9,8 @@ let _selectedUser   = null;
 let _currentDisk    = null;
 let _abortCtrl      = null;
 let _otherUsers     = [];   // [{ name, used }] from snapshot
-let _fileOffset     = 0;    // current pagination offset for file report
+let _filePage       = 1;    // current page (1-indexed)
+let _fileTotalPages = 1;    // total pages for file report
 const FILE_PAGE     = 500;  // rows per page
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -65,9 +66,57 @@ function _renderDirCard(dirData) {
     </div>`;
 }
 
-function _renderFileCard(fileData, isAppend = false) {
+function _renderPagination(current, total) {
+    if (total <= 1) return '';
+
+    const pages = [];
+    const delta = 2;  // pages around current
+
+    // Build visible page numbers with ellipsis
+    const range = [];
+    for (let i = Math.max(1, current - delta); i <= Math.min(total, current + delta); i++) range.push(i);
+
+    const buttons = [];
+
+    // Prev button
+    buttons.push(`<button class="ud-page-btn${current === 1 ? ' disabled' : ''}" data-page="${current - 1}" aria-label="Previous page">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>`);
+
+    // First page + ellipsis
+    if (range[0] > 1) {
+        buttons.push(`<button class="ud-page-btn" data-page="1">1</button>`);
+        if (range[0] > 2) buttons.push(`<span class="ud-page-ellipsis">…</span>`);
+    }
+
+    // Range
+    range.forEach(p => buttons.push(
+        `<button class="ud-page-btn${p === current ? ' active' : ''}" data-page="${p}">${p}</button>`
+    ));
+
+    // Last page + ellipsis
+    if (range[range.length - 1] < total) {
+        if (range[range.length - 1] < total - 1) buttons.push(`<span class="ud-page-ellipsis">…</span>`);
+        buttons.push(`<button class="ud-page-btn" data-page="${total}">${total}</button>`);
+    }
+
+    // Next button
+    buttons.push(`<button class="ud-page-btn${current === total ? ' disabled' : ''}" data-page="${current + 1}" aria-label="Next page">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>`);
+
+    return `<div class="ud-pagination" id="ud-pagination">${buttons.join('')}</div>`;
+}
+
+function _renderFileCard(fileData) {
     if (!fileData || !fileData.files?.length) return '';
-    const grandTotal = fileData.total_used || 1;
+    const grandTotal  = fileData.total_used || 1;
+    const totalFiles  = fileData.total_files ?? fileData.files.length;
+    const totalPages  = Math.max(1, Math.ceil(totalFiles / FILE_PAGE));
+    const currentPage = _filePage;
+    const shown       = (fileData.offset ?? 0) + fileData.files.length;
+    const badge       = `Page ${currentPage} of ${totalPages} · ${totalFiles.toLocaleString()} files`;
+
     const rows = fileData.files.map(f => {
         const pct = Math.min((f.size / grandTotal) * 100, 100).toFixed(1);
         const ext = _ext(f.path);
@@ -83,25 +132,6 @@ function _renderFileCard(fileData, isAppend = false) {
         </div>`;
     }).join('');
 
-    const shown   = (fileData.offset ?? 0) + fileData.files.length;
-    const total   = fileData.total_files ?? shown;
-    const hasMore = fileData.has_more ?? (shown < total);
-    const badge   = `Showing ${shown.toLocaleString()} of ${total.toLocaleString()} files`;
-
-    const loadMore = hasMore ? `
-        <div class="ud-load-more-wrap">
-            <button class="ud-load-more-btn" id="ud-load-more"
-                    data-offset="${shown}" aria-label="Load more files">
-                Load ${FILE_PAGE.toLocaleString()} more
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-            </button>
-        </div>` : '';
-
-    if (isAppend) {
-        // Return only the new rows + updated load-more (caller handles DOM surgery)
-        return { rows, loadMore, shown, total };
-    }
-
     return `
     <div class="ud-card glass-panel" id="ud-file-card">
         <div class="ud-card-header">
@@ -112,7 +142,7 @@ function _renderFileCard(fileData, isAppend = false) {
             <span class="ud-card-badge" id="ud-file-badge">${badge}</span>
         </div>
         <div class="ud-path-list" id="ud-file-list">${rows}</div>
-        ${loadMore}
+        ${_renderPagination(currentPage, totalPages)}
     </div>`;
 }
 
@@ -214,26 +244,26 @@ async function _loadAndRender(user) {
     const root = _getRoot();
     if (!root || !_currentDisk) return;
 
-    _selectedUser = user;
-    _fileOffset   = 0;
+    _selectedUser   = user;
+    _filePage       = 1;
+    _fileTotalPages = 1;
 
     const contentEl = root.querySelector('#ud-content');
     if (contentEl) contentEl.innerHTML = _renderSkeleton();
 
     try {
-        // Fetch dir (full) and first page of files in parallel
         const [dirData, fileData] = await Promise.all([
             _fetchDir(_currentDisk, user),
             _fetchFilePage(_currentDisk, user, 0, FILE_PAGE),
         ]);
-        _fileOffset = fileData.files.length;
+        _fileTotalPages = Math.max(1, Math.ceil((fileData.total_files ?? fileData.files.length) / FILE_PAGE));
 
         if (contentEl) {
             contentEl.innerHTML = `<div class="ud-grid">
                 ${_renderDirCard(dirData)}
                 ${_renderFileCard(fileData)}
             </div>`;
-            _attachLoadMore(contentEl, fileData);
+            _attachPaginationEvents(contentEl);
         }
     } catch (err) {
         if (err.name === 'AbortError') return;
@@ -254,54 +284,69 @@ async function _loadAndRender(user) {
     }
 }
 
-function _attachLoadMore(root, firstPage) {
-    const btn = root.querySelector('#ud-load-more');
-    if (!btn) return;
-    btn.addEventListener('click', () => _loadMoreFiles(root, firstPage.total_files));
+function _attachPaginationEvents(root) {
+    const pg = root.querySelector('#ud-pagination');
+    if (!pg) return;
+    pg.addEventListener('click', e => {
+        const btn = e.target.closest('.ud-page-btn');
+        if (!btn || btn.classList.contains('disabled') || btn.classList.contains('active')) return;
+        const page = parseInt(btn.dataset.page, 10);
+        if (!isNaN(page) && page >= 1 && page <= _fileTotalPages) _goToPage(root, page);
+    });
 }
 
-async function _loadMoreFiles(root, grandTotal) {
-    const btn = root.querySelector('#ud-load-more');
-    if (!btn || !_currentDisk || !_selectedUser) return;
+async function _goToPage(root, page) {
+    if (!_currentDisk || !_selectedUser) return;
+    if (page < 1 || page > _fileTotalPages) return;
 
-    btn.disabled = true;
-    btn.textContent = 'Loading...';
+    // Dim the list while loading
+    const list  = root.querySelector('#ud-file-list');
+    const pager = root.querySelector('#ud-pagination');
+    const badge = root.querySelector('#ud-file-badge');
+    if (list) list.style.opacity = '0.4';
+    if (pager) pager.style.pointerEvents = 'none';
 
     try {
-        const fileData = await _fetchFilePage(_currentDisk, _selectedUser, _fileOffset, FILE_PAGE);
-        _fileOffset += fileData.files?.length ?? 0;
+        const offset   = (page - 1) * FILE_PAGE;
+        const fileData = await _fetchFilePage(_currentDisk, _selectedUser, offset, FILE_PAGE);
+        _filePage      = page;
+        _fileTotalPages = Math.max(1, Math.ceil((fileData.total_files ?? fileData.files.length) / FILE_PAGE));
 
-        const list   = root.querySelector('#ud-file-list');
-        const badge  = root.querySelector('#ud-file-badge');
-        const oldBtn = root.querySelector('#ud-load-more');
-
-        // Append new rows
+        // Re-render file card rows + pagination in-place
         if (list) {
-            const result = _renderFileCard(fileData, true);
-
-            // Guard: empty page or early-return string → no more data
-            if (!result || typeof result !== 'object') {
-                oldBtn?.closest('.ud-load-more-wrap')?.remove();
-                return;
-            }
-
-            const { rows, loadMore, shown } = result;
-            if (rows) list.insertAdjacentHTML('beforeend', rows);
-
-            // Update badge
-            if (badge) badge.textContent = `Showing ${shown.toLocaleString()} of ${(grandTotal || shown).toLocaleString()} files`;
-
-            // Replace load-more button (remove old, inject new)
-            const wrap = oldBtn?.closest('.ud-load-more-wrap');
-            if (wrap) wrap.remove();
-            if (loadMore) list.insertAdjacentHTML('afterend', loadMore);
-
-            // Re-attach click on new button
-            const newBtn = root.querySelector('#ud-load-more');
-            if (newBtn) newBtn.addEventListener('click', () => _loadMoreFiles(root, grandTotal));
+            const grandTotal = fileData.total_used || 1;
+            list.innerHTML = fileData.files.map(f => {
+                const pct = Math.min((f.size / grandTotal) * 100, 100).toFixed(1);
+                const ext = _ext(f.path);
+                const clr = _extColor(ext);
+                return `
+                <div class="ud-path-row">
+                    <span class="ud-ext-badge" style="background:${clr}20;color:${clr}">.${ext}</span>
+                    <div class="ud-path-name" title="${f.path}">${_shortPath(f.path)}</div>
+                    <div class="ud-path-bar-wrap">
+                        <div class="ud-path-bar-fill ud-fill-emerald" style="width:${pct}%"></div>
+                    </div>
+                    <span class="ud-path-val">${fmt(f.size)}</span>
+                </div>`;
+            }).join('');
+            list.style.opacity = '';
         }
+
+        // Update badge
+        const totalFiles = fileData.total_files ?? fileData.files.length;
+        if (badge) badge.textContent = `Page ${page} of ${_fileTotalPages} · ${totalFiles.toLocaleString()} files`;
+
+        // Re-render pagination
+        const pgWrap = root.querySelector('#ud-pagination');
+        if (pgWrap) {
+            pgWrap.outerHTML = _renderPagination(page, _fileTotalPages);
+            // Re-attach events on the new element
+            _attachPaginationEvents(root);
+        }
+
     } catch (err) {
-        if (btn) { btn.disabled = false; btn.textContent = 'Retry'; }
+        if (list) list.style.opacity = '';
+        if (pager) pager.style.pointerEvents = '';
     }
 }
 
