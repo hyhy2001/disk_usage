@@ -4146,7 +4146,7 @@
     align-items: center;
     gap: 6px;
     font-size: 0.8rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     white-space: nowrap;
     flex-shrink: 0;
 }
@@ -4165,9 +4165,9 @@
     width: 100%;
     padding: 8px 12px;
     border-radius: 8px;
-    border: 1px solid var(--border);
+    border: 1px solid rgba(148, 163, 184, 0.2);
     background: rgba(255,255,255,0.04);
-    color: var(--text);
+    color: var(--text-primary);
     font-size: 0.85rem;
     cursor: pointer;
     transition: border-color 0.15s, background 0.15s;
@@ -4191,11 +4191,11 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.ud-dropdown-btn-text.placeholder { color: var(--text-muted); }
+.ud-dropdown-btn-text.placeholder { color: var(--text-secondary); }
 .ud-dropdown-chevron {
     flex-shrink: 0;
     transition: transform 0.18s;
-    color: var(--text-muted);
+    color: var(--text-secondary);
 }
 .ud-dropdown-btn.open .ud-dropdown-chevron { transform: rotate(180deg); }
 .ud-dropdown-list {
@@ -4204,13 +4204,13 @@
     left: 0;
     right: 0;
     z-index: 200;
-    background: var(--bg-panel, #1e293b);
+    background: var(--bg-surface-elevated);
     border: 1px solid var(--sky-400, #38bdf8);
     border-top: none;
     border-radius: 0 0 10px 10px;
     max-height: 260px;
     overflow-y: auto;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
     display: none;
 }
 .ud-dropdown-list.visible { display: block; }
@@ -4219,18 +4219,18 @@
     padding: 8px 12px;
     background: rgba(255,255,255,0.04);
     border: none;
-    border-bottom: 1px solid var(--border);
-    color: var(--text);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+    color: var(--text-primary);
     font-size: 0.82rem;
     outline: none;
     box-sizing: border-box;
 }
-.ud-dropdown-search::placeholder { color: var(--text-muted); }
+.ud-dropdown-search::placeholder { color: var(--text-secondary); }
 .ud-dropdown-option {
     padding: 8px 14px;
     font-size: 0.83rem;
     cursor: pointer;
-    color: var(--text);
+    color: var(--text-primary);
     transition: background 0.1s;
     white-space: nowrap;
     overflow: hidden;
@@ -4246,7 +4246,7 @@
 
 .ud-picker-hint {
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     margin-left: auto;
     white-space: nowrap;
 }
@@ -4271,7 +4271,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px 10px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
     gap: 8px;
 }
 .ud-card-title {
@@ -4280,11 +4280,11 @@
     gap: 6px;
     font-size: 0.82rem;
     font-weight: 600;
-    color: var(--text);
+    color: var(--text-primary);
 }
 .ud-card-badge {
     font-size: 0.72rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     white-space: nowrap;
 }
 
@@ -4315,7 +4315,7 @@
 }
 .ud-path-name {
     font-size: 0.76rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -4342,7 +4342,7 @@
 .ud-fill-emerald{ background: var(--emerald-400,#34d399); }
 .ud-path-val {
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     white-space: nowrap;
     text-align: right;
     min-width: 52px;
@@ -4377,10 +4377,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-muted);
+    color: var(--text-secondary);
 }
 .ud-empty-state h3 { font-size: 1rem; font-weight: 600; margin: 0; }
-.ud-empty-state p  { font-size: 0.83rem; color: var(--text-muted); margin: 0; max-width: 300px; }
+.ud-empty-state p  { font-size: 0.83rem; color: var(--text-secondary); margin: 0; max-width: 300px; }
 
 /* Error */
 .ud-error {
@@ -4396,7 +4396,7 @@
 .ud-loading {
     padding: 40px;
     text-align: center;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     font-size: 0.85rem;
 }
 
