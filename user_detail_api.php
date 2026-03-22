@@ -145,8 +145,8 @@ function readFileReportPaginated($detailPath, $user, $offset, $limit) {
         }
     }
 
+    $returned = count($collected);
     fclose($fh);
-
     return [
         'date'        => $date,
         'user'        => $userName,
@@ -154,7 +154,9 @@ function readFileReportPaginated($detailPath, $user, $offset, $limit) {
         'total_used'  => $totalUsed,
         'offset'      => $offset,
         'limit'       => $limit,
-        'has_more'    => ($offset + count($collected)) < $totalFiles,
+        // Reliable end-of-file detection: if we received a full page we may have more;
+        // if fewer than requested, we've consumed all remaining entries.
+        'has_more'    => $returned >= $limit,
         'files'       => $collected,
     ];
 }

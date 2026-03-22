@@ -269,7 +269,7 @@ async function _loadMoreFiles(root, grandTotal) {
 
     try {
         const fileData = await _fetchFilePage(_currentDisk, _selectedUser, _fileOffset, FILE_PAGE);
-        _fileOffset += fileData.files.length;
+        _fileOffset += fileData.files?.length ?? 0;
 
         const list   = root.querySelector('#ud-file-list');
         const badge  = root.querySelector('#ud-file-badge');
@@ -277,8 +277,16 @@ async function _loadMoreFiles(root, grandTotal) {
 
         // Append new rows
         if (list) {
-            const { rows, loadMore, shown } = _renderFileCard(fileData, true);
-            list.insertAdjacentHTML('beforeend', rows);
+            const result = _renderFileCard(fileData, true);
+
+            // Guard: empty page or early-return string → no more data
+            if (!result || typeof result !== 'object') {
+                oldBtn?.closest('.ud-load-more-wrap')?.remove();
+                return;
+            }
+
+            const { rows, loadMore, shown } = result;
+            if (rows) list.insertAdjacentHTML('beforeend', rows);
 
             // Update badge
             if (badge) badge.textContent = `Showing ${shown.toLocaleString()} of ${(grandTotal || shown).toLocaleString()} files`;
