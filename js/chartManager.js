@@ -661,17 +661,21 @@ export class ChartManager {
                     if (!dataStore || !elements.length) return;
                     const idx = elements[0].index;
                     const team = allTeams[idx];
-                    if (!team || team.team_id === undefined) {
-                        // Unknown team clicked — reset
-                        this._clearTeamFilter(dataStore);
-                        return;
-                    }
+
+                    // Same slice clicked again -> reset
                     if (this._selectedTeamIdx === idx) {
-                        // Same slice clicked again — reset filter
                         this._clearTeamFilter(dataStore);
                         return;
                     }
                     this._selectedTeamIdx = idx;
+
+                    if (!team || team.team_id === undefined) {
+                        // "Unknown" slice — no user mapping available
+                        this._showNoDataUsersChart('Unknown');
+                        this._showTeamFilterBadge('Unknown', () => this._clearTeamFilter(dataStore));
+                        return;
+                    }
+
                     const teamUsers = dataStore.getUsersByTeamId(team.team_id);
                     this.renderUsersChart(teamUsers);
                     this._showTeamFilterBadge(team.name, () => this._clearTeamFilter(dataStore));
@@ -712,6 +716,23 @@ export class ChartManager {
         this.renderUsersChart(dataStore.getTopUsers(10));
         const badge = document.getElementById('team-filter-badge');
         if (badge) badge.style.display = 'none';
+    }
+
+    /** Show an empty-state placeholder in the users chart area */
+    _showNoDataUsersChart(teamName) {
+        if (this.usersChart) { this.usersChart.destroy(); this.usersChart = null; }
+        const canvas = document.getElementById('usersChart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const isLight = document.documentElement.dataset.theme === 'light';
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = isLight ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.15)';
+        ctx.font = '500 14px Inter, sans-serif';
+        ctx.fillText(`No user data for "${teamName}"`, canvas.width / 2, canvas.height / 2);
+        ctx.restore();
     }
 
     renderUsersChart(userData, logScale = false) {
