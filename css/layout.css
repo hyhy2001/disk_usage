@@ -1,4 +1,5 @@
-/* ── Custom Scrollbar ───────────────────────────────────────────────────── */
+/* layout.css -- All interactive inputs use aria-label for accessibility compliance */
+/* -- Custom Scrollbar ----------------------------------------------------- */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -22,15 +23,16 @@
     scrollbar-color: rgba(255,255,255,0.12) transparent;
 }
 
-/* Layout Grid Structure */
+/* -- Layout Root ----------------------------------------------------------- */
 
 .app-container {
     display: flex;
-    min-height: 100vh;
+    height: 100vh;
     width: 100%;
+    overflow: hidden; /* all scrolling happens inside .main-content */
 }
 
-/* SPA Router — page visibility toggle */
+/* SPA Router -- page visibility toggle */
 .page-section {
     width: 100%;
 }
@@ -43,7 +45,7 @@
     display: block;
 }
 
-/* Sidebar */
+/* -- Sidebar --------------------------------------------------------------- */
 .sidebar {
     width: var(--sidebar-width);
     height: 100vh;
@@ -53,12 +55,22 @@
     display: flex;
     flex-direction: column;
     padding: 24px;
-    z-index: 10;
+    z-index: 200;
     border-right: var(--glass-border);
+    transition: width 0.25s ease, left 0.25s ease;
+    overflow: hidden;
 }
 
 .brand {
-    margin-bottom: 40px;
+    margin-bottom: 32px;
+}
+
+/* Logo + theme toggle on one row */
+.brand-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
 }
 
 .logo {
@@ -70,7 +82,7 @@
     letter-spacing: -0.02em;
 }
 
-/* Main Content Area */
+/* -- Main Content Area ----------------------------------------------------- */
 .main-content {
     flex: 1;
     margin-left: var(--sidebar-width);
@@ -78,9 +90,16 @@
     display: flex;
     flex-direction: column;
     gap: 32px;
+    /* CRITICAL: allow flex child to shrink below its content width */
+    min-width: 0;
+    /* All scrolling happens here, not on the page */
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: 100vh;
+    transition: margin-left 0.25s ease;
 }
 
-/* Headers */
+/* -- Headers --------------------------------------------------------------- */
 .top-header {
     display: flex;
     flex-direction: column;
@@ -111,7 +130,8 @@
 }
 
 .top-header h1 {
-    font-size: 1.35rem;
+    /* TASK-07: Fluid typography */
+    font-size: clamp(1.05rem, 2.5vw, 1.45rem);
     font-weight: 700;
     letter-spacing: -0.02em;
     white-space: nowrap;
@@ -135,7 +155,7 @@
     min-width: 0;
 }
 
-/* Shared Stat Bar — compact inline variant */
+/* Shared Stat Bar -- compact inline variant */
 .page-stat-bar {
     display: flex;
     align-items: center;
@@ -151,12 +171,14 @@
     gap: 24px;
 }
 
-/* Charts Grid */
+/* -- Charts Grid ----------------------------------------------------------- */
 .charts-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(2, minmax(350px, auto));
     gap: 24px;
+    /* Prevent grid from overflowing its container */
+    min-width: 0;
+    width: 100%;
 }
 
 .large-span {
@@ -169,6 +191,11 @@
     flex-direction: column;
     gap: 16px;
     min-height: 350px;
+    /* CRITICAL: prevents grid/flex children from overflowing their container */
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    /* NOTE: no overflow:hidden -- would clip Chart.js tooltips and expand buttons */
 }
 
 .panel-header h2 {
@@ -197,7 +224,9 @@
     color: var(--text-secondary, #94a3b8);
     font-size: 0.72rem;
     font-weight: 600;
-    padding: 3px 10px;
+    /* TASK-01: Minimum touch target */
+    padding: 6px 10px;
+    min-height: 32px;
     border-radius: 6px;
     cursor: pointer;
     letter-spacing: 0.04em;
@@ -231,7 +260,8 @@
 }
 
 .tsh-value {
-    font-size: 1.25rem;
+    /* TASK-07: Fluid typography */
+    font-size: clamp(1rem, 2vw, 1.3rem);
     font-weight: 700;
     color: var(--text-primary);
     letter-spacing: -0.01em;
@@ -249,11 +279,657 @@
     flex: 1;
     position: relative;
     width: 100%;
-    height: 100%;
+    /* CRITICAL: explicit height lets Chart.js ResizeObserver detect changes */
+    height: 250px;
     min-height: 250px;
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 /* Timeline chart taller */
 .large-span .canvas-wrapper {
+    height: 340px;
     min-height: 340px;
+}
+
+/* -- Hamburger Button (mobile only) ---------------------------------------- */
+.hamburger-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.06);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    transition: background 0.2s;
+}
+.hamburger-btn:hover { background: rgba(255,255,255,0.12); }
+
+/* -- Disk icon trigger + flyout: hidden by default, shown only in icon-only mode -- */
+.disk-icon-trigger { display: none; }
+.disk-flyout       { display: none; }
+
+/* Sidebar overlay backdrop (mobile) */
+.sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 150;
+    opacity: 0;
+    pointer-events: none;   /* ← CRITICAL: don't intercept clicks when invisible */
+    transition: opacity 0.25s;
+}
+.sidebar-backdrop.visible {
+    opacity: 1;
+    pointer-events: all;    /* ← Only intercept clicks when actually visible */
+}
+
+/* -- Brand actions: theme toggle + close button -- */
+.brand-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* -- Sidebar close button (drawer only) -- */
+.sidebar-close-btn {
+    display: none;            /* hidden on desktop */
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.06);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s;
+    flex-shrink: 0;
+}
+.sidebar-close-btn:hover {
+    background: rgba(255,255,255,0.12);
+    color: var(--text-primary);
+}
+
+/* -- Responsive Breakpoints ------------------------------------------------ */
+
+/* - 1100px: chart grid becomes single column - */
+@media (max-width: 1100px) {
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Shrink canvas a bit on tablet to leave breathing room */
+    .canvas-wrapper {
+        height: 260px;
+        min-height: 220px;
+    }
+    .large-span .canvas-wrapper {
+        height: 300px;
+        min-height: 260px;
+    }
+}
+
+/* - 960px: sidebar collapses to icon-only mode - */
+@media (max-width: 960px) {
+    :root { --sidebar-width: 64px; }
+
+    .sidebar {
+        padding: 16px 12px;
+        width: 64px;
+        overflow: visible;
+    }
+
+    /* Hide all text-only elements inside sidebar */
+    .sidebar .brand span,
+    .sidebar .nav-item span,
+    .sidebar .disk-selector-label,
+    .sidebar .disk-search-wrap,
+    .sidebar .disk-list,
+    .sidebar .status-monitor,
+    .sidebar .sidebar-clock,
+    .sidebar-clock {
+        display: none;
+    }
+
+    /* Center nav icons */
+    .sidebar .nav-links {
+        align-items: center;
+    }
+
+    .sidebar .nav-item {
+        justify-content: center;
+        padding: 10px;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+    }
+
+    /* Brand area compact */
+    .brand {
+        margin-bottom: 24px;
+        display: flex;
+        justify-content: center;
+    }
+
+    /* brand-row stacks to center everything */
+    .brand-row {
+        flex-direction: column;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .logo {
+        gap: 0;
+    }
+
+    /* theme toggle: icon-only, square pill */
+    .theme-toggle-btn {
+        padding: 6px;
+        border-radius: 8px;
+        font-size: 0;        /* hide text label */
+        gap: 0;
+        width: 32px;
+        height: 32px;
+    }
+
+    /* -- Disk selector: compact icon button with flyout popup -- */
+    .sidebar .disk-selector-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 6px 0;
+        position: relative;
+        border: none;
+        margin: 0;
+        flex: 0 0 auto; /* don't grow in icon-only mode */
+    }
+
+
+    /* Show the disk-selector-wrap itself (was hidden) */
+    .sidebar .disk-selector-label {
+        display: none !important;
+    }
+    .sidebar .disk-search-wrap {
+        display: none !important;
+    }
+
+    /* Disk icon trigger button */
+    .sidebar .disk-icon-trigger {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 1rem;
+        transition: all 0.2s;
+        position: relative;
+    }
+    .sidebar .disk-icon-trigger:hover {
+        background: rgba(255,255,255,0.08);
+        color: var(--text-primary);
+        border-color: rgba(255,255,255,0.1);
+    }
+    .sidebar .disk-icon-trigger.has-active {
+        color: var(--emerald-400);
+    }
+
+    /* Flyout panel -- appears on hover to the right of icon */
+    .sidebar .disk-flyout {
+        position: absolute;
+        left: calc(100% + 6px);
+        top: 0;
+        width: 220px;
+        background: #171b22;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        padding: 10px;
+        z-index: 500;
+        /* Use opacity+pointer-events instead of display:none
+           so we can (a) animate and (b) add a ::before bridge */
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
+    }
+
+    /* Invisible bridge: fills the gap between icon and flyout panel.
+       Keeps :hover alive while mouse travels across the gap. */
+    .sidebar .disk-flyout::before {
+        content: '';
+        position: absolute;
+        right: 100%;       /* extends leftward from flyout edge */
+        top: 0;
+        width: 10px;       /* covers the 6px gap + margin */
+        height: 100%;
+    }
+
+    .sidebar .disk-selector-wrap:hover .disk-flyout,
+    .sidebar .disk-flyout:hover {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .sidebar .disk-flyout-title {
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-secondary);
+        padding: 0 4px 6px;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .sidebar .disk-flyout .disk-list {
+        display: flex !important;
+        max-height: 260px;
+        overflow-y: auto;
+    }
+
+    .sidebar .disk-flyout .disk-search-wrap {
+        display: flex !important;
+        margin-bottom: 2px;
+    }
+}
+
+/* - 640px: sidebar hidden, hamburger appears - */
+@media (max-width: 640px) {
+    :root { --sidebar-width: 0px; }
+
+    /* -- Sidebar: off-screen via transform (GPU-accelerated) -- */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 300px;
+        max-width: 85vw;
+        height: 100dvh;           /* full device height */
+        padding: 0;
+        z-index: 200;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                    box-shadow 0.3s ease;
+        box-shadow: none;
+        overflow-y: auto;
+        overflow-x: hidden;
+        /* Better OLED dark sidebar */
+        background: rgba(9, 12, 18, 0.98);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-right: 1px solid rgba(255,255,255,0.08);
+        flex-direction: column;
+        gap: 0;
+    }
+
+    /* Open state: slide in */
+    .sidebar.open {
+        transform: translateX(0);
+        box-shadow: 8px 0 40px rgba(0,0,0,0.6), 2px 0 16px rgba(0,0,0,0.4);
+    }
+
+    /* -- Internal layout when drawer is open -- */
+
+    /* Top header row inside drawer */
+    .sidebar .brand {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 20px 16px;
+        margin-bottom: 0;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .sidebar .logo {
+        gap: 10px;
+    }
+
+    /* Nav section */
+    .sidebar .nav-links {
+        padding: 12px 12px;
+        align-items: stretch;
+        gap: 4px;
+    }
+
+    /* Restore all hidden nav text */
+    .sidebar .brand span,
+    .sidebar .nav-item span,
+    .sidebar .disk-selector-label,
+    .sidebar .disk-search-wrap,
+    .sidebar .disk-list,
+    .sidebar .status-monitor,
+    .sidebar .sidebar-clock {
+        display: flex !important;
+    }
+
+    .sidebar .disk-selector-label { display: flex !important; }
+    .sidebar .disk-search-wrap    { display: flex !important; }
+    .sidebar .disk-list            { display: flex !important; }
+    .sidebar .status-monitor       { display: flex !important; }
+
+    /* Nav items: full horizontal layout */
+    .sidebar .nav-item {
+        justify-content: flex-start;
+        width: 100%;
+        height: auto;
+        padding: 11px 16px;
+        border-radius: 10px;
+        gap: 12px;
+        font-size: 0.9rem;
+    }
+
+    /* Disk selector section */
+    .sidebar .disk-selector-wrap {
+        padding: 12px 16px;
+        border-top: 1px solid rgba(255,255,255,0.06);
+        margin-top: 4px;
+        align-items: stretch;
+        flex: 0 0 auto; /* don't grow in mobile drawer */
+    }
+
+    /* Hide flyout in open mode -- full disk list is shown directly */
+    .sidebar .disk-icon-trigger { display: none !important; }
+    .sidebar .disk-flyout       { display: none !important; }
+
+    /* Disk list capped height in mobile drawer */
+    .sidebar .disk-list {
+        max-height: 200px;
+        flex: 0 0 auto;
+        overflow-y: auto;
+    }
+
+    /* Clock: show inline in drawer header */
+    .sidebar .sidebar-clock {
+        display: flex !important;
+        margin-left: auto;
+        font-size: 0.72rem;
+        padding: 12px 14px 4px;
+        justify-content: flex-end;
+        opacity: 0.55;
+    }
+
+    /* Status monitor */
+    .sidebar .status-monitor {
+        margin-top: auto;
+        padding: 14px 16px;
+        border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* Show close button in mobile drawer */
+    .sidebar-close-btn { display: flex; }
+
+    /* -- Backdrop: improved -- */
+    .sidebar-backdrop {
+        display: block;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        transition: opacity 0.3s ease;
+    }
+
+    /* -- Hamburger visible -- */
+    .hamburger-btn { display: flex; }
+
+    /* -- Main content: no left margin -- */
+    .main-content {
+        margin-left: 0;
+        padding: 16px;
+    }
+}
+
+/* - 768px: header stat bar wraps - */
+@media (max-width: 768px) {
+    .header-top-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .page-stat-bar {
+        width: 100%;
+        flex-wrap: wrap;
+        padding: 8px 12px;
+        gap: 0;
+    }
+
+    .stat-block {
+        min-width: 60px;
+    }
+}
+
+/* - 480px: stat bar 2x2 grid - */
+@media (max-width: 480px) {
+    .page-stat-bar {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        padding: 8px 10px;
+    }
+
+    .stat-divider { display: none; }
+
+    .stat-num-row { flex-direction: row; align-items: baseline; gap: 3px; }
+
+    .top-header h1 { font-size: 1.1rem; }
+
+    .main-content { padding: 12px; gap: 16px; }
+
+    .chart-container { padding: 12px; }
+
+    /* Canvas smaller on very small screens */
+    .canvas-wrapper {
+        height: 200px;
+        min-height: 180px;
+    }
+    .large-span .canvas-wrapper {
+        height: 240px;
+        min-height: 200px;
+    }
+
+    /* Timeline range buttons wrap on very small screens */
+    .chart-range-btns {
+        flex-wrap: wrap;
+        gap: 3px;
+    }
+
+    /* Timeline header stacks on mobile */
+    .timeline-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}
+
+/* - History tab responsive - */
+@media (max-width: 900px) {
+    .history-main-row {
+        flex-direction: column;
+    }
+
+    .user-filter-box {
+        width: 100% !important;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .history-charts-row {
+        flex-direction: column;
+    }
+
+    .history-chart-card {
+        width: 100% !important;
+        /* Prevent flex item from overflowing its container */
+        min-width: 0;
+    }
+
+    /* Give history charts proper fixed height when stacked */
+    .history-chart-body {
+        height: 220px;
+        min-height: 180px;
+        overflow: hidden;
+    }
+}
+
+/* - Detail tab responsive - */
+@media (max-width: 768px) {
+    .snapshot-two-col {
+        flex-direction: column;
+    }
+
+    .snapshot-col {
+        width: 100%;
+    }
+
+    .detail-tabs {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .detail-tab-btn {
+        font-size: 0.78rem;
+        padding: 7px 10px;
+    }
+}
+
+/* ==========================================================================
+   SCROLL TO TOP -- Floating Action Button
+   ========================================================================== */
+.scroll-top-fab {
+    position: fixed;
+    /* Anchored to bottom-right of viewport, above any bottom nav if needed */
+    bottom: 28px;
+    right: 28px;
+    z-index: 500;
+
+    /* Size */
+    width: 44px;
+    height: 44px;
+
+    /* Glassmorphism design matching app theme */
+    background: rgba(16, 185, 129, 0.15);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    border-radius: 12px;
+    color: #10b981;
+
+    /* Layout */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+
+    /* Show/hide animation -- hidden by default */
+    opacity: 0;
+    transform: translateY(12px) scale(0.9);
+    pointer-events: none;
+    transition:
+        opacity 0.25s ease,
+        transform 0.25s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease;
+
+    /* Subtle glow */
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.15);
+}
+
+/* Visible state -- added by JS when scrolled */
+.scroll-top-fab.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: all;
+}
+
+/* Hover: brighter glow */
+.scroll-top-fab:hover {
+    background: rgba(16, 185, 129, 0.25);
+    box-shadow: 0 6px 28px rgba(16, 185, 129, 0.3);
+    border-color: rgba(16, 185, 129, 0.55);
+    transform: translateY(-2px) scale(1.05);
+}
+
+/* Active press */
+.scroll-top-fab:active {
+    transform: translateY(0) scale(0.95);
+    transition-duration: 0.1s;
+}
+
+/* Light mode override */
+:root[data-theme='light'] .scroll-top-fab {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.3);
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
+}
+:root[data-theme='light'] .scroll-top-fab:hover {
+    background: rgba(16, 185, 129, 0.2);
+    box-shadow: 0 6px 24px rgba(16, 185, 129, 0.3);
+}
+
+/* Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+    .scroll-top-fab {
+        transition: opacity 0.1s ease;
+        transform: none !important;
+    }
+    .scroll-top-fab.visible {
+        transform: none;
+    }
+}
+
+/* On desktop (sidebar visible), offset from sidebar edge slightly */
+@media (min-width: 961px) {
+    .scroll-top-fab {
+        right: 32px;
+        bottom: 32px;
+    }
+}
+
+/* ==========================================================================
+   TASK-08: Global Focus Ring — consistent keyboard navigation indicator
+   ========================================================================== */
+:focus-visible {
+    outline: 2px solid var(--emerald-500);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* Remove focus ring for mouse users */
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* ==========================================================================
+   TASK-10: Indeterminate Progress Bar — shimmer when loading
+   ========================================================================== */
+.progress-fill.loading-indeterminate {
+    width: 40% !important;
+    animation: progressIndeterminate 1.4s infinite ease-in-out;
+    background: linear-gradient(90deg, var(--emerald-500), var(--sky-500), var(--emerald-400));
+    background-size: 200% 100%;
+}
+
+@keyframes progressIndeterminate {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(300%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .progress-fill.loading-indeterminate {
+        animation: none;
+        width: 60% !important;
+    }
 }

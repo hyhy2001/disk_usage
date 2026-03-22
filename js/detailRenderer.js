@@ -1,23 +1,22 @@
 // Detail Page Renderer — 2 tabs: Latest Snapshot & History/Analysis
 import { AppState } from './main.js';
+import { fmt, fmtDate } from './formatters.js';
+import { saveFilters, loadFilters } from './filterStorage.js';
 
 let _store = null;
 
+// AbortController: canceled & replaced each time a new disk is loaded (CQ-02)
+let _historyAbortCtrl = null;
+
+// Debounce timer for applyFilters (PF-01)
+let _applyTimer = null;
+
+function debouncedApplyFilters() {
+    clearTimeout(_applyTimer);
+    _applyTimer = setTimeout(applyFilters, 150);
+}
+
 // ── Format Helpers ────────────────────────────────────────────────────────
-
-function fmt(bytes) {
-    if (bytes === null || bytes === undefined) return '—';
-    const TB = 1e12, GB = 1e9, MB = 1e6, KB = 1e3;
-    if (bytes >= TB)  return `${(bytes / TB).toFixed(2)} TB`;
-    if (bytes >= GB)  return `${(bytes / GB).toFixed(1)} GB`;
-    if (bytes >= MB)  return `${(bytes / MB).toFixed(0)} MB`;
-    if (bytes >= KB)  return `${(bytes / KB).toFixed(0)} KB`;
-    return `${bytes} B`;
-}
-
-function fmtDate(ms) {
-    return new Date(ms).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-}
 
 function toInputDate(ms) { return new Date(ms).toISOString().split('T')[0]; }
 
@@ -116,22 +115,22 @@ function renderSnapshotView() {
             </div>
         </div>
         <div class="general-legend-row">
-            <span class="legend-dot dot-amber"></span><span>Scanned ${fmt(scannedBytes)}</span>
+            <span class="legend-pair"><span class="legend-dot dot-amber"></span><span>Scanned ${fmt(scannedBytes)}</span></span>
             <span class="sep">·</span>
-            <span class="legend-dot dot-slate"></span><span>Unknown ${fmt(gapBytes)}</span>
+            <span class="legend-pair"><span class="legend-dot dot-slate"></span><span>Unknown ${fmt(gapBytes)}</span></span>
         </div>`;
 
 
 
 
     const leftCol = [
-        section('📦', 'General System', null, stackedBar),
-        section('🏷️', 'Team Usage', `${teams.length} teams`, teamRows),
+        section(`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`, 'General System', null, stackedBar),
+        section(`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`, 'Team Usage', `${teams.length} teams`, teamRows),
     ].join('');
 
     const rightCol = [
-        section('👤', 'Top 10 Users', `${users.length} total`, userRows),
-        section('📁', 'Other Usage', `${other.length} total`, otherRows),
+        section(`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`, 'Top 10 Users', `${users.length} total`, userRows),
+        section(`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`, 'Other Usage', `${other.length} total`, otherRows),
     ].join('');
 
     document.getElementById('tab-snapshot-body').innerHTML =
@@ -178,11 +177,25 @@ function renderUserFilterBox(sortedNames, defaultSet) {
     wrap.innerHTML = sortedNames.map(n => {
         const sel = defaultSet.has(n);
         return `<div class="user-filter-item${sel ? ' selected' : ''}" data-user="${n}"
-            onclick="window._toggleUserFilter(this)">
+            tabindex="0" role="option" aria-selected="${sel}">
             <span class="user-filter-check">${sel ? '✓' : ''}</span>
             <span class="user-filter-name">${n}</span>
         </div>`;
     }).join('');
+
+    // Event delegation — auto-removed when AbortController aborts on disk switch (ACC-03)
+    const evtSignal = _historyAbortCtrl?.signal;
+    wrap.addEventListener('click', e => {
+        const item = e.target.closest('.user-filter-item');
+        if (item) _toggleUserFilter(item);
+    }, { signal: evtSignal });
+    wrap.addEventListener('keydown', e => {
+        const item = e.target.closest('.user-filter-item');
+        if (item && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            _toggleUserFilter(item);
+        }
+    }, { signal: evtSignal });
 
     updateCount();
 }
@@ -241,7 +254,7 @@ function renderPivotView(pivotData) {
     document.getElementById('detail-view-area').innerHTML = `
         <div class="result-section">
             <div class="result-section-header">
-                <h3>📊 Usage Matrix</h3>
+                <h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Usage Matrix</h3>
                 <span class="result-count">${dates.length} days × ${userNames.length} users</span>
             </div>
             <div class="table-wrapper pivot-wrapper" style="overflow-x:auto">
@@ -267,10 +280,25 @@ export function initScaleToggle() {
 }
 
 export function applyFilters() {
+    if (!_store) return;  // No data — bail early (empty disk or not yet loaded)
     const f        = readFilters();
     const chartMgr = AppState.chartManagerInstance;
 
-    // Resolve which users appear in the pivot table / charts
+    // Persist current filter state
+    const startEl = document.getElementById('filter-date-start');
+    const endEl   = document.getElementById('filter-date-end');
+    const selectedChips = Array.from(document.querySelectorAll('#user-chips .user-filter-item.selected'))
+        .map(el => el.dataset.user).filter(Boolean);
+    const activeRangeBtn = document.querySelector('.hrange-btn.active');
+    saveFilters({
+        dateStart: startEl?.value,
+        dateEnd: endEl?.value,
+        selectedUsers: selectedChips,
+        hRangeDays: activeRangeBtn ? activeRangeBtn.dataset.days : '30',
+        usersLogScale: _logScale,
+    });
+
+    // Resolve which users appear in the charts
     let pivotUsers;
     if (f.selectedUsers?.length) {
         pivotUsers = f.selectedUsers;
@@ -302,6 +330,7 @@ export function applyFilters() {
 }
 
 function resetFilters() {
+    if (!_store) return;
     const dr  = _store.getDateRange();
     const se  = document.getElementById('filter-date-start');
     const ee  = document.getElementById('filter-date-end');
@@ -334,6 +363,8 @@ function resetFilters() {
 // ── Tab switching ──────────────────────────────────────────────────────────
 
 function initDetailTabs() {
+    const savedTab = loadFilters().activeTab;
+
     document.querySelectorAll('.detail-tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const target = btn.dataset.tab;
@@ -343,8 +374,15 @@ function initDetailTabs() {
             // Show/hide panes
             document.querySelectorAll('.detail-tab-pane').forEach(p => p.classList.remove('active'));
             document.getElementById(`tab-pane-${target}`)?.classList.add('active');
+            saveFilters({ activeTab: target });
         });
     });
+
+    // Restore previously active tab
+    if (savedTab) {
+        const savedBtn = document.querySelector(`.detail-tab-btn[data-tab="${savedTab}"]`);
+        if (savedBtn) savedBtn.click();
+    }
 }
 
 // ── General stat bar ───────────────────────────────────────────────────────
@@ -373,7 +411,9 @@ function renderGeneralSystem() {
 
 export function renderDetailTables(dataStore) {
     _store = dataStore;
-    const dr = _store.getDateRange();
+
+    // Remove any empty-state overlays left by a previous empty disk
+    _clearChartOverlays();
 
     // Init tabs
     initDetailTabs();
@@ -388,26 +428,173 @@ export function renderDetailTables(dataStore) {
     initHistoryTab();
 }
 
+// Helper: remove empty overlays injected by resetDashboardToEmpty
+function _clearChartOverlays() {
+    document.querySelectorAll('.chart-empty-overlay').forEach(el => el.remove());
+}
+
+/**
+ * Resets the entire dashboard to an empty/clean state.
+ * Called when the selected disk has no JSON reports.
+ * @param {ChartManager} chartMgr - The ChartManager instance to destroy charts.
+ */
+export function resetDashboardToEmpty(chartMgr) {
+    // 0. Null out the store — prevents lingering event listeners from re-rendering old data
+    _store = null;
+    // 1. Reset stat cards to —
+    ['shared-stat-total', 'shared-stat-used', 'shared-stat-scanned', 'shared-stat-free', 'shared-stat-pct'].forEach(id => {
+        const el = document.querySelector(`#${id} .stat-number`);
+        if (el) { el.textContent = '—'; el.style.color = ''; }
+    });
+
+    // 2. Destroy chart instances first, then clear canvases
+    if (chartMgr) {
+        // Destroy first so Chart.js stops owning the canvases
+        if (chartMgr.timelineChart)     { chartMgr.timelineChart.destroy();     chartMgr.timelineChart     = null; }
+        if (chartMgr.teamChart)         { chartMgr.teamChart.destroy();         chartMgr.teamChart         = null; }
+        if (chartMgr.usersChart)        { chartMgr.usersChart.destroy();        chartMgr.usersChart        = null; }
+        if (chartMgr._histTotalChart)   { chartMgr._histTotalChart.destroy();   chartMgr._histTotalChart   = null; }
+        if (chartMgr._histGrowersChart) { chartMgr._histGrowersChart.destroy(); chartMgr._histGrowersChart = null; }
+        chartMgr._fullTimeline = null;
+        chartMgr._usersData    = null;
+        chartMgr._teamData     = null;
+
+        // Then clear the pixel content so no ghost image remains
+        ['timelineChart', 'teamChart', 'usersChart', 'historyTotalChart', 'historyGrowersChart'].forEach(id => {
+            const canvas = document.getElementById(id);
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        });
+    }
+
+    // 3. Timeline stat header
+    const tsh = document.getElementById('timeline-stat-header');
+    if (tsh) tsh.innerHTML = '<span class="tsh-value">— TB</span>';
+
+    // 4. Period table
+    const periodTbody = document.getElementById('overview-period-table');
+    if (periodTbody) {
+        periodTbody.innerHTML = '<tr><td colspan="8" class="table-empty">No data to calculate trends.</td></tr>';
+    }
+
+    // 5. Snapshot tab — styled empty state
+    const snapBody = document.getElementById('tab-snapshot-body');
+    if (snapBody) {
+        snapBody.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                </div>
+                <h3>No Snapshot Data</h3>
+                <p>This disk has no JSON reports yet. Run a scan to generate data.</p>
+            </div>`;
+    }
+
+    // 6. History tab — clear controls and show empty state
+    const userChips = document.getElementById('user-chips');
+    if (userChips) userChips.innerHTML = '';
+    const historyUserCount = document.getElementById('history-user-count');
+    if (historyUserCount) historyUserCount.textContent = '0 / 0';
+
+    // Clear chart stat text labels
+    const growersStatEl = document.getElementById('history-growers-stat');
+    if (growersStatEl) growersStatEl.textContent = '';
+    const totalStatEl = document.getElementById('history-total-stat');
+    if (totalStatEl) totalStatEl.textContent = '';
+
+    // Replace chart panels with empty state message
+    const historyChartsArea = document.querySelector('.history-charts-row, .history-content, #tab-pane-detail .charts-row');
+    const detailViewArea = document.getElementById('detail-view-area');
+    if (detailViewArea) detailViewArea.innerHTML = '';
+
+    // Show empty state inside each chart wrapper so the layout stays intact
+    ['historyTotalChart', 'historyGrowersChart'].forEach(id => {
+        const canvas = document.getElementById(id);
+        const wrapper = canvas?.parentElement;
+        if (wrapper) {
+            wrapper.style.position = 'relative';
+            // Remove any leftover empty-state overlay first
+            wrapper.querySelector('.chart-empty-overlay')?.remove();
+            const overlay = document.createElement('div');
+            overlay.className = 'chart-empty-overlay empty-state';
+
+            overlay.innerHTML = `
+                <div class="empty-state-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>
+                    </svg>
+                </div>
+                <p style="font-size:0.8rem;margin:0;">No data available</p>`;
+            wrapper.appendChild(overlay);
+        }
+    });
+}
+
+
+
 function initHistoryTab() {
+    // Abort all listeners from the previous disk load to prevent accumulation (CQ-02)
+    if (_historyAbortCtrl) _historyAbortCtrl.abort();
+    _historyAbortCtrl = new AbortController();
+    const { signal } = _historyAbortCtrl;
+
     const dr      = _store.getDateRange();
     const startEl = document.getElementById('filter-date-start');
     const endEl   = document.getElementById('filter-date-end');
+    const saved   = loadFilters();
 
-    // Default: last 30 days
+    // Restore saved date range or default to last 30 days
     const defaultStart = Math.max(dr.min, dr.max - 29 * 86400000);
-    if (startEl) startEl.value = toInputDate(defaultStart);
-    if (endEl)   endEl.value   = toInputDate(dr.max);
+    if (startEl) startEl.value = saved.dateStart || toInputDate(defaultStart);
+    if (endEl)   endEl.value   = saved.dateEnd   || toInputDate(dr.max);
 
-    // Render chips: top-1 active first (onboarding hint), rest inactive
-    const top1Name    = _store.getTopUsers(1)[0]?.name;
-    const defaultSet  = top1Name ? new Set([top1Name]) : new Set();
-    const allNames    = _store.getAllUserNames();
-    // Put top by usage first, then alphabetical
-    const topNames    = _store.getTopUsers(allNames.length).map(u => u.name);
+    // Restore log scale
+    if (saved.usersLogScale) {
+        _logScale = saved.usersLogScale;
+        const btn = document.getElementById('btn-scale-toggle');
+        if (btn) { btn.textContent = _logScale ? 'Linear' : 'Log'; btn.classList.toggle('active', _logScale); }
+    }
+
+    // Determine which users to pre-select
+    const allNames  = _store.getAllUserNames();
+    const topNames  = _store.getTopUsers(allNames.length).map(u => u.name);
     const sortedNames = [...topNames, ...allNames.filter(n => !topNames.includes(n))];
+
+    const savedUsers = saved.selectedUsers;
+    let defaultSet;
+    if (savedUsers && savedUsers.length > 0) {
+        // Restore previously selected users (only those still in dataset)
+        const valid = new Set(allNames);
+        defaultSet = new Set(savedUsers.filter(u => valid.has(u)));
+    } else {
+        const top1Name = _store.getTopUsers(1)[0]?.name;
+        defaultSet = top1Name ? new Set([top1Name]) : new Set();
+    }
     renderUserChips(sortedNames, defaultSet);
 
-    // Preset range buttons
+    // Restore active range preset button
+    const savedRange = saved.hRangeDays;
+    if (savedRange !== undefined) {
+        document.querySelectorAll('.hrange-btn').forEach(b => b.classList.remove('active'));
+        const matchBtn = document.querySelector(`.hrange-btn[data-days="${savedRange}"]`);
+        if (matchBtn) {
+            matchBtn.classList.add('active');
+            // Re-apply the date range from the saved preset
+            const days  = parseInt(savedRange);
+            const endMs = dr.max;
+            const startMs = isNaN(days) ? dr.min : Math.max(dr.min, endMs - (days - 1) * 86400000);
+            if (startEl) startEl.value = toInputDate(startMs);
+            if (endEl)   endEl.value   = toInputDate(endMs);
+        }
+    }
+
+    // Preset range buttons — all use { signal } to auto-cleanup on disk change
     document.querySelectorAll('.hrange-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const days    = parseInt(btn.dataset.days);
@@ -418,12 +605,12 @@ function initHistoryTab() {
             document.querySelectorAll('.hrange-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             applyFilters();
-        });
+        }, { signal });
     });
 
-    startEl?.addEventListener('change', applyFilters);
-    endEl?.addEventListener('change', applyFilters);
-    document.getElementById('filter-user-sort')?.addEventListener('change', applyFilters);
+    startEl?.addEventListener('change', applyFilters, { signal });
+    endEl?.addEventListener('change', applyFilters, { signal });
+    document.getElementById('filter-user-sort')?.addEventListener('change', applyFilters, { signal });
 
     document.getElementById('btn-top10')?.addEventListener('click', () => {
         const top10 = new Set(_store.getTopUsers(10).map(u => u.name));
@@ -442,35 +629,38 @@ function initHistoryTab() {
         const wrap = document.getElementById('user-chips');
         wrap?.querySelectorAll('.user-filter-item').forEach(el => {
             el.classList.remove('selected');
+            el.setAttribute('aria-selected', 'false');
             const chk = el.querySelector('.user-filter-check');
             if (chk) chk.textContent = '';
         });
         if (wrap?._updateCount) wrap._updateCount();
         applyFilters();
-    });
+    }, { signal });
 
     document.getElementById('user-filter-search')?.addEventListener('input', function() {
         const q = this.value.toLowerCase();
         document.querySelectorAll('#user-chips .user-filter-item').forEach(el => {
             el.style.display = el.dataset.user.toLowerCase().includes(q) ? '' : 'none';
         });
-    });
+    }, { signal });
 
-    document.getElementById('btn-reset-filter')?.addEventListener('click', resetFilters);
+    document.getElementById('btn-reset-filter')?.addEventListener('click', resetFilters, { signal });
 
     applyFilters();
 }
 
 
-// Toggle a filter box item (History tab)
-window._toggleUserFilter = function(el) {
+// Toggle a filter box item — module-local, keyboard-accessible, with debounce (ACC-03 + PF-01)
+function _toggleUserFilter(el) {
     el.classList.toggle('selected');
+    const sel = el.classList.contains('selected');
+    el.setAttribute('aria-selected', String(sel));
     const chk = el.querySelector('.user-filter-check');
-    if (chk) chk.textContent = el.classList.contains('selected') ? '✓' : '';
+    if (chk) chk.textContent = sel ? '✓' : '';
     const wrap = document.getElementById('user-chips');
     if (wrap?._updateCount) wrap._updateCount();
-    applyFilters();
-};
+    debouncedApplyFilters();
+}
 
 // Legacy compatibility
 window.__applyFilters = applyFilters;

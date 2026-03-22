@@ -35,9 +35,9 @@
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ── Light Theme ─────────────────────────────────────────────────────────── */
+/* -- Light Theme ----------------------------------------------------------- */
 :root[data-theme='light'] {
-    /* Warm cream base — easy on the eyes */
+    /* Warm cream base -- easy on the eyes */
     --bg-base: #F0EDE6;
     --bg-surface: rgba(255, 253, 250, 0.96);
     --bg-surface-elevated: rgba(255, 255, 255, 1);
@@ -54,7 +54,7 @@
     box-sizing: border-box;
 }
 
-body.dark-theme {
+body {
     background-color: var(--bg-base);
     color: var(--text-primary);
     font-family: 'Inter', -apple-system, sans-serif;
@@ -66,12 +66,12 @@ body.dark-theme {
 
 
 /* Override body bg for light mode */
-:root[data-theme='light'] body.dark-theme,
-body.dark-theme {
+:root[data-theme='light'] body,
+body {
     transition: background-color 0.25s, color 0.25s;
 }
 
-/* Light mode background gradient — warm cream, not stark white */
+/* Light mode background gradient -- warm cream, not stark white */
 :root[data-theme='light'] .background-mesh {
     background: radial-gradient(ellipse at 60% 0%, #EDE8E0 0%, #F7F4EF 60%, #F2EFE8 100%) !important;
 }
@@ -80,40 +80,60 @@ body.dark-theme {
     opacity: 0.04;
 }
 
-/* Theme toggle button */
+/* Theme toggle button -- pill style */
 .theme-toggle-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 8px;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 20px;
     border: 1px solid rgba(255,255,255,0.1);
     background: rgba(255,255,255,0.06);
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.2s;
-    margin-left: 6px;
+    transition: all 0.2s ease;
     flex-shrink: 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    font-family: inherit;
+    white-space: nowrap;
 }
 
 .theme-toggle-btn:hover {
     background: rgba(255,255,255,0.12);
     color: var(--text-primary);
+    border-color: rgba(255,255,255,0.2);
+    transform: translateY(-1px);
 }
 
-/* Dark mode → show moon, hide sun */
-.theme-toggle-btn .icon-sun { display: none; }
-.theme-toggle-btn .icon-moon { display: block; }
+.theme-toggle-btn:active {
+    transform: translateY(0);
+}
 
-/* Light mode → show sun, hide moon */
-:root[data-theme='light'] .theme-toggle-btn .icon-sun { display: block; }
+/* Dark mode → show moon, hide sun; show "Dark" label */
+.theme-toggle-btn .icon-sun  { display: none; }
+.theme-toggle-btn .icon-moon { display: block; }
+.theme-toggle-btn .label-dark  { display: inline; }
+.theme-toggle-btn .label-light { display: none; }
+
+/* Light mode → show sun, hide moon; show "Light" label */
+:root[data-theme='light'] .theme-toggle-btn .icon-sun  { display: block; }
 :root[data-theme='light'] .theme-toggle-btn .icon-moon { display: none; }
+:root[data-theme='light'] .theme-toggle-btn .label-dark  { display: none; }
+:root[data-theme='light'] .theme-toggle-btn .label-light { display: inline; }
 
 :root[data-theme='light'] .theme-toggle-btn {
-    border-color: rgba(0,0,0,0.1);
+    border-color: rgba(0,0,0,0.12);
     background: rgba(0,0,0,0.05);
     color: #475569;
+}
+
+:root[data-theme='light'] .theme-toggle-btn:hover {
+    background: rgba(0,0,0,0.1);
+    border-color: rgba(0,0,0,0.2);
+    color: #1e293b;
 }
 
 /* Background Effects */
@@ -142,6 +162,7 @@ body.dark-theme {
     height: 40vw;
     background: var(--sky-500);
 }
+
 
 .orb-2 {
     bottom: -20%;

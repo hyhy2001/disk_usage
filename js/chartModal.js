@@ -50,11 +50,11 @@ function renderModalChart(chartType) {
     }
 
     const chartMap = {
-        trend:    { src: () => chartMgr._histTotalChart,    label: '📈 Selected Users Usage — Full View' },
-        growers:  { src: () => chartMgr._histGrowersChart,  label: '🔥 Fastest Growing Users — Full View' },
-        timeline: { src: () => chartMgr.timelineChart,      label: '📊 Capacity Over Time — Full View' },
+        trend:    { src: () => chartMgr._histTotalChart,    label: 'Selected Users Usage — Full View' },
+        growers:  { src: () => chartMgr._histGrowersChart,  label: 'Fastest Growing Users — Full View' },
+        timeline: { src: () => chartMgr.timelineChart,      label: 'Capacity Over Time — Full View' },
         team:     { src: () => chartMgr.teamChart,          label: '🍩 Usage by Teams — Full View' },
-        users:    { src: () => chartMgr.usersChart,         label: '👤 Top Consuming Users — Full View' },
+        users:    { src: () => chartMgr.usersChart,         label: 'Top Consuming Users — Full View' },
     };
 
     const entry = chartMap[chartType];
@@ -90,6 +90,34 @@ function renderModalChart(chartType) {
             maintainAspectRatio: false,
         }
     });
+
+    // Keep modal chart responsive when window is resized
+    if (typeof ResizeObserver !== 'undefined') {
+        const modalBody = canvas.parentElement;
+        if (window._modalResizeObs) window._modalResizeObs.disconnect();
+        let _resizeTimer = null;
+        window._modalResizeObs = new ResizeObserver(() => {
+            clearTimeout(_resizeTimer);
+            _resizeTimer = setTimeout(() => {
+                if (window._modalChart && window._modalChart.ctx !== null) {
+                    // Rebuild gradient for gradient-using charts
+                    if (chartType === 'timeline' || chartType === 'trend') {
+                        const h = modalBody.offsetHeight;
+                        const newGrad = ctx.createLinearGradient(0, 0, 0, h);
+                        newGrad.addColorStop(0,   'rgba(251, 191, 36, 0.28)');
+                        newGrad.addColorStop(0.6, 'rgba(251, 191, 36, 0.07)');
+                        newGrad.addColorStop(1,   'rgba(251, 191, 36, 0.02)');
+                        if (window._modalChart.data.datasets[0]) {
+                            window._modalChart.data.datasets[0].backgroundColor = newGrad;
+                            window._modalChart.update('none');
+                        }
+                    }
+                    window._modalChart.resize();
+                }
+            }, 100);
+        });
+        window._modalResizeObs.observe(modalBody);
+    }
 }
 
 // ── Open / Close ─────────────────────────────────────────────────────────────
@@ -118,6 +146,10 @@ function closeModal() {
     if (!_modal) return;
     _modal.classList.remove('visible');
     document.body.style.overflow = '';
+    if (window._modalResizeObs) {
+        window._modalResizeObs.disconnect();
+        window._modalResizeObs = null;
+    }
     if (window._modalChart) {
         window._modalChart.destroy();
         window._modalChart = null;

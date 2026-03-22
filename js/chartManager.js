@@ -1,45 +1,4 @@
-/** Auto unit formatter — takes bytes, returns human-readable string */
-function smartFmt(bytes, decimals = 2) {
-    if (bytes === 0) return '0 B';
-    const abs = Math.abs(bytes);
-    if (abs >= 1e15) return (bytes / 1e15).toFixed(decimals) + ' PB';
-    if (abs >= 1e12) return (bytes / 1e12).toFixed(decimals) + ' TB';
-    if (abs >= 1e9)  return (bytes / 1e9).toFixed(decimals) + ' GB';
-    if (abs >= 1e6)  return (bytes / 1e6).toFixed(decimals) + ' MB';
-    if (abs >= 1e3)  return (bytes / 1e3).toFixed(decimals) + ' KB';
-    return bytes.toFixed(decimals) + ' B';
-}
-
-/**
- * Compact tick label — short suffix, no space: "23.6G", "1.1T", "450M"
- * Use for axis ticks only (tooltips use smartFmt for full readability).
- */
-function smartFmtTick(bytes) {
-    if (bytes === 0) return '0';
-    const abs = Math.abs(bytes);
-    const sign = bytes < 0 ? '-' : '';
-    if (abs >= 1e15) return sign + (abs / 1e15).toFixed(1) + 'P';
-    if (abs >= 1e12) return sign + (abs / 1e12).toFixed(1) + 'T';
-    if (abs >= 1e9)  return sign + (abs / 1e9).toFixed(1) + 'G';
-    if (abs >= 1e6)  return sign + (abs / 1e6).toFixed(1) + 'M';
-    if (abs >= 1e3)  return sign + (abs / 1e3).toFixed(1) + 'K';
-    return sign + abs.toFixed(0) + 'B';
-}
-
-/**
- * Pick a consistent unit for a whole chart based on the max absolute value.
- * Returns { divisor, unit } so all data in chart uses the same unit.
- * @param {number[]} bytesArray - array of raw byte values
- */
-function pickUnit(bytesArray) {
-    const maxAbs = Math.max(...bytesArray.map(Math.abs));
-    if (maxAbs >= 1e15) return { divisor: 1e15, unit: 'PB' };
-    if (maxAbs >= 1e12) return { divisor: 1e12, unit: 'TB' };
-    if (maxAbs >= 1e9)  return { divisor: 1e9,  unit: 'GB' };
-    if (maxAbs >= 1e6)  return { divisor: 1e6,  unit: 'MB' };
-    if (maxAbs >= 1e3)  return { divisor: 1e3,  unit: 'KB' };
-    return { divisor: 1, unit: 'B' };
-}
+import { smartFmt, smartFmtTick, pickUnit } from './formatters.js';
 
 /** Chart theme — returns appropriate colors based on current light/dark mode */
 function ct() {
@@ -72,7 +31,7 @@ export class ChartManager {
         this._growersData = null;
         this._teamData    = null;
         this._teamTotal   = 0;
-        
+
         // Brand Colors
         this.colors = {
             emerald: '#10b981',
@@ -85,18 +44,183 @@ export class ChartManager {
         Chart.defaults.font.family = "'Inter', sans-serif";
         this._updateChartDefaults();
 
-        // Re-render all charts when user toggles theme
+        // Re-theme all charts when user toggles light/dark — NO data re-fetch
         document.addEventListener('themeChanged', () => {
             this._updateChartDefaults();
-            if (this._fullTimeline)  this.renderTimeline(this._fullTimeline);
-            if (this._usersData)     this.renderUsersChart(this._usersData, this._usersLogScale);
-            if (this._teamData)      this.renderTeamChart(this._teamData, this._teamTotal);
+            this._applyThemeToCharts();
         });
     }
+
+    /**
+     * Updates chart colors in-place without destroying/recreating charts.
+     * Called on theme toggle — keeps data intact, no animation flash.
+     */
+    _applyThemeToCharts() {
+        const colors = ct();
+        const isLight = document.documentElement.dataset.theme === 'light';
+
+        // ── Timeline chart ─────────────────────────────────────────────────
+        if (this.timelineChart) {
+            const canvas = document.getElementById('timelineChart');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                const grad = ctx.createLinearGradient(0, 0, 0, canvas.offsetHeight || 300);
+                grad.addColorStop(0,    isLight ? 'rgba(251,191,36,0.55)' : 'rgba(251,191,36,0.26)');
+                grad.addColorStop(0.65, isLight ? 'rgba(251,191,36,0.15)' : 'rgba(251,191,36,0.06)');
+                grad.addColorStop(1,    isLight ? 'rgba(251,191,36,0.03)' : 'rgba(251,191,36,0.02)');
+                if (this.timelineChart.data.datasets[0]) {
+                    this.timelineChart.data.datasets[0].backgroundColor = grad;
+                }
+            }
+            // Patch axis/tooltip colors
+            const opts = this.timelineChart.options;
+            if (opts.scales?.x) opts.scales.x.grid.color = colors.gridXs;
+            if (opts.scales?.x?.ticks) opts.scales.x.ticks.color = colors.tick;
+            if (opts.scales?.y) opts.scales.y.grid.color = colors.gridSm;
+            if (opts.scales?.y?.ticks) opts.scales.y.ticks.color = colors.tick;
+            if (opts.plugins?.tooltip) {
+                opts.plugins.tooltip.backgroundColor = colors.tipBg;
+                opts.plugins.tooltip.titleColor      = colors.tipTitle;
+                opts.plugins.tooltip.bodyColor       = colors.tipBody;
+                opts.plugins.tooltip.borderColor     = colors.tipBdr;
+            }
+            if (opts.plugins?.legend?.labels) opts.plugins.legend.labels.color = colors.tickDim;
+            this.timelineChart.update('none');
+        }
+
+        // ── History total chart ─────────────────────────────────────────────
+        if (this._histTotalChart) {
+            const el = document.getElementById('historyTotalChart');
+            if (el) {
+                const ctx = el.getContext('2d');
+                const grad = ctx.createLinearGradient(0, 0, 0, el.offsetHeight || 180);
+                grad.addColorStop(0,   isLight ? 'rgba(251,191,36,0.55)' : 'rgba(251,191,36,0.28)');
+                grad.addColorStop(0.7, isLight ? 'rgba(251,191,36,0.12)' : 'rgba(251,191,36,0.04)');
+                grad.addColorStop(1,   'rgba(251,191,36,0)');
+                if (this._histTotalChart.data.datasets[0]) {
+                    this._histTotalChart.data.datasets[0].backgroundColor = grad;
+                }
+            }
+            const opts = this._histTotalChart.options;
+            if (opts.scales?.x?.ticks) opts.scales.x.ticks.color = colors.tick;
+            if (opts.scales?.y?.ticks) opts.scales.y.ticks.color = colors.tick;
+            if (opts.plugins?.tooltip) {
+                opts.plugins.tooltip.backgroundColor = colors.tipBg;
+                opts.plugins.tooltip.titleColor      = colors.tipTitle;
+                opts.plugins.tooltip.bodyColor       = colors.tipBody;
+                opts.plugins.tooltip.borderColor     = colors.tipBdr;
+            }
+            this._histTotalChart.update('none');
+        }
+
+        // ── Users chart ─────────────────────────────────────────────────────
+        if (this.usersChart) {
+            const opts = this.usersChart.options;
+            if (opts.scales?.x?.grid) opts.scales.x.grid.color = colors.grid;
+            if (opts.plugins?.tooltip) {
+                opts.plugins.tooltip.backgroundColor = colors.tipBg;
+                opts.plugins.tooltip.titleColor      = colors.tipBody;
+                opts.plugins.tooltip.bodyColor       = colors.tipBody;
+                opts.plugins.tooltip.borderColor     = colors.tipBdr;
+            }
+            this.usersChart.update('none');
+        }
+
+        // ── Growers chart ───────────────────────────────────────────────────
+        if (this._histGrowersChart) {
+            const opts = this._histGrowersChart.options;
+            if (opts.scales?.x?.ticks) opts.scales.x.ticks.color = colors.tick;
+            if (opts.scales?.y?.ticks) opts.scales.y.ticks.color = colors.tickDim;
+            if (opts.plugins?.tooltip) {
+                opts.plugins.tooltip.backgroundColor = colors.tipBg;
+                opts.plugins.tooltip.bodyColor       = colors.tipBody;
+            }
+            this._histGrowersChart.update('none');
+        }
+
+        // ── Team doughnut — center text redraws automatically on update ─────
+        if (this.teamChart) {
+            this.teamChart.update('none');
+        }
+    }
+
 
     _updateChartDefaults() {
         const light = document.documentElement.dataset.theme === 'light';
         Chart.defaults.color = light ? '#6B7280' : '#94a3b8';
+    }
+
+    // ── Resize registry ───────────────────────────────────────────────────────
+    // Tracks {chart, onResize} for every active chart so the global window
+    // 'resize' listener can call chart.resize() on all of them at once.
+    _registry = new Map();  // canvasId → { chart, canvas, onResize }
+
+    /**
+     * Register a chart in the resize registry and attach a ResizeObserver.
+     * A shared, debounced window 'resize' handler resizes ALL registered charts
+     * — this is the most reliable cross-browser responsive method for Chart.js.
+     *
+     * @param {HTMLCanvasElement} canvas   - The chart canvas
+     * @param {Chart}             chart    - Chart.js instance
+     * @param {Function|null}     onResize - Optional gradient-rebuild callback
+     *                                       called as (chart, ctx, width, height)
+     */
+    _watchResize(canvas, chart, onResize = null) {
+        if (!canvas || !chart) return;
+
+        const id = canvas.id;
+
+        // Disconnect any previous observer for this slot
+        const prev = this._registry.get(id);
+        if (prev?._obs) prev._obs.disconnect();
+
+        // ① ResizeObserver on the wrapper (catches container-level changes)
+        const wrapper = canvas.parentElement;
+        let _obs = null;
+        if (typeof ResizeObserver !== 'undefined' && wrapper) {
+            _obs = new ResizeObserver(() => this._doResize(id));
+            _obs.observe(wrapper);
+        }
+
+        this._registry.set(id, { chart, canvas, onResize, _obs });
+
+        // ② Ensure global window-resize handler is installed (installed once)
+        if (!this._winResizeInstalled) {
+            this._winResizeInstalled = true;
+            let _winTimer = null;
+            window.addEventListener('resize', () => {
+                clearTimeout(_winTimer);
+                _winTimer = setTimeout(() => this._resizeAll(), 100);
+            });
+        }
+    }
+
+    /** Resize a single chart by canvas id */
+    _doResize(id) {
+        const entry = this._registry.get(id);
+        if (!entry) return;
+        const { chart, canvas, onResize } = entry;
+        if (!chart || chart.ctx === null) { this._registry.delete(id); return; }
+
+        const wrapper = canvas.parentElement;
+        if (onResize && wrapper) {
+            onResize(chart, canvas.getContext('2d'), wrapper.offsetWidth, wrapper.offsetHeight);
+        }
+        chart.resize();
+    }
+
+    /** Resize ALL registered charts (called by window resize) */
+    _resizeAll() {
+        for (const id of this._registry.keys()) {
+            this._doResize(id);
+        }
+    }
+
+    /** Unregister and stop observing a canvas */
+    _unwatchResize(canvasId) {
+        const entry = this._registry.get(canvasId);
+        if (entry?._obs) entry._obs.disconnect();
+        this._registry.delete(canvasId);
     }
 
     render(dataStore) {
@@ -140,60 +264,40 @@ export class ChartManager {
              return;
         }
 
-        const formatBytesRound = (b) => {
-            if (b === 0) return '0 B';
-            const num = Math.abs(b);
-            if (num >= 1e12) return (b / 1e12).toFixed(2) + ' TB';
-            if (num >= 1e9)  return (b / 1e9).toFixed(2) + ' GB';
-            if (num >= 1e6)  return (b / 1e6).toFixed(2) + ' MB';
-            return (b / 1e3).toFixed(2) + ' KB';
-        };
-
         const lastPoint = timelineData[timelineData.length - 1];
         const lastTs = lastPoint.timestamp;
-        
+
         const periods = [
-            { label: '1 Day', ms: 86400000, days: 1 },
-            { label: '7 Days', ms: 7 * 86400000, days: 7 },
-            { label: '30 Days', ms: 30 * 86400000, days: 30 },
-            { label: '3 Months', ms: 90 * 86400000, days: 90 },
-            { label: '6 Months', ms: 180 * 86400000, days: 180 },
-            { label: '1 Year', ms: 365 * 86400000, days: 365 },
-            { label: 'Max (All Time)', ms: Infinity, days: 1 } // Days will be calculated
+            { label: '1 Day',         ms: 86400000,        days: 1   },
+            { label: '7 Days',        ms: 7  * 86400000,   days: 7   },
+            { label: '30 Days',       ms: 30 * 86400000,   days: 30  },
+            { label: '3 Months',      ms: 90 * 86400000,   days: 90  },
+            { label: '6 Months',      ms: 180 * 86400000,  days: 180 },
+            { label: '1 Year',        ms: 365 * 86400000,  days: 365 },
+            { label: 'Max (All Time)',ms: Infinity,         days: 1   },
         ];
 
         const calc = periods.map(p => {
-             const targetTs = lastTs - p.ms;
-             let refPoint = timelineData[0];
-             if (p.ms !== Infinity) {
-                 refPoint = timelineData.slice().reverse().find(d => d.timestamp <= targetTs) || timelineData[0];
-             }
-             
-             const diffBytes = lastPoint.used - refPoint.used;
-             const pct = refPoint.used > 0 ? ((diffBytes / refPoint.used) * 100).toFixed(2) : '0.00';
-             
-             let actualDays = p.days;
-             if (p.ms === Infinity) {
-                 actualDays = Math.max(1, (lastTs - refPoint.timestamp) / 86400000);
-             }
-             const avgDaily = diffBytes / actualDays;
-             
-             return {
-                 diff: diffBytes,
-                 pct: pct,
-                 avg: avgDaily,
-                 isUp: diffBytes >= 0,
-                 empty: diffBytes === 0
-             };
+            const targetTs = lastTs - p.ms;
+            let refPoint = timelineData[0];
+            if (p.ms !== Infinity) {
+                refPoint = timelineData.slice().reverse().find(d => d.timestamp <= targetTs) || timelineData[0];
+            }
+            const diffBytes = lastPoint.used - refPoint.used;
+            const pct = refPoint.used > 0 ? ((diffBytes / refPoint.used) * 100).toFixed(2) : '0.00';
+            let actualDays = p.days;
+            if (p.ms === Infinity) actualDays = Math.max(1, (lastTs - refPoint.timestamp) / 86400000);
+            const avgDaily = diffBytes / actualDays;
+            return { diff: diffBytes, pct, avg: avgDaily, isUp: diffBytes >= 0, empty: diffBytes === 0 };
         });
 
         const colorClass = (isUp, isEmpty) => isEmpty ? '' : (isUp ? 'text-rose' : 'text-emerald');
         const arrow = (isUp, isEmpty) => isEmpty ? '' : (isUp ? '▲ ' : '▼ ');
-        const sign = (isUp, isEmpty) => isEmpty ? '' : (isUp ? '+' : '');
+        const sign  = (isUp, isEmpty) => isEmpty ? '' : (isUp ? '+' : '');
 
         let html = `<tr><td><strong>Growth (Capacity)</strong></td>`;
         calc.forEach(c => {
-            html += `<td class="${colorClass(c.isUp, c.empty)}">${arrow(c.isUp, c.empty)}${formatBytesRound(c.diff)}</td>`;
+            html += `<td class="${colorClass(c.isUp, c.empty)}">${arrow(c.isUp, c.empty)}${smartFmt(c.diff)}</td>`;
         });
         html += `</tr><tr><td><strong>% Change</strong></td>`;
         calc.forEach(c => {
@@ -201,10 +305,10 @@ export class ChartManager {
         });
         html += `</tr><tr><td><strong>Avg Daily Change</strong></td>`;
         calc.forEach(c => {
-            html += `<td class="${colorClass(c.isUp, c.empty)}">${arrow(c.isUp, c.empty)}${formatBytesRound(c.avg)}/d</td>`;
+            html += `<td class="${colorClass(c.isUp, c.empty)}">${arrow(c.isUp, c.empty)}${smartFmt(c.avg)}/d</td>`;
         });
         html += `</tr>`;
-        
+
         tbody.innerHTML = html;
     }
 
@@ -455,6 +559,19 @@ export class ChartManager {
             }
         });
 
+        // Rebuild gradient whenever canvas height changes
+        const canvas = document.getElementById('timelineChart');
+        this._watchResize(canvas, this.timelineChart, (chart, c, _w, h) => {
+            const newGrad = c.createLinearGradient(0, 0, 0, h);
+            const _isLight = document.documentElement.dataset.theme === 'light';
+            newGrad.addColorStop(0,    _isLight ? 'rgba(251,191,36,0.55)' : 'rgba(251,191,36,0.26)');
+            newGrad.addColorStop(0.65, _isLight ? 'rgba(251,191,36,0.15)' : 'rgba(251,191,36,0.06)');
+            newGrad.addColorStop(1,    _isLight ? 'rgba(251,191,36,0.03)' : 'rgba(251,191,36,0.02)');
+            if (chart.data.datasets[0]) {
+                chart.data.datasets[0].backgroundColor = newGrad;
+                chart.update('none');
+            }
+        });
     }
 
 
@@ -475,7 +592,7 @@ export class ChartManager {
         ];
 
         if (unknownBytes > 0) {
-            allTeams.push({ name: '🔒 Unknown', used: unknownBytes });
+            allTeams.push({ name: 'Unknown', used: unknownBytes });
             bgColors.push('#334155');
         }
 
@@ -543,8 +660,10 @@ export class ChartManager {
                 }
             }
         });
-    }
 
+        const teamCanvas = document.getElementById('teamChart');
+        this._watchResize(teamCanvas, this.teamChart);
+    }
 
     renderUsersChart(userData, logScale = false) {
         const ctx = document.getElementById('usersChart').getContext('2d');
@@ -606,6 +725,9 @@ export class ChartManager {
                 this.renderUsersChart(userData, this._usersLogScale);
             };
         }
+
+        const usersCanvas = document.getElementById('usersChart');
+        this._watchResize(usersCanvas, this.usersChart);
     }
 
     // ── History Tab Charts ────────────────────────────────────────────────────
@@ -656,8 +778,20 @@ export class ChartManager {
                 }
             }
         });
-    }
 
+        // Rebuild gradient whenever canvas height changes
+        this._watchResize(el, this._histTotalChart, (chart, c, _w, h) => {
+            const _isLight = document.documentElement.dataset.theme === 'light';
+            const newGrad = c.createLinearGradient(0, 0, 0, h);
+            newGrad.addColorStop(0,   _isLight ? 'rgba(251,191,36,0.55)' : 'rgba(251,191,36,0.28)');
+            newGrad.addColorStop(0.7, _isLight ? 'rgba(251,191,36,0.12)' : 'rgba(251,191,36,0.04)');
+            newGrad.addColorStop(1,   'rgba(251,191,36,0)');
+            if (chart.data.datasets[0]) {
+                chart.data.datasets[0].backgroundColor = newGrad;
+                chart.update('none');
+            }
+        });
+    }
     renderTopGrowersChart(growersData, logScale = false) {
         const el = document.getElementById('historyGrowersChart');
         if (!el) return;
@@ -732,8 +866,9 @@ export class ChartManager {
                 this.renderTopGrowersChart(growersData, this._growersLogScale);
             };
         }
-    }
 
+        this._watchResize(el, this._histGrowersChart);
+    }
     renderUserTrendChart(userTimelineMap, selectedUsers, startMs, endMs, logScale = false) {
         const el = document.getElementById('historyTotalChart');
         if (!el) return;
@@ -797,5 +932,7 @@ export class ChartManager {
                 }
             }
         });
+
+        this._watchResize(el, this._histTotalChart);
     }
 }

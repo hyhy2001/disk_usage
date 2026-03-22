@@ -32,6 +32,12 @@ export function initApp() {
 
 // Simple CountUp animation for the numbers
 export function animateValue(obj, start, end, duration) {
+    if (!obj) return;
+    // Respect user's motion preference (accessibility)
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        obj.textContent = end.toFixed(2);
+        return;
+    }
     let startTimestamp = null;
     const step = (timestamp) => {
         if (!startTimestamp) startTimestamp = timestamp;
@@ -53,4 +59,46 @@ export function animateValue(obj, start, end, duration) {
 // Convert bytes to TB (decimal: 1 TB = 1,000,000,000,000 bytes)
 export function bytesToTB(bytes) {
     return bytes / 1e12;
+}
+
+// ── TASK-06: Toast Notification System ────────────────────────────────────────
+
+const TOAST_ICONS = {
+    success: '✓',
+    error:   '✕',
+    warning: '⚠',
+    info:    'ℹ',
+};
+
+/**
+ * Show a toast notification.
+ * @param {string} title   - Main message (required)
+ * @param {string} [desc]  - Sub-text (optional)
+ * @param {'success'|'error'|'warning'|'info'} [type] - Visual variant
+ * @param {number} [duration] - Auto-dismiss ms (default 3200)
+ */
+export function showToast(title, desc = '', type = 'success', duration = 3200) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast${type !== 'success' ? ` toast-${type}` : ''}`;
+    toast.setAttribute('role', 'alert');
+    toast.innerHTML = `
+        <span class="toast-icon">${TOAST_ICONS[type] ?? '✓'}</span>
+        <div class="toast-body">
+            <span class="toast-title">${title}</span>
+            ${desc ? `<span class="toast-desc">${desc}</span>` : ''}
+        </div>`;
+
+    const dismiss = () => {
+        toast.classList.add('toast-exiting');
+        setTimeout(() => toast.remove(), 280);
+    };
+
+    toast.addEventListener('click', dismiss);
+    container.appendChild(toast);
+
+    // Auto-dismiss
+    setTimeout(dismiss, duration);
 }

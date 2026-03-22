@@ -11,40 +11,61 @@
     <meta property="og:type" content="website">
     
     <!-- Modern Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     
     <!-- CSS -->
-    <link rel="stylesheet" href="css/index.css?v=9">
-    <link rel="stylesheet" href="css/layout.css?v=9">
-    <link rel="stylesheet" href="css/components.css?v=9">
+    <link rel="stylesheet" href="css/index.css?v=31">
+    <link rel="stylesheet" href="css/layout.css?v=31">
+    <link rel="stylesheet" href="css/components.css?v=31">
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 </head>
-<body class="dark-theme">
+<body>
     <div class="background-mesh">
         <div class="glow-orb orb-1"></div>
         <div class="glow-orb orb-2"></div>
     </div>
 
     <div class="app-container">
+        <!-- Mobile sidebar overlay backdrop -->
+        <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+        <!-- Scroll to Top FAB — appears after scrolling down 300px in .main-content -->
+        <button id="btn-scroll-top" class="scroll-top-fab" aria-label="Scroll to top" title="Cuộn lên đầu trang">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 15l-6-6-6 6"/>
+            </svg>
+        </button>
+
         <!-- Sidebar / Navigation -->
         <aside class="sidebar glass-panel">
             <div class="brand">
-                <div class="logo">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="brand-icon">
-                        <path d="M21 16V8C21 6.89543 20.1046 6 19 6H5C3.89543 6 3 6.89543 3 8V16C3 17.1046 3.89543 18 5 18H19C20.1046 18 21 17.1046 21 16Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M3 10H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M3 14H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <circle cx="7" cy="12" r="1" fill="currentColor"/>
-                    </svg>
-                    <span>Disk<span class="text-accent"> Usage</span></span>
-                    <button id="btn-theme-toggle" class="theme-toggle-btn" title="Toggle light/dark mode" aria-label="Toggle theme">
-                        <svg class="icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                        <svg class="icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                    </button>
+                <div class="brand-row">
+                    <div class="logo">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="brand-icon">
+                            <path d="M21 16V8C21 6.89543 20.1046 6 19 6H5C3.89543 6 3 6.89543 3 8V16C3 17.1046 3.89543 18 5 18H19C20.1046 18 21 17.1046 21 16Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M3 10H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M3 14H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <circle cx="7" cy="12" r="1" fill="currentColor"/>
+                        </svg>
+                        <span>Disk<span class="text-accent"> Usage</span></span>
+                    </div>
+                    <div class="brand-actions">
+                        <button id="btn-theme-toggle" class="theme-toggle-btn" title="Toggle light/dark mode" aria-label="Toggle theme">
+                            <svg class="icon-moon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                            <svg class="icon-sun" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                            <span class="toggle-label label-dark">Dark</span>
+                            <span class="toggle-label label-light">Light</span>
+                        </button>
+                        <!-- Close button (mobile drawer only) -->
+                        <button id="btn-sidebar-close" class="sidebar-close-btn" aria-label="Close navigation" title="Close sidebar">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 <!-- Live clock -->
                 <div id="sidebar-clock" class="sidebar-clock"></div>
@@ -65,13 +86,33 @@
 
             <!-- Disk Selector -->
             <div class="disk-selector-wrap">
+                <!-- Icon trigger for icon-only sidebar mode (640-960px) -->
+                <button class="disk-icon-trigger has-active" id="btn-disk-icon" title="Switch active disk" aria-label="Select disk">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                    </svg>
+                </button>
+
+                <!-- Flyout (icon-only mode) -->
+                <div class="disk-flyout">
+                    <div class="disk-flyout-title">Active Disk</div>
+                    <div class="disk-search-wrap">
+                        <svg class="disk-search-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" id="disk-search-flyout" class="disk-search-input" placeholder="Search disk..." autocomplete="off" aria-label="Search disk (flyout)">
+                    </div>
+                    <div id="disk-list-flyout" class="disk-list"></div>
+                </div>
+
+                <!-- Full sidebar mode -->
                 <label class="disk-selector-label">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16"/></svg>
                     Active Disk
                 </label>
                 <div class="disk-search-wrap">
                     <svg class="disk-search-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <input type="text" id="disk-search" class="disk-search-input" placeholder="Search disk..." autocomplete="off">
+                    <input type="text" id="disk-search" class="disk-search-input" placeholder="Search disk..." autocomplete="off" aria-label="Search disk">
                 </div>
                 <div id="disk-list" class="disk-list">
                     <div class="disk-list-item loading">Loading disks…</div>
@@ -108,6 +149,13 @@
             <!-- Row 1: disk name · path · quick stats (all inline) -->
             <div class="header-top-row">
                 <div class="header-identity">
+                    <button id="btn-hamburger" class="hamburger-btn" aria-label="Toggle navigation" title="Toggle sidebar">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                            <line x1="3" y1="6" x2="21" y2="6"/>
+                            <line x1="3" y1="12" x2="21" y2="12"/>
+                            <line x1="3" y1="18" x2="21" y2="18"/>
+                        </svg>
+                    </button>
                     <h1 id="shared-page-title">Disk Usage Overview</h1>
                     <span class="header-sep">·</span>
                     <p id="header-disk-path" class="header-disk-path">—</p>
@@ -167,7 +215,7 @@
                             <h2>Capacity Over Time</h2>
                             <div id="timeline-stat-header" class="timeline-stat-header"></div>
                         </div>
-                        <div style="display:flex;align-items:center;gap:8px">
+                        <div class="flex-row-g8">
                             <div class="chart-range-btns">
                                 <button class="range-btn" data-range="7">7D</button>
                                 <button class="range-btn" data-range="30">30D</button>
@@ -176,7 +224,7 @@
                                 <button class="range-btn" data-range="1825">5Y</button>
                                 <button class="range-btn active" data-range="all">All</button>
                             </div>
-                            <button class="chart-expand-btn" data-chart="timeline" title="Expand chart">⛶</button>
+                            <button class="chart-expand-btn" data-chart="timeline" title="Expand chart" aria-label="Expand chart"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                         </div>
                     </div>
                     <div class="canvas-wrapper">
@@ -190,7 +238,7 @@
                 <div class="chart-container glass-panel">
                     <div class="panel-header">
                         <h2>Usage by Teams</h2>
-                        <button class="chart-expand-btn" data-chart="team" title="Expand chart">⛶</button>
+                        <button class="chart-expand-btn" data-chart="team" title="Expand chart" aria-label="Expand chart"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                     </div>
                     <div class="canvas-wrapper">
                         <canvas id="teamChart"></canvas>
@@ -201,9 +249,9 @@
                 <div class="chart-container glass-panel">
                     <div class="panel-header">
                         <h2>Top Consuming Users</h2>
-                        <div style="display:flex;align-items:center;gap:6px">
+                        <div class="flex-row-g6">
                             <button id="users-scale-btn" class="scale-toggle-btn" title="Toggle log/linear scale">Lin</button>
-                            <button class="chart-expand-btn" data-chart="users" title="Expand chart">⛶</button>
+                            <button class="chart-expand-btn" data-chart="users" title="Expand chart" aria-label="Expand chart"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                         </div>
                     </div>
                     <div class="canvas-wrapper">
@@ -218,9 +266,9 @@
 
                 <!-- Tab Bar -->
                 <div class="detail-tabs">
-                    <button class="detail-tab-btn active" data-tab="snapshot">📸 Latest Snapshot</button>
-                    <button class="detail-tab-btn" data-tab="history">📊 History &amp; Analysis</button>
-                    <button class="detail-tab-btn" data-tab="permissions">🔒 Permission Issues</button>
+                    <button class="detail-tab-btn active" data-tab="snapshot"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Latest Snapshot</button>
+                    <button class="detail-tab-btn" data-tab="history"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> History &amp; Analysis</button>
+                    <button class="detail-tab-btn" data-tab="permissions"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Permission Issues</button>
                 </div>
 
                 <!-- ── Tab Pane 1: Latest Snapshot ── -->
@@ -235,7 +283,7 @@
                         <!-- ① Time Range Bar -->
                         <div class="history-timerange glass-panel">
                             <div class="timerange-presets">
-                                <span class="timerange-label">🕐</span>
+                                <span class="timerange-label"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
                                 <button class="hrange-btn" data-days="7">7D</button>
                                 <button class="hrange-btn active" data-days="30">30D</button>
                                 <button class="hrange-btn" data-days="90">3M</button>
@@ -244,9 +292,9 @@
                                 <button class="hrange-btn" data-days="NaN">All</button>
                             </div>
                             <div class="timerange-custom">
-                                <input type="date" id="filter-date-start" class="date-input">
+                                <input type="date" id="filter-date-start" class="date-input" aria-label="Filter start date">
                                 <span class="date-sep">→</span>
-                                <input type="date" id="filter-date-end" class="date-input">
+                                <input type="date" id="filter-date-end" class="date-input" aria-label="Filter end date">
                             </div>
                         </div>
 
@@ -256,17 +304,17 @@
                             <!-- Left: User Filter Box -->
                             <div class="glass-panel user-filter-box">
                                 <div class="user-filter-header">
-                                    <span class="user-filter-title">👤 Users</span>
+                                    <span class="user-filter-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Users</span>
                                     <span class="user-filter-count" id="history-user-count">—</span>
                                 </div>
-                                <input type="text" id="user-filter-search" class="user-filter-search" placeholder="🔍 Search user…">
+                                <input type="text" id="user-filter-search" class="user-filter-search" placeholder="Search user…" aria-label="Search users">
                                 <div class="user-filter-list" id="user-chips">
                                     <span class="table-empty">Loading…</span>
                                 </div>
                                 <div class="user-filter-footer">
                                     <button class="user-bar-btn" id="btn-top10">Top 10</button>
                                     <button class="user-bar-btn" id="btn-clear-users">Clear</button>
-                                    <button id="btn-reset-filter" class="user-bar-btn" style="width:100%">↺ Reset</button>
+                                    <button id="btn-reset-filter" class="user-bar-btn w-full">↺ Reset</button>
                                 </div>
                             </div>
 
@@ -277,11 +325,11 @@
                                 <div class="history-charts-row">
                                     <div class="glass-panel history-chart-card">
                                         <div class="history-chart-header">
-                                            <span class="history-chart-title">📈 Selected Users Usage</span>
-                                            <div style="display:flex;align-items:center;gap:6px">
+                                            <span class="history-chart-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> Selected Users Usage</span>
+                                            <div class="flex-row-g6">
                                                 <span class="history-chart-stat" id="history-total-stat"></span>
                                                 <button id="btn-scale-toggle" class="scale-toggle-btn" data-scale="linear">Log</button>
-                                                <button class="chart-expand-btn" data-chart="trend" title="Expand chart">⛶</button>
+                                                <button class="chart-expand-btn" data-chart="trend" title="Expand chart" aria-label="Expand chart"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                                             </div>
                                         </div>
                                         <div class="history-chart-body">
@@ -290,11 +338,11 @@
                                     </div>
                                     <div class="glass-panel history-chart-card">
                                         <div class="history-chart-header">
-                                            <span class="history-chart-title">🔥 Fastest Growing Users</span>
-                                            <div style="display:flex;align-items:center;gap:6px">
+                                            <span class="history-chart-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Fastest Growing Users</span>
+                                            <div class="flex-row-g6">
                                                 <span class="history-chart-stat" id="history-growers-stat"></span>
                                                 <button id="growers-scale-btn" class="scale-toggle-btn" title="Toggle log/linear scale">Lin</button>
-                                                <button class="chart-expand-btn" data-chart="growers" title="Expand chart">⛶</button>
+                                                <button class="chart-expand-btn" data-chart="growers" title="Expand chart" aria-label="Expand chart"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                                             </div>
                                         </div>
                                         <div class="history-chart-body">
@@ -313,7 +361,16 @@
                 <!-- ── Tab Pane 3: Permission Issues ── -->
                 <div class="detail-tab-pane" id="tab-pane-permissions">
                     <div id="permissions-body">
-                        <p class="table-empty">Loading permission data…</p>
+                        <div class="empty-state">
+                            <div class="empty-state-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                </svg>
+                            </div>
+                            <h3>Permission Analysis</h3>
+                            <p>Select a disk from the sidebar, then click this tab to scan for access problems.</p>
+                        </div>
                     </div>
                 </div><!-- /#tab-pane-permissions -->
 
@@ -324,16 +381,19 @@
         </main>
     </div>
 
+    <!-- TASK-06: Toast Notification Container -->
+    <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="false"></div>
 
 
 
-    <script src="js/dataFetcher.js" type="module"></script>
-    <script src="js/dataStore.js" type="module"></script>
-    <script src="js/chartManager.js" type="module"></script>
-    <script src="js/permissionRenderer.js" type="module"></script>
-    <script src="js/main.js" type="module"></script>
-    <script src="js/chartModal.js" type="module"></script>
-    <script src="js/themeToggle.js"></script>
+    <script src="js/dataFetcher.js?v=31" type="module"></script>
+    <script src="js/dataStore.js?v=31" type="module"></script>
+    <script src="js/chartManager.js?v=31" type="module"></script>
+    <script src="js/permissionRenderer.js?v=31" type="module"></script>
+    <script src="js/main.js?v=31" type="module"></script>
+    <script src="js/chartModal.js?v=31" type="module"></script>
+    <script src="js/themeToggle.js?v=31"></script>
+    <script src="js/scrollToTop.js?v=31" type="module"></script>
 </body>
 </html>
 

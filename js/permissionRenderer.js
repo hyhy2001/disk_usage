@@ -1,14 +1,8 @@
 // permissionRenderer.js — Renders Permission Issues tab content
 // Listens for 'permissionsLoaded' event dispatched by dataFetcher.js
+import { fmtDateSec as fmtDate } from './formatters.js';
 
-const TYPE_ICON = { directory: '📁', file: '📄' };
-
-function fmtDate(unixSec) {
-    if (!unixSec) return '—';
-    return new Date(unixSec * 1000).toLocaleDateString('en-GB', {
-        day: '2-digit', month: 'short', year: 'numeric'
-    });
-}
+const TYPE_ICON = { directory: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`, file: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>` };
 
 function escHtml(str) {
     return String(str)
@@ -17,7 +11,7 @@ function escHtml(str) {
 }
 
 function renderItem(item) {
-    const icon = TYPE_ICON[item.type] ?? '❓';
+    const icon = TYPE_ICON[item.type] ?? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>`;
     return `
         <div class="perm-item">
             <span class="perm-item-icon">${icon}</span>
@@ -82,7 +76,16 @@ function renderPermissions(data) {
     if (!body) return;
 
     if (!data) {
-        body.innerHTML = `<p class="table-empty">No permission issues file found for this disk.</p>`;
+        body.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16"/>
+                    </svg>
+                </div>
+                <h3>No Permission Data</h3>
+                <p>No permission issues file found for this disk.</p>
+            </div>`;
         return;
     }
 
@@ -115,7 +118,7 @@ function renderPermissions(data) {
            <div class="user-filter-item" data-key="__unknown__"
                onclick="window._permToggleItem(this)">
                <span class="user-filter-check"></span>
-               <span class="user-filter-name">⚠️ Unknown</span>
+               <span class="user-filter-name"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg> Unknown</span>
                <span class="result-count" style="font-size:0.65rem;padding:1px 5px">${unknown.length}</span>
            </div>`
         : '';
@@ -127,7 +130,7 @@ function renderPermissions(data) {
         return `
         <div class="perm-user-card glass-panel" data-key="${escHtml(u.name)}">
             <div class="perm-user-header">
-                <span class="perm-user-name">👤 ${escHtml(u.name)}</span>
+                <span class="perm-user-name"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> ${escHtml(u.name)}</span>
                 <span class="result-count">${count} item${count !== 1 ? 's' : ''}</span>
             </div>
             <div class="perm-items">${items.map(renderItem).join('')}</div>
@@ -137,7 +140,7 @@ function renderPermissions(data) {
     const unknownSection = unknown.length > 0 ? `
         <div class="perm-user-card glass-panel" data-key="__unknown__">
             <div class="perm-user-header">
-                <span class="perm-user-name">⚠️ Unknown Items</span>
+                <span class="perm-user-name"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg> Unknown Items</span>
                 <span class="result-count">${unknown.length}</span>
             </div>
             <div class="perm-items">${unknown.map(renderItem).join('')}</div>
@@ -146,8 +149,8 @@ function renderPermissions(data) {
     // ── Full layout ────────────────────────────────────────────────────────────
     body.innerHTML = `
         <div class="perm-meta">
-            <span class="perm-meta-date">📅 ${dateStr}</span>
-            <span class="perm-meta-dir">📂 ${escHtml(dir)}</span>
+            <span class="perm-meta-date"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> ${dateStr}</span>
+            <span class="perm-meta-dir"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> ${escHtml(dir)}</span>
             <span class="result-count">${totalIssues} total issue${totalIssues !== 1 ? 's' : ''}</span>
         </div>
 
@@ -174,17 +177,22 @@ function renderPermissions(data) {
             <!-- Left: User Filter Box -->
             <div class="glass-panel user-filter-box">
                 <div class="user-filter-header">
-                    <span class="user-filter-title">🔒 Users</span>
+                    <span class="user-filter-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Users</span>
                     <span class="user-filter-count" id="perm-filter-count">1 selected</span>
                 </div>
-                <input type="text" id="perm-user-search" class="user-filter-search"
-                    placeholder="🔍 Search user…"
-                    oninput="
-                        const q = this.value.toLowerCase();
-                        document.querySelectorAll('#perm-filter-list .user-filter-item').forEach(el => {
-                            el.style.display = (el.dataset.key || '').toLowerCase().includes(q) ? '' : 'none';
-                        });
-                    ">
+                <div class="perm-filter-searches">
+                    <input type="text" id="perm-user-search" class="user-filter-search"
+                        placeholder="Search user…"
+                        oninput="
+                            const q = this.value.toLowerCase();
+                            document.querySelectorAll('#perm-filter-list .user-filter-item').forEach(el => {
+                                el.style.display = (el.dataset.key || '').toLowerCase().includes(q) ? '' : 'none';
+                            });
+                        ">
+                    <input type="text" id="perm-path-search" class="user-filter-search"
+                        placeholder="Filter paths…"
+                        oninput="window._permSearch(this.value)">
+                </div>
                 <div class="user-filter-list" id="perm-filter-list">
                     ${filterItems}${unknownItem}
                 </div>
@@ -205,14 +213,7 @@ function renderPermissions(data) {
                         });
                         window._permSearch();
                     ">Clear</button>
-                </div>
-                <div class="user-filter-divider"></div>
-                <div class="user-filter-header" style="margin-top:4px">
-                    <span class="user-filter-title" style="font-size:0.68rem">🔍 Path Search</span>
-                </div>
-                <input type="text" id="perm-path-search" class="user-filter-search"
-                    placeholder="Filter paths…"
-                    oninput="window._permSearch(this.value)">
+                 </div>
             </div>
 
             <!-- Right: User Cards -->
