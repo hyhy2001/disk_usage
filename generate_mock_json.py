@@ -106,14 +106,15 @@ def generate_mock_data(num_files=500):
         {"name": "UK",    "team_id": 3},
         {"name": "JP",    "team_id": 4},
         {"name": "EU",    "team_id": 5},
-        {"name": "Other", "team_id": 6},
+        {"name": "Other"},  # no team_id -- mirrors real report behaviour
     ]
     team_names = [t["name"] for t in teams]
-    team_id_map = {t["name"]: t["team_id"] for t in teams}
+    team_id_map = {t["name"]: t["team_id"] for t in teams if "team_id" in t}
 
-    # Assign each user to a team (deterministic, round-robin)
-    user_names  = [f"user{i}" for i in range(1, 21)]
-    user_team   = {u: teams[i % (len(teams) - 1)]["name"] for i, u in enumerate(user_names)}
+    # Assign each user to a named team (excludes Other — no team_id)
+    named_teams  = [t for t in teams if "team_id" in t]
+    user_names   = [f"user{i}" for i in range(1, 21)]
+    user_team    = {u: named_teams[i % len(named_teams)]["name"] for i, u in enumerate(user_names)}
     user_team_id = {u: team_id_map[t] for u, t in user_team.items()}
 
     other_users = ["www-data", "nginx", "mysql", "redis", "backup", "nobody", "daemon", "syslog", "postfix", "git"]
@@ -148,7 +149,8 @@ def generate_mock_data(num_files=500):
                 team_usage.append({"name": team["name"], "used": usage, "team_id": team["team_id"]})
                 remaining -= usage
             last = teams[-1]
-            team_usage.append({"name": last["name"], "used": max(0, remaining - LOCKED_GAP), "team_id": last["team_id"]})
+            # "Other" has no team_id in real reports (auto-generated catchall)
+            team_usage.append({"name": last["name"], "used": max(0, remaining - LOCKED_GAP)})
 
             user_usage = []
             user_remaining = used_space
