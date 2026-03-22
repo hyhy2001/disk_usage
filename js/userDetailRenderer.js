@@ -119,10 +119,9 @@ function _renderPicker(users, otherUsers) {
         ...otherUsers.map(o => o.name).filter(n => !users.includes(n)),
     ].sort((a, b) => a.localeCompare(b));
 
-    const opts = allUsers.map(name => {
-        const isOther = !users.includes(name) && otherNames.has(name);
-        return `<div class="ud-dropdown-option${name === _selectedUser ? ' selected' : ''}${isOther ? ' ud-opt-other' : ''}" data-value="${name}">${name}</div>`;
-    }).join('');
+    const opts = allUsers.map(name =>
+        `<div class="ud-dropdown-option${name === _selectedUser ? ' selected' : ''}" data-value="${name}">${name}</div>`
+    ).join('');
 
     return `
     <div class="ud-picker-wrap glass-panel">
