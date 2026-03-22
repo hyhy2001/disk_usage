@@ -670,12 +670,17 @@ export class ChartManager {
                     this._selectedTeamIdx = idx;
 
                     if (!team || team.team_id === undefined) {
-                        // No team_id = auto-generated "Other" catchall -> show other_usage
-                        const otherUsers = dataStore.getOtherUsers();
-                        if (otherUsers.length) {
-                            this.renderUsersChart(otherUsers);
-                        } else {
+                        if (team?.name === 'Unknown') {
+                            // JS-generated slice for unaccounted disk space — no user mapping
                             this._showNoDataUsersChart();
+                        } else {
+                            // "Other" catchall from report — show other_usage (system users)
+                            const otherUsers = dataStore.getOtherUsers();
+                            if (otherUsers.length) {
+                                this.renderUsersChart(otherUsers);
+                            } else {
+                                this._showNoDataUsersChart();
+                            }
                         }
                         this._showTeamFilterBadge(team?.name ?? 'Other', () => this._clearTeamFilter(dataStore));
                         return;
