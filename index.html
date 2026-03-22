@@ -268,6 +268,7 @@
                 <div class="detail-tabs">
                     <button class="detail-tab-btn active" data-tab="snapshot"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Latest Snapshot</button>
                     <button class="detail-tab-btn" data-tab="history"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> History &amp; Analysis</button>
+                    <button class="detail-tab-btn" data-tab="user-detail" id="tab-btn-user-detail"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="23" y2="12"/><line x1="23" y1="8" x2="19" y2="12"/></svg> Detail User</button>
                     <button class="detail-tab-btn" data-tab="permissions"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Permission Issues</button>
                 </div>
 
@@ -374,6 +375,13 @@
                     </div>
                 </div><!-- /#tab-pane-permissions -->
 
+                <!-- ── Tab Pane 3: Detail User ── -->
+                <div class="detail-tab-pane" id="tab-pane-user-detail">
+                    <div id="ud-root">
+                        <!-- Rendered by userDetailRenderer.js -->
+                    </div>
+                </div><!-- /#tab-pane-user-detail -->
+
             </section><!-- /#page-detail -->
 
 
@@ -386,14 +394,15 @@
 
 
 
-    <script src="js/dataFetcher.js?v=31" type="module"></script>
-    <script src="js/dataStore.js?v=31" type="module"></script>
-    <script src="js/chartManager.js?v=31" type="module"></script>
-    <script src="js/permissionRenderer.js?v=31" type="module"></script>
-    <script src="js/main.js?v=31" type="module"></script>
-    <script src="js/chartModal.js?v=31" type="module"></script>
-    <script src="js/themeToggle.js?v=31"></script>
-    <script src="js/scrollToTop.js?v=31" type="module"></script>
+    <script src="js/dataFetcher.js?v=32" type="module"></script>
+    <script src="js/dataStore.js?v=32" type="module"></script>
+    <script src="js/chartManager.js?v=32" type="module"></script>
+    <script src="js/permissionRenderer.js?v=32" type="module"></script>
+    <script src="js/userDetailRenderer.js?v=32" type="module"></script>
+    <script src="js/main.js?v=32" type="module"></script>
+    <script src="js/chartModal.js?v=32" type="module"></script>
+    <script src="js/themeToggle.js?v=32"></script>
+    <script src="js/scrollToTop.js?v=32" type="module"></script>
 </body>
 </html>
 

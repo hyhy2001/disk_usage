@@ -265,6 +265,133 @@ def generate_permission_issues():
         print(f"🔒 permission_issues → {output_dir}/{fname}  ({len(affected)} users, {n_items} items)")
 
 
+# ── Detail report generation ─────────────────────────────────────────────────
+
+# Fake sub-directory templates per base path
+SUBDIRS = [
+    "projects", "datasets", "models", "logs", "exports", "cache",
+    "builds", "archives", "uploads", "backups", "reports", "tmp",
+]
+SUBSUBDIRS = [
+    "2024", "2025", "raw", "processed", "v1", "v2", "latest",
+    "checkpoint", "output", "input", "staging",
+]
+FILE_EXTS = [
+    (".bin",  0.40), (".log",  0.20), (".gz",   0.15),
+    (".csv",  0.10), (".json", 0.08), (".txt",  0.07),
+]
+FILE_NAMES = [
+    "model", "data", "checkpoint", "dump", "export", "report",
+    "output", "archive", "backup", "log", "index", "snapshot",
+    "dataset", "weights", "config", "metrics",
+]
+
+
+def _fake_dirs(base_path, user, total_used, n=20):
+    """Generate n fake directory entries whose sizes roughly sum to total_used."""
+    dirs = []
+    remaining = total_used
+    for i in range(n):
+        sub  = random.choice(SUBDIR := SUBDIRS)
+        sub2 = random.choice(SUBSUBDIRS)
+        path = f"{base_path}/{user}/{sub}/{sub2}"
+        # Last entry gets all remaining space
+        if i == n - 1:
+            size = max(0, remaining)
+        else:
+            size = random.randint(int(remaining * 0.02), int(remaining * 0.25))
+            size = min(size, remaining)
+        dirs.append({"path": path, "used": size})
+        remaining -= size
+        if remaining <= 0:
+            break
+    return sorted(dirs, key=lambda d: d["used"], reverse=True)
+
+
+def _fake_files(base_path, user, total_used, n=30):
+    """Generate n fake file entries."""
+    files = []
+    remaining = total_used
+    for i in range(n):
+        sub  = random.choice(SUBDIRS)
+        name = random.choice(FILE_NAMES) + f"_{random.randint(1, 999):03d}"
+        # Pick extension weighted by probability
+        r = random.random()
+        acc = 0
+        ext = ".bin"
+        for e, p in FILE_EXTS:
+            acc += p
+            if r < acc:
+                ext = e
+                break
+        path = f"{base_path}/{user}/{sub}/{name}{ext}"
+        if i == n - 1:
+            size = max(0, remaining)
+        else:
+            size = random.randint(int(remaining * 0.01), int(remaining * 0.20))
+            size = min(size, remaining)
+        files.append({"path": path, "size": size})
+        remaining -= size
+        if remaining <= 0:
+            break
+    return sorted(files, key=lambda f: f["size"], reverse=True)
+
+
+def generate_detail_reports():
+    """Create detail_users/ folder per disk with per-user dir+file snapshots."""
+    user_names = [f"user{i}" for i in range(1, 21)]
+    # Use a fixed "latest" timestamp (last simulated date)
+    last_ts = int((datetime(2025, 1, 1) + timedelta(days=499)).timestamp())
+
+    for disk in DISK_CONFIGS:
+        output_dir    = disk["dir"]
+        detail_dir    = os.path.join(output_dir, "detail_users")
+        total_space   = disk["total_gb"] * 1024 * 1024 * 1024
+        # Rough user budget: 60% of disk split across users
+        budget_per_user = int(total_space * 0.60 / len(user_names))
+
+        if not os.path.exists(detail_dir):
+            os.makedirs(detail_dir)
+
+        for user in user_names:
+            # Randomise each user's actual usage (±40%)
+            user_total = random.randint(
+                int(budget_per_user * 0.60),
+                int(budget_per_user * 1.40),
+            )
+            total_files_count = random.randint(500, 50_000)
+
+            dirs  = _fake_dirs(disk["path"], user, user_total, n=20)
+            files = _fake_files(disk["path"], user, user_total, n=30)
+
+            dir_report = {
+                "date":      last_ts,
+                "directory": disk["path"],
+                "user":      user,
+                "total_used": user_total,
+                "dirs":      dirs,
+            }
+            file_report = {
+                "date":        last_ts,
+                "user":        user,
+                "total_files": total_files_count,
+                "total_used":  user_total,
+                "files":       files,
+            }
+
+            dir_path  = os.path.join(detail_dir, f"detail_report_dir_{user}.json")
+            file_path = os.path.join(detail_dir, f"detail_report_file_{user}.json")
+            with open(dir_path,  "w") as f: json.dump(dir_report,  f, indent=2)
+            with open(file_path, "w") as f: json.dump(file_report, f, indent=2)
+
+        print(f"[detail] {len(user_names)*2} files -> {detail_dir}/")
+
+
 if __name__ == "__main__":
-    generate_mock_data()
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--num-files", type=int, default=500)
+    args = ap.parse_args()
+    generate_mock_data(args.num_files)
     generate_permission_issues()
+    generate_detail_reports()

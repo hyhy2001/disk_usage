@@ -4126,3 +4126,207 @@
         width: 100%;
     }
 }
+
+/* ==========================================================================
+   Detail User Tab (userDetailRenderer.js)
+   ========================================================================== */
+
+/* Picker strip */
+.ud-picker-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    border-radius: 12px;
+    flex-wrap: wrap;
+}
+.ud-picker-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+.ud-picker-select {
+    flex: 1;
+    min-width: 160px;
+    max-width: 280px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-glass);
+    color: var(--text);
+    font-size: 0.85rem;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.ud-picker-select:focus { border-color: var(--sky-400); }
+.ud-picker-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+
+/* Two-column grid for cards */
+.ud-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+@media (max-width: 900px) { .ud-grid { grid-template-columns: 1fr; } }
+
+/* Card */
+.ud-card {
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.ud-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+}
+.ud-card-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text);
+}
+.ud-card-badge {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* Path list */
+.ud-path-list {
+    padding: 8px 12px;
+    overflow-y: auto;
+    max-height: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.ud-path-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 4px;
+    border-radius: 6px;
+    transition: background 0.12s;
+}
+.ud-path-row:hover { background: var(--bg-hover, rgba(255,255,255,0.04)); }
+
+/* When file card (has ext badge) use 4-col layout */
+.ud-path-row:has(.ud-ext-badge) {
+    grid-template-columns: auto 1fr auto auto;
+}
+.ud-path-name {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace;
+}
+.ud-path-bar-wrap {
+    width: 70px;
+    height: 5px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.ud-path-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+.ud-fill-sky    { background: var(--sky-400,  #38bdf8); }
+.ud-fill-amber  { background: var(--amber-400,#fbbf24); }
+.ud-fill-rose   { background: var(--rose-500, #f43f5e); }
+.ud-fill-emerald{ background: var(--emerald-400,#34d399); }
+.ud-path-val {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    text-align: right;
+    min-width: 52px;
+}
+
+/* Extension badge */
+.ud-ext-badge {
+    font-size: 0.68rem;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 2px 5px;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+/* Empty / prompt state */
+.ud-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 24px;
+    text-align: center;
+    gap: 12px;
+}
+.ud-empty-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+}
+.ud-empty-state h3 { font-size: 1rem; font-weight: 600; margin: 0; }
+.ud-empty-state p  { font-size: 0.83rem; color: var(--text-muted); margin: 0; max-width: 300px; }
+
+/* Error */
+.ud-error {
+    padding: 16px;
+    border-radius: 10px;
+    background: rgba(244, 63, 94, 0.08);
+    color: var(--rose-400, #fb7185);
+    font-size: 0.83rem;
+    margin-top: 12px;
+}
+
+/* Loading hint */
+.ud-loading {
+    padding: 40px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+/* Skeleton animations */
+.ud-skeleton {
+    background: linear-gradient(90deg,
+        rgba(255,255,255,0.04) 25%,
+        rgba(255,255,255,0.08) 50%,
+        rgba(255,255,255,0.04) 75%);
+    background-size: 200% 100%;
+    animation: ud-shimmer 1.4s infinite;
+    border-radius: 6px;
+}
+@keyframes ud-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.ud-skeleton-card { padding: 14px 16px; gap: 10px; display: flex; flex-direction: column; }
+.ud-sk-title { height: 16px; width: 40%; border-radius: 4px; }
+.ud-sk-row   { height: 10px; border-radius: 4px; }

@@ -3,6 +3,7 @@ import { DataStore } from './dataStore.js';
 import { ChartManager } from './chartManager.js';
 import { initRouter } from './router.js';
 import { renderDetailTables, initScaleToggle, resetDashboardToEmpty } from './detailRenderer.js';
+import { initUserDetailTab, resetUserDetailTab } from './userDetailRenderer.js';
 import { fmt } from './formatters.js';
 import { saveFilters, loadFilters } from './filterStorage.js';
 
@@ -42,6 +43,18 @@ class DataFetcher {
             permTab.addEventListener('click', () => {
                 if (!this._permissionsLoaded && this._activeDisk) {
                     this._fetchPermissions();
+                }
+            });
+        }
+
+        // Lazy-load Detail User tab on click
+        const userDetailTab = document.querySelector('.detail-tab-btn[data-tab="user-detail"]');
+        if (userDetailTab) {
+            userDetailTab.addEventListener('click', () => {
+                if (this._activeDisk) {
+                    const diskConf = this.disksConfig?.find(d => d.id === this._activeDisk);
+                    const diskPath = diskConf?.path || this._activeDisk;
+                    initUserDetailTab(diskPath);
                 }
             });
         }
@@ -131,6 +144,9 @@ class DataFetcher {
                             <p>Click the <strong>Permission Issues</strong> tab to scan this disk for access problems.</p>
                         </div>`;
                 }
+
+                // Reset Detail User tab on disk change
+                resetUserDetailTab();
             };
 
             // Populate main list
