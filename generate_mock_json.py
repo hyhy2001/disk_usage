@@ -366,7 +366,7 @@ def generate_detail_reports():
             dir_report  = {"date": last_ts, "directory": disk["path"],
                            "user": user, "total_used": user_total, "dirs": dirs}
             file_report = {"date": last_ts, "user": user,
-                           "total_files": total_files_count,
+                           "total_files": len(files),
                            "total_used":  user_total, "files": files}
 
             with open(os.path.join(detail_dir, f"detail_report_dir_{user}.json"),  "w") as f:
@@ -411,7 +411,7 @@ def generate_detail_reports():
             dir_report  = {"date": last_ts, "directory": disk["path"],
                            "user": user, "total_used": user_total, "dirs": dirs}
             file_report = {"date": last_ts, "user": user,
-                           "total_files": total_files_count,
+                           "total_files": len(files),
                            "total_used":  user_total, "files": files}
 
             with open(os.path.join(detail_dir, f"detail_report_dir_{user}.json"),  "w") as f:
