@@ -98,18 +98,13 @@ function readFileReportPaginated($detailPath, $user, $offset, $limit) {
     $inFiles     = false;
 
     while (($line = fgets($fh)) !== false) {
-        if (!$inFiles) {
-            if (preg_match('/"date"\s*:\s*(\d+)/', $line, $m))         $date       = (int)$m[1];
-            elseif (preg_match('/"user"\s*:\s*"([^"]+)"/', $line, $m)) $userName   = $m[1];
-            elseif (preg_match('/"total_files"\s*:\s*(\d+)/', $line, $m)) $totalFiles = (int)$m[1];
-            elseif (preg_match('/"total_used"\s*:\s*(\d+)/', $line, $m))  $totalUsed  = (int)$m[1];
+        if (preg_match('/"date"\s*:\s*(\d+)/', $line, $m))         $date       = (int)$m[1];
+        elseif (preg_match('/"user"\s*:\s*"([^"]+)"/', $line, $m)) $userName   = $m[1];
+        elseif (preg_match('/"total_files"\s*:\s*(\d+)/', $line, $m)) $totalFiles = (int)$m[1];
+        elseif (preg_match('/"total_used"\s*:\s*(\d+)/', $line, $m))  $totalUsed  = (int)$m[1];
 
-            if (strpos($line, '"files"') !== false && strpos($line, '[') !== false) {
-                $inFiles = true;
-            }
-        } else {
-            break;  // stop right after "files": [
-        }
+        // Stop as soon as we reach the files array — next fgets() will be first entry
+        if (strpos($line, '"files"') !== false && strpos($line, '[') !== false) break;
     }
 
     // ── Pass 2: stream entries with brace-depth tracking ─────────────────────
