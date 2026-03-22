@@ -111,18 +111,18 @@ function _renderSkeleton() {
 
 function _renderPicker(users, otherUsers) {
     const selectedLabel = _selectedUser || 'choose a user...';
-    const total = users.length + otherUsers.length;
 
-    const makeOpt = (name, cls = '') =>
-        `<div class="ud-dropdown-option${name === _selectedUser ? ' selected' : ''}${cls}" data-value="${name}">${name}</div>`;
+    // Merge all users into one flat sorted list
+    const otherNames = new Set(otherUsers.map(o => o.name));
+    const allUsers = [
+        ...users,
+        ...otherUsers.map(o => o.name).filter(n => !users.includes(n)),
+    ].sort((a, b) => a.localeCompare(b));
 
-    const regularOpts = users.length
-        ? `<div class="ud-dropdown-group-label">Detail Reports (${users.length})</div>${users.map(u => makeOpt(u)).join('')}`
-        : '';
-
-    const otherOpts = otherUsers.length
-        ? `<div class="ud-dropdown-group-label">Other Users (${otherUsers.length})</div>${otherUsers.map(o => makeOpt(o.name, ' ud-opt-other')).join('')}`
-        : '';
+    const opts = allUsers.map(name => {
+        const isOther = !users.includes(name) && otherNames.has(name);
+        return `<div class="ud-dropdown-option${name === _selectedUser ? ' selected' : ''}${isOther ? ' ud-opt-other' : ''}" data-value="${name}">${name}</div>`;
+    }).join('');
 
     return `
     <div class="ud-picker-wrap glass-panel">
@@ -137,10 +137,10 @@ function _renderPicker(users, otherUsers) {
             </button>
             <div class="ud-dropdown-list" id="ud-dropdown-list" role="listbox">
                 <input class="ud-dropdown-search" id="ud-dropdown-search" placeholder="Search user..." autocomplete="off">
-                <div id="ud-dropdown-options">${regularOpts}${otherOpts}</div>
+                <div id="ud-dropdown-options">${opts}</div>
             </div>
         </div>
-        <span class="ud-picker-hint">${total} users available</span>
+        <span class="ud-picker-hint">${allUsers.length} users available</span>
     </div>`;
 }
 
