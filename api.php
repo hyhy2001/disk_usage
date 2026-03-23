@@ -100,12 +100,15 @@ if ($type === 'permissions') {
     $item_type   = trim(param('item_type', ''));   // 'file' | 'directory' | ''
     $path_query  = trim(param('path', ''));         // substring match on path
 
-    // Find newest permission_issues*.json
+    // Find newest file matching *permission_issue*.json (singular or plural, any prefix/suffix)
     $perm_file  = null;
     $perm_mtime = 0;
     $dh = @opendir($disk_path);
     while ($dh && ($f = readdir($dh)) !== false) {
-        if (strpos($f, 'permission_issues') !== false && substr($f, -5) === '.json') {
+        if (substr($f, -5) !== '.json') continue;
+        $fl = strtolower($f);
+        // Match: permission_issue, permission_issues, or any *permission_issue*.json
+        if (strpos($fl, 'permission_issue') !== false) {
             $fp = $disk_path . DIRECTORY_SEPARATOR . $f;
             $mt = @filemtime($fp);
             if ($mt > $perm_mtime) { $perm_file = $fp; $perm_mtime = $mt; }
@@ -310,10 +313,16 @@ if ($type === 'files') {
 $dh    = @opendir($disk_path);
 $files = array();
 while ($dh && ($f = readdir($dh)) !== false) {
-    $is_report = substr($f, -5) === '.json'
-              && strpos($f, 'permission_issues') === false
-              && strpos($f, 'detail_report')     === false
-              && (strpos($f, 'report_') === 0 || strpos($f, 'disk_usage_report') === 0);
+    if (substr($f, -5) !== '.json') continue;
+    $fl = strtolower($f);
+    // Exclude non-report files
+    if (strpos($fl, 'permission_issue') !== false) continue;
+    if (strpos($fl, 'detail_report')    !== false) continue;
+    // Match: *disk_usage_report*, *report_*, *usage_report* (wildcard-style)
+    $is_report = strpos($fl, 'disk_usage_report') !== false
+              || strpos($fl, 'usage_report')       !== false
+              || strpos($f,  'report_') === 0  // legacy: report_YYYY-MM-DD.json
+              || preg_match('/^report[_-]/i', $f); // report- prefix
     if ($is_report) {
         $files[] = $disk_path . DIRECTORY_SEPARATOR . $f;
     }
