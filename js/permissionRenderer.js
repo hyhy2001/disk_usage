@@ -81,7 +81,7 @@ async function fetchPermPage(diskDir, offset = 0) {
     });
     // server-side user filter
     if (_activeUsers.size > 0 && _activeUsers.size < 50) {
-        params.set('users', [..._activeUsers].join(','));
+        params.set('users', [..._activeUsers].join('|'));
     }
     const res  = await fetch(`permission_api.php?${params}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

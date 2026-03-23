@@ -106,10 +106,10 @@ foreach ($allItems as $item) {
 }
 
 // ── Server-side user filter (applied BEFORE pagination) ───────────────────────
-// ?users=alice,bob,__unknown__  — comma-separated. Empty = no filter (all).
+// ?users=alice|bob|__unknown__  — pipe-separated. Empty = no filter (all).
 $userFilter = [];
 if (isset($_GET['users']) && trim($_GET['users']) !== '') {
-    $userFilter = array_filter(array_map('trim', explode(',', $_GET['users'])));
+    $userFilter = array_filter(array_map('trim', explode('|', $_GET['users'])));
 }
 
 if (!empty($userFilter)) {
