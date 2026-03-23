@@ -4548,7 +4548,7 @@
 }
 .perm-item {
     display: grid;
-    grid-template-columns: 20px auto 1fr auto auto;
+    grid-template-columns: 20px auto 1fr 80px 210px;
     align-items: center;
     gap: 10px;
     padding: 8px 14px;
@@ -4586,14 +4586,18 @@
     font-size: 0.68rem;
     opacity: .65;
     white-space: nowrap;
+    text-align: center;
+    justify-self: center;
 }
 .perm-item-error {
     font-size: 0.72rem;
     color: #f87171;
     white-space: nowrap;
-    max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-align: right;
+    justify-self: end;
+    width: 100%;
 }
 .perm-empty-filter {
     padding: 24px;
