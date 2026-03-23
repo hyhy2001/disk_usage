@@ -4547,8 +4547,9 @@
     transition: opacity 0.2s;
 }
 .perm-item {
-    display: flex;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: 20px 100px 2fr 100px 2fr;
+    align-items: center;
     gap: 8px;
     padding: 8px 14px;
     font-size: 0.8rem;
@@ -4558,17 +4559,9 @@
 .perm-item:last-child { border-bottom: none; }
 .perm-item:hover { background: rgba(148,163,184,0.06); }
 
-/* fixed left: icon */
-.perm-item-icon {
-    flex: 0 0 20px;
-    padding-top: 2px;
-}
+.perm-item-icon { text-align: center; }
 
-/* fixed left: user badge */
 .perm-user-badge {
-    flex: 0 0 auto;
-    min-width: 54px;
-    max-width: 90px;
     display: inline-block;
     padding: 1px 7px;
     border-radius: 5px;
@@ -4579,6 +4572,8 @@
     color: #93c5fd;
     border: 1px solid rgba(59,130,246,0.2);
     text-align: center;
+    justify-self: center;
+    max-width: 95px;
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -4588,36 +4583,29 @@
     border-color: rgba(251,191,36,0.2);
 }
 
-/* flexible middle: path + type + error, wraps if needed */
-.perm-item-mid {
-    flex: 1 1 0;
-    min-width: 0;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 8px;
-}
 .perm-item-path {
     font-family: monospace;
     font-size: 0.77rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--text-secondary);
-    word-break: break-all;
-    flex: 1 1 auto;
-    min-width: 120px;
+    min-width: 0;
 }
 .perm-item-type {
-    flex: 0 0 auto;
     font-size: 0.68rem;
     opacity: .65;
     white-space: nowrap;
+    text-align: center;
+    justify-self: center;
 }
 .perm-item-error {
-    flex: 0 0 auto;
     font-size: 0.72rem;
     color: #f87171;
-    white-space: normal;
-    word-break: break-word;
-    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 .perm-empty-filter {
     padding: 24px;
