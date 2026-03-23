@@ -150,17 +150,21 @@ function renderPermissions(data) {
         return;
     }
 
+    // Set data first so _userSummary() works correctly
+    _allItems  = data.items;
+    _permPage  = 1;
+    _pathQuery = '';
+
+    const userSum = _userSummary();
+
     // Default: select only the first user (not all)
     const allUserKeys = Object.keys(userSum).sort((a, b) => {
         if (a === '__unknown__') return 1;
         if (b === '__unknown__') return -1;
         return a.localeCompare(b);
     });
-    const firstUser  = allUserKeys.length > 0 ? allUserKeys[0] : null;
-    _allItems    = data.items;
-    _permPage    = 1;
+    const firstUser = allUserKeys.length > 0 ? allUserKeys[0] : null;
     _activeUsers = firstUser ? new Set([firstUser]) : new Set();
-    _pathQuery   = '';
 
     const total      = _allItems.length;
     const totalPages = Math.max(1, Math.ceil(_filtered().length / PERM_PAGE));
