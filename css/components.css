@@ -4547,18 +4547,28 @@
     transition: opacity 0.2s;
 }
 .perm-item {
-    display: grid;
-    grid-template-columns: 20px 90px 1fr auto auto;
-    align-items: center;
+    display: flex;
+    align-items: flex-start;
     gap: 8px;
-    padding: 7px 14px;
+    padding: 8px 14px;
     font-size: 0.8rem;
     border-bottom: 1px solid rgba(148,163,184,0.07);
     transition: background 0.12s;
 }
 .perm-item:last-child { border-bottom: none; }
 .perm-item:hover { background: rgba(148,163,184,0.06); }
+
+/* fixed left: icon */
+.perm-item-icon {
+    flex: 0 0 20px;
+    padding-top: 2px;
+}
+
+/* fixed left: user badge */
 .perm-user-badge {
+    flex: 0 0 auto;
+    min-width: 54px;
+    max-width: 90px;
     display: inline-block;
     padding: 1px 7px;
     border-radius: 5px;
@@ -4569,8 +4579,6 @@
     color: #93c5fd;
     border: 1px solid rgba(59,130,246,0.2);
     text-align: center;
-    justify-self: center;
-    max-width: 88px;
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -4579,28 +4587,37 @@
     color: #fbbf24;
     border-color: rgba(251,191,36,0.2);
 }
+
+/* flexible middle: path + type + error, wraps if needed */
+.perm-item-mid {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+}
 .perm-item-path {
     font-family: monospace;
     font-size: 0.77rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     color: var(--text-secondary);
+    word-break: break-all;
+    flex: 1 1 auto;
+    min-width: 120px;
 }
 .perm-item-type {
+    flex: 0 0 auto;
     font-size: 0.68rem;
     opacity: .65;
     white-space: nowrap;
-    text-align: center;
 }
 .perm-item-error {
+    flex: 0 0 auto;
     font-size: 0.72rem;
     color: #f87171;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 220px;
-    text-align: right;
+    white-space: normal;
+    word-break: break-word;
+    max-width: 260px;
 }
 .perm-empty-filter {
     padding: 24px;

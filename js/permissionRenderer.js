@@ -68,9 +68,11 @@ function renderItem(item) {
     return `<div class="perm-item">
         <span class="perm-item-icon">${icon}</span>
         ${badge}
-        <span class="perm-item-path" title="${escHtml(item.path)}">${escHtml(item.path)}</span>
-        <span class="perm-item-type">${escHtml(item.type ?? '')}</span>
-        <span class="perm-item-error">${escHtml(item.error ?? '')}</span>
+        <div class="perm-item-mid">
+            <span class="perm-item-path" title="${escHtml(item.path)}">${escHtml(item.path)}</span>
+            <span class="perm-item-type">${escHtml(item.type ?? '')}</span>
+            <span class="perm-item-error">${escHtml(item.error ?? '')}</span>
+        </div>
     </div>`;
 }
 
