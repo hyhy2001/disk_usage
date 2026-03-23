@@ -1,6 +1,12 @@
 <?php
-// permission_api.php — Return latest permission_issues_*.json for a disk directory
-// Usage: ?dir=mock_reports/disk_sda
+// permission_api.php — Paginated permission issues API
+//
+// Usage:
+//   ?dir=mock_reports/disk_sda                     → full response (legacy)
+//   ?dir=mock_reports/disk_sda&offset=0&limit=100  → paginated flat items
+//
+// Flat item format: { user, path, type, error }
+// unknown UID items use user="__unknown__"
 
 $baseDir = __DIR__;
 $reqDir  = isset($_GET['dir']) ? trim($_GET['dir'], '/\\') : '';
@@ -8,7 +14,7 @@ $reqDir  = isset($_GET['dir']) ? trim($_GET['dir'], '/\\') : '';
 // Block traversal
 if (strpos($reqDir, '..') !== false || $reqDir === '') {
     http_response_code(403);
-    echo "Access denied.";
+    echo 'Access denied.';
     exit;
 }
 
@@ -16,12 +22,16 @@ $rawPath = $baseDir . DIRECTORY_SEPARATOR . $reqDir;
 
 if (!is_dir($rawPath) && !is_link($rawPath)) {
     http_response_code(404);
-    echo "Directory not found: $reqDir";
+    echo json_encode(['status' => 'error', 'message' => "Directory not found: $reqDir"]);
     exit;
 }
 
-// Find most recent permission_issues_*.json (by file modification time)
-$dh = @opendir($rawPath);
+// Sanitise pagination params
+$offset = max(0,    (int)($_GET['offset'] ?? 0));
+$limit  = min(5000, max(1, (int)($_GET['limit'] ?? 100)));
+
+// ── Find most recent permission_issues_*.json ─────────────────────────────────
+$dh        = @opendir($rawPath);
 $permFiles = [];
 while ($dh && ($f = readdir($dh)) !== false) {
     if (strpos($f, 'permission_issues') !== false && substr($f, -5) === '.json') {
@@ -31,15 +41,82 @@ while ($dh && ($f = readdir($dh)) !== false) {
 }
 if ($dh) closedir($dh);
 
-// Sort by mtime descending, pick newest
 arsort($permFiles);
 $latestPath = !empty($permFiles) ? key($permFiles) : null;
 
-$data = null;
-if ($latestPath) {
-    $content = file_get_contents($latestPath);
-    if ($content !== false) $data = json_decode($content, true);
+header('Content-Type: application/json; charset=utf-8');
+
+if (!$latestPath) {
+    echo json_encode(['status' => 'success', 'data' => null]);
+    exit;
 }
 
-header('Content-Type: text/plain; charset=utf-8');
-echo json_encode(['status' => 'success', 'data' => $data]);
+$content = file_get_contents($latestPath);
+if ($content === false) {
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'Cannot read permission file']);
+    exit;
+}
+
+$data = json_decode($content, true);
+if ($data === null) {
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'Invalid JSON in permission file']);
+    exit;
+}
+
+// ── Normalize: support both flat (new) and nested (legacy) formats ────────────
+$issues = $data['permission_issues'] ?? [];
+
+if (isset($issues['items'])) {
+    // New flat format
+    $allItems = $issues['items'];
+    $total    = $issues['total'] ?? count($allItems);
+} else {
+    // Legacy nested format — flatten on the fly
+    $allItems = [];
+    foreach ($issues['users'] ?? [] as $u) {
+        foreach ($u['inaccessible_items'] ?? [] as $item) {
+            $allItems[] = [
+                'user'  => $u['name'] ?? '',
+                'path'  => $item['path']  ?? '',
+                'type'  => $item['type']  ?? '',
+                'error' => $item['error'] ?? '',
+            ];
+        }
+    }
+    foreach ($issues['unknown_items'] ?? [] as $item) {
+        $allItems[] = [
+            'user'  => '__unknown__',
+            'path'  => $item['path']  ?? '',
+            'type'  => $item['type']  ?? '',
+            'error' => $item['error'] ?? '',
+        ];
+    }
+    $total = count($allItems);
+}
+
+// ── Paginate ─────────────────────────────────────────────────────────────────
+$page_items = array_slice($allItems, $offset, $limit);
+$returned   = count($page_items);
+
+// Build user summary (for filter sidebar) — from full list, not page
+$userSummary = [];
+foreach ($allItems as $item) {
+    $u = $item['user'] ?? '__unknown__';
+    $userSummary[$u] = ($userSummary[$u] ?? 0) + 1;
+}
+
+echo json_encode([
+    'status' => 'success',
+    'data'   => [
+        'date'         => $data['date']      ?? null,
+        'directory'    => $data['directory'] ?? null,
+        'total'        => $total,
+        'offset'       => $offset,
+        'limit'        => $limit,
+        'has_more'     => $returned >= $limit && ($offset + $returned) < $total,
+        'items'        => $page_items,
+        'user_summary' => $userSummary,   // { "alice": 5, "bob": 3, "__unknown__": 2 }
+    ],
+]);

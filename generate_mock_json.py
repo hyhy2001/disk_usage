@@ -213,7 +213,7 @@ PERM_ERRORS = [
 PERM_TYPES = ["directory", "file"]
 
 def generate_permission_issues():
-    """Generate one permission_issues_<date>.json per disk (latest date)."""
+    """Generate one permission_issues_<date>.json per disk (latest date) — flat format."""
     users = [f"user{i}" for i in range(1, 21)]
 
     for disk in DISK_CONFIGS:
@@ -221,39 +221,36 @@ def generate_permission_issues():
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        # Pick 3-7 affected users
-        affected = random.sample(users, random.randint(3, 7))
-        user_issues = []
-        for uname in affected:
-            # 2-12 inaccessible items per user
-            count = random.randint(2, 12)
-            items = []
+        # Pick 5-12 affected users, 10-40 items each → 50-480 total (multiple pages)
+        affected = random.sample(users, random.randint(5, 12))
+        all_items = []
+
+        for uname in sorted(affected):
+            count = random.randint(10, 40)
             for _ in range(count):
-                items.append({
-                    "path": random.choice(PERM_PATHS) + f"/{random.randint(1,999)}",
-                    "type": random.choice(PERM_TYPES),
+                all_items.append({
+                    "user":  uname,
+                    "path":  random.choice(PERM_PATHS) + f"/{random.randint(1, 999)}",
+                    "type":  random.choice(PERM_TYPES),
                     "error": random.choice(PERM_ERRORS),
                 })
-            user_issues.append({"name": uname, "inaccessible_items": items})
 
-        # A few unknown/orphan items
-        unknown = [
-            {
-                "path": random.choice(PERM_PATHS) + "/orphan",
-                "type": "directory",
+        # Unknown/orphan items
+        for _ in range(random.randint(2, 8)):
+            all_items.append({
+                "user":  "__unknown__",
+                "path":  random.choice(PERM_PATHS) + "/orphan",
+                "type":  "directory",
                 "error": "Cannot stat: no such file or directory (orphaned inode)",
-            }
-            for _ in range(random.randint(1, 4))
-        ]
+            })
 
-        # Use the last date: base_date + 499 days
         last_date = (datetime(2025, 1, 1) + timedelta(days=499)).strftime("%Y%m%d")
         payload = {
-            "date": last_date,
-            "directory": disk["path"],
+            "date":              last_date,
+            "directory":         disk["path"],
             "permission_issues": {
-                "users": user_issues,
-                "unknown_items": unknown,
+                "total": len(all_items),
+                "items": all_items,
             }
         }
 
@@ -261,8 +258,8 @@ def generate_permission_issues():
         with open(os.path.join(output_dir, fname), "w") as f:
             json.dump(payload, f, indent=4)
 
-        n_items = sum(len(u["inaccessible_items"]) for u in user_issues)
-        print(f"🔒 permission_issues → {output_dir}/{fname}  ({len(affected)} users, {n_items} items)")
+        n_users = len(affected)
+        print(f"🔒 permission_issues → {output_dir}/{fname}  ({n_users} users, {len(all_items)} items)")
 
 
 # ── Detail report generation ─────────────────────────────────────────────────

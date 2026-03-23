@@ -295,7 +295,9 @@ class DataFetcher {
             if (json?.status === 'success') {
                 this._permissionsLoaded = true;
                 this.dataStore.permissionIssues = json.data ?? null;
-                document.dispatchEvent(new CustomEvent('permissionsLoaded', { detail: json.data }));
+                document.dispatchEvent(new CustomEvent('permissionsLoaded', {
+                    detail: json.data ? { diskDir: diskPath, ...json.data } : { diskDir: diskPath },
+                }));
             } else {
                 if (permBody) {
                     permBody.innerHTML = `
