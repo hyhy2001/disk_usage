@@ -88,7 +88,7 @@ function _update() {
 
     const list  = body.querySelector('#perm-flat-list');
     const badge = body.querySelector('#perm-total-badge');
-    const oldPg = body.querySelector('.perm-pagination');
+    const pgWrap = body.querySelector('#perm-pg-wrap');   // always present
 
     if (list) list.innerHTML = page.length
         ? page.map(renderItem).join('')
@@ -96,9 +96,10 @@ function _update() {
 
     if (badge) badge.textContent = `Page ${_permPage} of ${totalPages} · ${visible.length.toLocaleString()} shown`;
 
-    if (oldPg) {
-        oldPg.outerHTML = renderPagination(_permPage, totalPages);
-        _attachPagination(body);
+    // Always update wrapper content (even if empty string = no pagination)
+    if (pgWrap) {
+        pgWrap.innerHTML = renderPagination(_permPage, totalPages);
+        _attachPagination(pgWrap);
     }
 }
 
@@ -149,23 +150,29 @@ function renderPermissions(data) {
         return;
     }
 
+    // Default: select only the first user (not all)
+    const allUserKeys = Object.keys(userSum).sort((a, b) => {
+        if (a === '__unknown__') return 1;
+        if (b === '__unknown__') return -1;
+        return a.localeCompare(b);
+    });
+    const firstUser  = allUserKeys.length > 0 ? allUserKeys[0] : null;
     _allItems    = data.items;
     _permPage    = 1;
-    _activeUsers = new Set();  // empty = all selected
+    _activeUsers = firstUser ? new Set([firstUser]) : new Set();
     _pathQuery   = '';
 
-    const userSum    = _userSummary();
     const total      = _allItems.length;
-    const totalPages = Math.max(1, Math.ceil(total / PERM_PAGE));
+    const totalPages = Math.max(1, Math.ceil(_filtered().length / PERM_PAGE));
     const numUsers   = Object.keys(userSum).filter(u => u !== '__unknown__').length;
-    const numUnk     = userSum['__unknown__'] ?? 0;
-    const pageItems  = _allItems.slice(0, PERM_PAGE);
+    const numUnk     = userSum['__unknown__'] || 0;
+    const pageItems  = _filtered().slice(0, PERM_PAGE);
 
     body.innerHTML = `
         <div class="perm-meta">
             <span class="perm-meta-date"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> ${fmtDate(data.date)}</span>
-            <span class="perm-meta-dir"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> ${escHtml(data.directory ?? '—')}</span>
-            <span class="result-count" id="perm-total-badge">Page 1 of ${totalPages} · ${total.toLocaleString()} shown</span>
+            <span class="perm-meta-dir"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> ${escHtml(data.directory || '—')}</span>
+            <span class="result-count" id="perm-total-badge">Page 1 of ${totalPages} · ${_filtered().length.toLocaleString()} shown</span>
         </div>
         <div class="perm-summary-bar glass-panel">
             <div class="perm-summary-item"><span class="perm-summary-num">${numUsers}</span><span class="perm-summary-label">Users affected</span></div>
@@ -180,16 +187,17 @@ function renderPermissions(data) {
                 <div class="perm-flat-list glass-panel" id="perm-flat-list">
                     ${pageItems.map(renderItem).join('')}
                 </div>
-                ${renderPagination(1, totalPages)}
+                <div id="perm-pg-wrap">${renderPagination(1, totalPages)}</div>
             </div>
         </div>`;
 
-    _attachPagination(body);
+    _attachPagination(body.querySelector('#perm-pg-wrap'));
 }
 
 // ── Pagination clicks ─────────────────────────────────────────────────────────
 function _attachPagination(root) {
-    const pg = root.querySelector('.perm-pagination');
+    if (!root) return;
+    const pg = root.querySelector ? root.querySelector('.perm-pagination') : null;
     if (!pg) return;
     pg.addEventListener('click', e => {
         const btn = e.target.closest('.ud-page-btn');
@@ -202,12 +210,25 @@ function _attachPagination(root) {
 
 // ── Filter callbacks (inline onclick) ─────────────────────────────────────────
 window._permToggle = function(el) {
+    const key = el.dataset.key;
+
+    // If currently showing all (empty = all), build an explicit set of all users first
+    if (_activeUsers.size === 0) {
+        const allEls = document.querySelectorAll('#perm-filter-list .user-filter-item');
+        _activeUsers = new Set(Array.from(allEls).map(e => e.dataset.key));
+    }
+
     el.classList.toggle('selected');
     const chk = el.querySelector('.user-filter-check');
-    const key = el.dataset.key;
-    if (el.classList.contains('selected')) { _activeUsers.add(key);    if (chk) chk.textContent = '✓'; }
-    else                                   { _activeUsers.delete(key); if (chk) chk.textContent = ''; }
-    document.getElementById('perm-filter-count').textContent = `${_activeUsers.size} selected`;
+    if (el.classList.contains('selected')) {
+        _activeUsers.add(key);
+        if (chk) chk.textContent = '✓';
+    } else {
+        _activeUsers.delete(key);
+        if (chk) chk.textContent = '';
+    }
+    const countEl = document.getElementById('perm-filter-count');
+    if (countEl) countEl.textContent = `${_activeUsers.size} selected`;
     _permPage = 1; _update();
 };
 
