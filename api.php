@@ -1,71 +1,9 @@
 <?php
-// api.php — Unified API endpoint
-// Usage:
-//   ?dir=reports/disk_sda                              → main disk data (default)
-//   ?dir=reports/disk_sda&action=perm                  → permission issues
-//   ?dir=reports/disk_sda&action=detail                → list users
-//   ?dir=reports/disk_sda&action=detail&u=user1&t=dir  → dir report
-//   ?dir=reports/disk_sda&action=detail&u=user1&t=file&p=0&n=500 → file report
+// api.php — Read & aggregate .json report files from a directory
+// Usage: ?dir=reports/disk_sda
 
 $baseDir = __DIR__;
 $reqDir  = isset($_GET['dir']) ? trim($_GET['dir'], '/\\') : '';
-$action  = $_GET['action'] ?? '';
-
-// ── ACTION: info — server diagnostic (no ?dir needed) ───────────────────────
-if (($action ?? '') === 'info') {
-    header('Content-Type: text/plain; charset=utf-8');
-    error_reporting(0);   // suppress open_basedir warnings
-
-    $rf = fn($p) => @is_file($p) ? @file_get_contents($p) : null;
-
-    // Possible WAF / config paths to probe
-    $probePaths = [
-        '/etc/modsecurity/modsecurity.conf',
-        '/etc/modsecurity2/modsecurity.conf',
-        '/etc/apache2/mods-enabled/security2.conf',
-        '/etc/nginx/modsec/main.conf',
-        '/www/server/btwaf/conf/config.json',
-        '/www/server/btwaf/conf/rule.json',
-        '/www/server/btwaf/conf/white.rule',
-        '/usr/local/nginx/conf/modsecurity.conf',
-        '/usr/local/apache/conf/modsecurity.conf',
-        '/etc/apache2/apache2.conf',
-        '/etc/httpd/conf/httpd.conf',
-        '/usr/local/apache/conf/httpd.conf',
-        '/etc/nginx/nginx.conf',
-        '/usr/local/nginx/conf/nginx.conf',
-        '/var/log/modsec_audit.log',
-        '/var/log/apache2/modsec_audit.log',
-    ];
-
-    $found = [];
-    $miss  = [];
-    foreach ($probePaths as $p) {
-        $c = $rf($p);
-        if ($c !== null) $found[$p] = substr($c, 0, 3000);
-        else             $miss[]    = $p;
-    }
-
-    $info = [
-        'php'           => PHP_VERSION,
-        'server'        => $_SERVER['SERVER_SOFTWARE'] ?? 'unknown',
-        'open_basedir'  => ini_get('open_basedir') ?: '(not set)',
-        'disable_fns'   => ini_get('disable_functions') ?: '(none)',
-        'php_ini'       => php_ini_loaded_file(),
-        'doc_root'      => $_SERVER['DOCUMENT_ROOT'] ?? 'n/a',
-        'script'        => __FILE__,
-        'apache_mods'   => function_exists('apache_get_modules') ? apache_get_modules() : null,
-        'php_exts'      => get_loaded_extensions(),
-        'htaccess'      => $rf(__DIR__ . '/.htaccess'),
-        'user_ini'      => $rf(__DIR__ . '/.user.ini'),
-        'config_found'  => $found,
-        'config_miss'   => $miss,
-        'shell_test'    => @shell_exec('id 2>/dev/null') ?? '(disabled)',
-    ];
-
-    echo json_encode($info, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    exit;
-}
 
 // Block traversal
 if (strpos($reqDir, '..') !== false || $reqDir === '') {
@@ -82,134 +20,7 @@ if (!is_dir($rawPath) && !is_link($rawPath)) {
     exit;
 }
 
-header('Content-Type: text/plain; charset=utf-8');
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ACTION: perm — permission issues
-// ─────────────────────────────────────────────────────────────────────────────
-if ($action === 'perm') {
-    $dh        = @opendir($rawPath);
-    $permFiles = [];
-    while ($dh && ($f = readdir($dh)) !== false) {
-        if (strpos($f, 'permission_issues') !== false && substr($f, -5) === '.json') {
-            $fp = $rawPath . DIRECTORY_SEPARATOR . $f;
-            $permFiles[$fp] = @filemtime($fp);
-        }
-    }
-    if ($dh) closedir($dh);
-    arsort($permFiles);
-    $latestPath = !empty($permFiles) ? key($permFiles) : null;
-
-    $data = null;
-    if ($latestPath) {
-        $content = file_get_contents($latestPath);
-        if ($content !== false) {
-            $raw    = json_decode($content, true);
-            $issues = $raw['permission_issues'] ?? [];
-            if (isset($issues['items'])) {
-                $allItems = $issues['items'];
-            } else {
-                $allItems = [];
-                foreach ($issues['users'] ?? [] as $u) {
-                    foreach ($u['inaccessible_items'] ?? [] as $item) {
-                        $allItems[] = ['user' => $u['name'] ?? '', 'path' => $item['path'] ?? '', 'type' => $item['type'] ?? '', 'error' => $item['error'] ?? ''];
-                    }
-                }
-                foreach ($issues['unknown_items'] ?? [] as $item) {
-                    $allItems[] = ['user' => '__unknown__', 'path' => $item['path'] ?? '', 'type' => $item['type'] ?? '', 'error' => $item['error'] ?? ''];
-                }
-            }
-            $data = ['date' => $raw['date'] ?? null, 'directory' => $raw['directory'] ?? null, 'total' => count($allItems), 'items' => $allItems];
-        }
-    }
-    echo json_encode(['status' => 'success', 'data' => $data]);
-    exit;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ACTION: detail — user detail reports
-// ─────────────────────────────────────────────────────────────────────────────
-if ($action === 'detail') {
-    $detailPath = $rawPath . DIRECTORY_SEPARATOR . 'detail_users';
-    $who    = isset($_GET['u']) ? preg_replace('/[^a-zA-Z0-9_\-]/', '', $_GET['u']) : '';
-    $kind   = $_GET['t'] ?? '';
-    $offset = max(0,    (int)($_GET['p'] ?? 0));
-    $limit  = min(2000, max(1, (int)($_GET['n'] ?? 500)));
-
-    // List users
-    if ($who === '') {
-        $users = [];
-        if (is_dir($detailPath)) {
-            $dh = @opendir($detailPath);
-            while ($dh && ($f = readdir($dh)) !== false) {
-                if (preg_match('/^detail_report_dir_(.+)\.json$/', $f, $m)) $users[] = $m[1];
-            }
-            if ($dh) closedir($dh);
-            sort($users);
-        }
-        echo json_encode(['status' => 'success', 'data' => ['users' => $users]]);
-        exit;
-    }
-
-    if (!in_array($kind, ['dir', 'file', 'both'], true)) {
-        http_response_code(400);
-        echo json_encode(['status' => 'error', 'message' => 'Invalid t. Use: dir, file, both']);
-        exit;
-    }
-    if (!is_dir($detailPath)) {
-        http_response_code(404);
-        echo json_encode(['status' => 'error', 'message' => 'detail_users/ not found']);
-        exit;
-    }
-
-    $data = [];
-
-    if ($kind === 'dir' || $kind === 'both') {
-        $file = $detailPath . DIRECTORY_SEPARATOR . "detail_report_dir_{$who}.json";
-        if (!is_file($file)) { http_response_code(404); echo json_encode(['status' => 'error', 'message' => "No dir report for: $who"]); exit; }
-        $c = file_get_contents($file);
-        $data['dir'] = $c !== false ? json_decode($c, true) : null;
-    }
-
-    if ($kind === 'file' || $kind === 'both') {
-        $file = $detailPath . DIRECTORY_SEPARATOR . "detail_report_file_{$who}.json";
-        if (!is_file($file)) { http_response_code(404); echo json_encode(['status' => 'error', 'message' => "No file report for: $who"]); exit; }
-        $fh = @fopen($file, 'r');
-        $date = 0; $userName = $who; $totalFiles = 0; $totalUsed = 0;
-        while ($fh && ($line = fgets($fh)) !== false) {
-            if      (preg_match('/"date"\s*:\s*(\d+)/', $line, $m))          $date       = (int)$m[1];
-            elseif  (preg_match('/"user"\s*:\s*"([^"]+)"/', $line, $m))      $userName   = $m[1];
-            elseif  (preg_match('/"total_files"\s*:\s*(\d+)/', $line, $m))   $totalFiles = (int)$m[1];
-            elseif  (preg_match('/"total_used"\s*:\s*(\d+)/', $line, $m))    $totalUsed  = (int)$m[1];
-            if (strpos($line, '"files"') !== false && strpos($line, '[') !== false) break;
-        }
-        $idx = 0; $collected = []; $buf = ''; $depth = 0;
-        while ($fh && ($line = fgets($fh)) !== false) {
-            $t = trim($line);
-            if ($t === ']' || $t === '];') break;
-            if ($t === '' || $t === '[') continue;
-            $buf .= $line; $depth += substr_count($line, '{') - substr_count($line, '}');
-            if ($depth <= 0 && ltrim($buf) !== '') {
-                $obj = @json_decode(rtrim(trim($buf), ','), true);
-                if ($obj !== null && is_array($obj)) {
-                    if ($idx >= $offset && count($collected) < $limit) $collected[] = $obj;
-                    $idx++;
-                    if (count($collected) >= $limit && $idx >= $offset + $limit) break;
-                }
-                $buf = ''; $depth = 0;
-            }
-        }
-        if ($fh) fclose($fh);
-        $data['file'] = ['date' => $date, 'user' => $userName, 'total_files' => $totalFiles, 'total_used' => $totalUsed, 'offset' => $offset, 'limit' => $limit, 'has_more' => count($collected) >= $limit, 'files' => $collected];
-    }
-
-    echo json_encode(['status' => 'success', 'data' => $data]);
-    exit;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DEFAULT: main disk data (original api.php behavior)
-// ─────────────────────────────────────────────────────────────────────────────
+// List .json files (exclude permission_issues and detail reports)
 $dh    = @opendir($rawPath);
 $files = [];
 while ($dh && ($f = readdir($dh)) !== false) {
@@ -219,6 +30,7 @@ while ($dh && ($f = readdir($dh)) !== false) {
 if ($dh) closedir($dh);
 sort($files);
 
+// Read & aggregate
 $aggregated = [];
 foreach ($files as $file) {
     $content = file_get_contents($file);
@@ -227,6 +39,7 @@ foreach ($files as $file) {
     if ($json !== null) $aggregated[] = $json;
 }
 
+header('Content-Type: text/plain; charset=utf-8');
 echo json_encode([
     'status'      => 'success',
     'total_files' => count($aggregated),

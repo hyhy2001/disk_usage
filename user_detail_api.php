@@ -15,10 +15,10 @@
 $baseDir = __DIR__;
 $reqDir  = isset($_GET['dir']) ? trim($_GET['dir'], '/\\') : '';
 
-// ── Security: block path traversal ───────────────────────────────────────────
+// Block traversal
 if (strpos($reqDir, '..') !== false || $reqDir === '') {
     http_response_code(403);
-    echo 'Access denied.';
+    echo "Access denied.";
     exit;
 }
 
@@ -27,33 +27,29 @@ $detailPath = $rawPath . DIRECTORY_SEPARATOR . 'detail_users';
 
 if (!is_dir($rawPath) && !is_link($rawPath)) {
     http_response_code(404);
-    echo json_encode(['status' => 'error', 'message' => "Directory not found: $reqDir"]);
+    echo "Directory not found: $reqDir";
     exit;
 }
 
 // Sanitise params
 $user   = isset($_GET['user'])   ? preg_replace('/[^a-zA-Z0-9_\-]/', '', $_GET['user']) : '';
-$type   = isset($_GET['type'])   ? $_GET['type'] : '';
+$type   = $_GET['type']   ?? '';
 $offset = max(0,    (int)($_GET['offset'] ?? 0));
 $limit  = min(2000, max(1, (int)($_GET['limit'] ?? 500)));
 
-header('Content-Type: application/json; charset=utf-8');
+header('Content-Type: text/plain; charset=utf-8');
 
 // ── Mode A: list users ────────────────────────────────────────────────────────
 if ($user === '') {
-    if (!is_dir($detailPath)) {
-        echo json_encode(['status' => 'success', 'data' => ['users' => []]]);
-        exit;
-    }
-    $dh    = @opendir($detailPath);
     $users = [];
-    while ($dh && ($f = readdir($dh)) !== false) {
-        if (preg_match('/^detail_report_dir_(.+)\.json$/', $f, $m)) {
-            $users[] = $m[1];
+    if (is_dir($detailPath)) {
+        $dh = @opendir($detailPath);
+        while ($dh && ($f = readdir($dh)) !== false) {
+            if (preg_match('/^detail_report_dir_(.+)\.json$/', $f, $m)) $users[] = $m[1];
         }
+        if ($dh) closedir($dh);
+        sort($users);
     }
-    if ($dh) closedir($dh);
-    sort($users);
     echo json_encode(['status' => 'success', 'data' => ['users' => $users]]);
     exit;
 }
@@ -80,9 +76,6 @@ function readDirReport($detailPath, $user) {
 }
 
 // ── File report: streaming paginated reader ───────────────────────────────────
-// Works for both indent=2 (multi-line entries) and single-line-per-entry formats
-// by using brace-depth counting to detect object boundaries.
-// Memory: O(limit) regardless of file size.
 function readFileReportPaginated($detailPath, $user, $offset, $limit) {
     $file = $detailPath . DIRECTORY_SEPARATOR . "detail_report_file_{$user}.json";
     if (!is_file($file)) return null;
@@ -90,53 +83,30 @@ function readFileReportPaginated($detailPath, $user, $offset, $limit) {
     $fh = @fopen($file, 'r');
     if (!$fh) return null;
 
-    // ── Pass 1: read metadata until "files": [ ───────────────────────────────
-    $date        = 0;
-    $userName    = $user;
-    $totalFiles  = 0;
-    $totalUsed   = 0;
-    $inFiles     = false;
+    $date = 0; $userName = $user; $totalFiles = 0; $totalUsed = 0;
 
     while (($line = fgets($fh)) !== false) {
-        if (preg_match('/"date"\s*:\s*(\d+)/', $line, $m))         $date       = (int)$m[1];
-        elseif (preg_match('/"user"\s*:\s*"([^"]+)"/', $line, $m)) $userName   = $m[1];
-        elseif (preg_match('/"total_files"\s*:\s*(\d+)/', $line, $m)) $totalFiles = (int)$m[1];
-        elseif (preg_match('/"total_used"\s*:\s*(\d+)/', $line, $m))  $totalUsed  = (int)$m[1];
-
-        // Stop as soon as we reach the files array — next fgets() will be first entry
+        if      (preg_match('/"date"\s*:\s*(\d+)/', $line, $m))          $date       = (int)$m[1];
+        elseif  (preg_match('/"user"\s*:\s*"([^"]+)"/', $line, $m))      $userName   = $m[1];
+        elseif  (preg_match('/"total_files"\s*:\s*(\d+)/', $line, $m))   $totalFiles = (int)$m[1];
+        elseif  (preg_match('/"total_used"\s*:\s*(\d+)/', $line, $m))    $totalUsed  = (int)$m[1];
         if (strpos($line, '"files"') !== false && strpos($line, '[') !== false) break;
     }
 
-    // ── Pass 2: stream entries with brace-depth tracking ─────────────────────
-    $idx       = 0;      // current entry index
-    $collected = [];
-    $buf       = '';
-    $depth     = 0;
-
+    $idx = 0; $collected = []; $buf = ''; $depth = 0;
     while (($line = fgets($fh)) !== false) {
         $t = trim($line);
-
-        // End of array
         if ($t === ']' || $t === '];') break;
-        if ($t === '' || $t === '[')   continue;
-
-        $buf   .= $line;
-        $depth += substr_count($line, '{') - substr_count($line, '}');
-
+        if ($t === '' || $t === '[') continue;
+        $buf .= $line; $depth += substr_count($line, '{') - substr_count($line, '}');
         if ($depth <= 0 && ltrim($buf) !== '') {
-            // We have a complete JSON object
-            $clean = rtrim(trim($buf), ',');
-            $obj   = @json_decode($clean, true);
+            $obj = @json_decode(rtrim(trim($buf), ','), true);
             if ($obj !== null && is_array($obj)) {
-                if ($idx >= $offset && count($collected) < $limit) {
-                    $collected[] = $obj;
-                }
+                if ($idx >= $offset && count($collected) < $limit) $collected[] = $obj;
                 $idx++;
-                // Early exit: collected enough and past offset
                 if (count($collected) >= $limit && $idx >= $offset + $limit) break;
             }
-            $buf   = '';
-            $depth = 0;
+            $buf = ''; $depth = 0;
         }
     }
 
@@ -149,8 +119,6 @@ function readFileReportPaginated($detailPath, $user, $offset, $limit) {
         'total_used'  => $totalUsed,
         'offset'      => $offset,
         'limit'       => $limit,
-        // Reliable end-of-file detection: if we received a full page we may have more;
-        // if fewer than requested, we've consumed all remaining entries.
         'has_more'    => $returned >= $limit,
         'files'       => $collected,
     ];
