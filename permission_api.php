@@ -11,10 +11,12 @@
 $baseDir = __DIR__;
 $reqDir  = isset($_GET['dir']) ? trim($_GET['dir'], '/\\') : '';
 
-// Block traversal
-if (strpos($reqDir, '..') !== false || $reqDir === '') {
+header('Content-Type: application/json; charset=utf-8');
+
+// Block traversal + empty dir
+if ($reqDir === '' || strpos($reqDir, '..') !== false) {
     http_response_code(403);
-    echo 'Access denied.';
+    echo json_encode(['status' => 'error', 'message' => 'Access denied: invalid dir parameter']);
     exit;
 }
 
