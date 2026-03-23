@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StorageOS · Config Generator</title>
+    <meta name="description" content="Visual configuration generator for disk_checker_config.json and disks.json">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/index.css?v=31">
+    <style>
+        /* ── Page layout ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-base, #0b0f1a);
+            color: var(--text-primary, #e2e8f0);
+            min-height: 100vh;
+        }
+
+        .cfg-page {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 32px 24px 80px;
+        }
+
+        /* ── Header ── */
+        .cfg-hero {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+        .cfg-hero-icon {
+            width: 48px; height: 48px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 0 24px rgba(99,102,241,0.35);
+        }
+        .cfg-hero-text h1 {
+            font-size: 1.5rem; font-weight: 700;
+            background: linear-gradient(120deg, #e2e8f0 30%, #94a3b8);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .cfg-hero-text p {
+            font-size: 0.82rem; color: var(--text-secondary, #64748b); margin-top: 3px;
+        }
+        .cfg-home-link {
+            margin-left: auto;
+            display: flex; align-items: center; gap: 7px;
+            text-decoration: none;
+            font-size: 0.78rem; font-weight: 500;
+            color: var(--text-secondary, #64748b);
+            padding: 7px 14px; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.03);
+            transition: all 0.15s;
+        }
+        .cfg-home-link:hover { color: #e2e8f0; border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); }
+
+        /* ── Two-col grid ── */
+        .cfg-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        @media (max-width: 780px) { .cfg-grid { grid-template-columns: 1fr; } }
+
+        /* ── Panel ── */
+        .cfg-panel {
+            background: rgba(255,255,255,0.035);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        .cfg-panel-head {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            display: flex; align-items: center; gap: 10px;
+            background: rgba(255,255,255,0.02);
+        }
+        .cfg-panel-icon {
+            width: 30px; height: 30px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; flex-shrink: 0;
+        }
+        .cfg-panel-icon.sky  { background: rgba(14,165,233,0.18); color: #38bdf8; }
+        .cfg-panel-icon.indigo { background: rgba(99,102,241,0.18); color: #818cf8; }
+        .cfg-panel-title { font-size: 0.9rem; font-weight: 600; }
+        .cfg-panel-file  { font-size: 0.7rem; color: var(--text-secondary, #64748b); font-family: 'JetBrains Mono', monospace; margin-left: auto; }
+        .cfg-panel-body  { padding: 20px; }
+
+        /* ── Form elements ── */
+        .field { margin-bottom: 14px; }
+        .field label {
+            display: block; font-size: 0.72rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.06em;
+            color: var(--text-secondary, #64748b); margin-bottom: 5px;
+        }
+        .field input, .field select {
+            width: 100%;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: var(--text-primary, #e2e8f0);
+            font-size: 0.83rem;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .field input:focus, .field select:focus {
+            border-color: #38bdf8;
+            background: rgba(56,189,248,0.06);
+        }
+        .field input::placeholder { color: rgba(148,163,184,0.5); }
+
+        /* ── Section heading inside panel ── */
+        .cfg-section-label {
+            font-size: 0.7rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.08em;
+            color: var(--text-secondary, #64748b);
+            margin: 18px 0 10px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .cfg-section-label::after {
+            content: ''; flex: 1; height: 1px;
+            background: rgba(255,255,255,0.06);
+        }
+
+        /* ── Repeating cards (teams, users, disks) ── */
+        .cfg-list { display: flex; flex-direction: column; gap: 10px; }
+
+        .cfg-card {
+            background: rgba(255,255,255,0.035);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 10px;
+            padding: 12px 14px;
+        }
+        .cfg-card-row { display: flex; gap: 8px; align-items: flex-end; }
+        .cfg-card-row .field { margin-bottom: 0; flex: 1; }
+        .cfg-card-number {
+            width: 22px; height: 22px; border-radius: 50%;
+            background: rgba(255,255,255,0.07);
+            font-size: 0.65rem; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--text-secondary); flex-shrink: 0; align-self: center;
+        }
+
+        /* ── Buttons ── */
+        .btn { cursor: pointer; font-family: inherit; border: none; border-radius: 8px; font-weight: 500; transition: all 0.15s; }
+        .btn-ghost {
+            display: flex; align-items: center; gap: 6px;
+            padding: 7px 13px; font-size: 0.78rem;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.09);
+            color: var(--text-secondary, #64748b);
+        }
+        .btn-ghost:hover { background: rgba(255,255,255,0.08); color: #e2e8f0; }
+        .btn-danger {
+            width: 28px; height: 28px; padding: 0;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(244,63,94,0.1);
+            border: 1px solid rgba(244,63,94,0.2);
+            color: #fb7185;
+            border-radius: 7px; flex-shrink: 0;
+        }
+        .btn-danger:hover { background: rgba(244,63,94,0.2); }
+        .btn-add-row {
+            width: 100%;
+            padding: 8px;
+            font-size: 0.78rem;
+            background: rgba(255,255,255,0.03);
+            border: 1px dashed rgba(255,255,255,0.12);
+            color: var(--text-secondary, #64748b);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .btn-add-row:hover { border-color: #38bdf8; color: #38bdf8; background: rgba(56,189,248,0.04); }
+
+        .btn-primary-lg {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            width: 100%; padding: 11px 20px;
+            font-size: 0.85rem; font-weight: 600;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #0ea5e9, #6366f1);
+            color: #fff;
+            border: none;
+            margin-top: 16px;
+            cursor: pointer;
+            transition: opacity 0.15s, transform 0.1s;
+            box-shadow: 0 4px 16px rgba(99,102,241,0.3);
+        }
+        .btn-primary-lg:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-primary-lg:active { transform: translateY(0); }
+
+        /* ── Preview / output ── */
+        .cfg-preview {
+            margin-top: 14px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .cfg-preview-head {
+            padding: 8px 14px;
+            font-size: 0.68rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.06em;
+            color: var(--text-secondary); background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .cfg-preview pre {
+            padding: 14px 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            line-height: 1.6;
+            color: #94a3b8;
+            overflow-x: auto;
+            white-space: pre;
+        }
+        .cfg-preview pre .key   { color: #818cf8; }
+        .cfg-preview pre .str   { color: #34d399; }
+        .cfg-preview pre .num   { color: #fb923c; }
+
+        /* ── Toast ── */
+        .cfg-toast {
+            position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px);
+            background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3);
+            color: #6ee7b7; padding: 10px 20px; border-radius: 10px;
+            font-size: 0.8rem; font-weight: 500;
+            display: flex; align-items: center; gap: 8px;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            opacity: 0; z-index: 99999;
+        }
+        .cfg-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+        /* ── Team ID badge in users ── */
+        .team-id-hint { font-size: 0.65rem; color: rgba(148,163,184,0.5); margin-top: 3px; }
+
+        /* ── Divider ── */
+        hr.cfg-divider { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 20px 0; }
+
+        /* ── Checkbox-like toggle for "auto-generate id" ── */
+        .cfg-auto-id {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 0.74rem; color: var(--text-secondary);
+            margin-bottom: 10px; cursor: pointer; user-select: none;
+        }
+        .cfg-auto-id input[type=checkbox] { accent-color: #38bdf8; width: 14px; height: 14px; cursor: pointer; }
+    </style>
+</head>
+
+<body>
+<div class="cfg-page">
+
+    <!-- Hero -->
+    <div class="cfg-hero">
+        <div class="cfg-hero-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07M8.46 15.54a5 5 0 0 1 0-7.07"/>
+            </svg>
+        </div>
+        <div class="cfg-hero-text">
+            <h1>Config Generator</h1>
+            <p>Generate <code>disk_checker_config.json</code> and <code>disks.json</code> visually — then download both files.</p>
+        </div>
+        <a href="index.html" class="cfg-home-link">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Two-col grid -->
+    <div class="cfg-grid">
+
+        <!-- ════════════════════ LEFT: disk_checker_config.json ════════════════════ -->
+        <div class="cfg-panel">
+            <div class="cfg-panel-head">
+                <div class="cfg-panel-icon sky">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                </div>
+                <span class="cfg-panel-title">Disk Scanner Config</span>
+                <span class="cfg-panel-file">disk_checker_config.json</span>
+            </div>
+            <div class="cfg-panel-body">
+
+                <!-- Scanner settings -->
+                <div class="field">
+                    <label>Scan Directory</label>
+                    <input type="text" id="dc-directory" placeholder="/mnt/data" value="/www/wwwroot">
+                </div>
+                <div class="field">
+                    <label>Output File Name</label>
+                    <input type="text" id="dc-output" placeholder="disk_usage_report.json" value="disk_usage_report.json">
+                </div>
+
+                <!-- Teams -->
+                <div class="cfg-section-label">Teams</div>
+                <div class="cfg-list" id="dc-teams-list"></div>
+                <button class="btn btn-add-row" id="dc-add-team" style="margin-top:8px">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Add Team
+                </button>
+
+                <!-- Users -->
+                <div class="cfg-section-label" style="margin-top:20px">Users</div>
+                <div class="cfg-list" id="dc-users-list"></div>
+                <button class="btn btn-add-row" id="dc-add-user" style="margin-top:8px">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Add User
+                </button>
+
+                <!-- Preview -->
+                <div class="cfg-preview" style="margin-top:20px">
+                    <div class="cfg-preview-head">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                        Preview
+                    </div>
+                    <pre id="dc-preview"></pre>
+                </div>
+
+                <button class="btn btn-primary-lg" id="dc-download">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download disk_checker_config.json
+                </button>
+            </div>
+        </div>
+
+        <!-- ════════════════════ RIGHT: disks.json ════════════════════ -->
+        <div class="cfg-panel">
+            <div class="cfg-panel-head">
+                <div class="cfg-panel-icon indigo">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                </div>
+                <span class="cfg-panel-title">Dashboard Disks</span>
+                <span class="cfg-panel-file">disks.json</span>
+            </div>
+            <div class="cfg-panel-body">
+
+                <p style="font-size:0.77rem;color:var(--text-secondary);margin-bottom:16px;line-height:1.5">
+                    Each entry maps a <strong>disk ID</strong> (used in API calls) to a display name and the
+                    relative path of its report directory on the server.
+                </p>
+
+                <label class="cfg-auto-id">
+                    <input type="checkbox" id="disks-auto-id" checked>
+                    Auto-generate <code>id</code> from display name
+                </label>
+
+                <div class="cfg-list" id="disks-list"></div>
+                <button class="btn btn-add-row" id="disks-add" style="margin-top:8px">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Add Disk
+                </button>
+
+                <!-- Preview -->
+                <div class="cfg-preview" style="margin-top:20px">
+                    <div class="cfg-preview-head">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                        Preview
+                    </div>
+                    <pre id="disks-preview"></pre>
+                </div>
+
+                <button class="btn btn-primary-lg" id="disks-download">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download disks.json
+                </button>
+            </div>
+        </div>
+
+    </div><!-- /.cfg-grid -->
+
+</div><!-- /.cfg-page -->
+
+<!-- Toast -->
+<div class="cfg-toast" id="cfg-toast">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+    <span id="cfg-toast-msg">Downloaded!</span>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+//  State
+// ════════════════════════════════════════════════════════
+let dcTeams = [{ name: 'Ops', id: 1 }];
+let dcUsers = [{ name: 'root', teamId: 1 }, { name: 'www', teamId: 1 }];
+let disksList = [{ name: 'Primary Storage', id: 'disk_sda', path: 'reports/disk_sda' }];
+
+// ════════════════════════════════════════════════════════
+//  Helpers
+// ════════════════════════════════════════════════════════
+function slugify(str) {
+    return str.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'disk';
+}
+
+function toast(msg) {
+    const el = document.getElementById('cfg-toast');
+    document.getElementById('cfg-toast-msg').textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+function download(filename, content) {
+    const a = document.createElement('a');
+    a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(content);
+    a.download = filename;
+    a.click();
+}
+
+function highlightJson(obj) {
+    return JSON.stringify(obj, null, 2)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"([^"]+)":/g, '<span class="key">"$1"</span>:')
+        .replace(/: "([^"]*)"/g, ': <span class="str">"$1"</span>')
+        .replace(/: (\d+)/g, ': <span class="num">$1</span>');
+}
+
+// ════════════════════════════════════════════════════════
+//  disk_checker_config
+// ════════════════════════════════════════════════════════
+function dcBuild() {
+    return {
+        directory:   document.getElementById('dc-directory').value.trim() || '/mnt/data',
+        output_file: document.getElementById('dc-output').value.trim()    || 'disk_usage_report.json',
+        teams: dcTeams.map(t => ({ name: t.name, team_ID: t.id })),
+        users: dcUsers.map(u => ({ name: u.name, team_ID: u.teamId })),
+    };
+}
+
+function dcRenderPreview() {
+    document.getElementById('dc-preview').innerHTML = highlightJson(dcBuild());
+}
+
+function dcRenderTeams() {
+    const list = document.getElementById('dc-teams-list');
+    list.innerHTML = dcTeams.map((t, i) => `
+    <div class="cfg-card" data-i="${i}">
+        <div class="cfg-card-row">
+            <span class="cfg-card-number">${i + 1}</span>
+            <div class="field">
+                <label>Team Name</label>
+                <input class="dc-team-name" type="text" value="${escAttr(t.name)}" placeholder="Engineering">
+            </div>
+            <div class="field" style="max-width:90px">
+                <label>Team ID</label>
+                <input class="dc-team-id" type="number" min="1" value="${t.id}">
+            </div>
+            <button class="btn btn-danger dc-rm-team">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+    </div>`).join('');
+    list.querySelectorAll('.dc-team-name').forEach((el, i) => el.addEventListener('input', () => { dcTeams[i].name = el.value; dcRenderUserTeamOptions(); dcRenderPreview(); }));
+    list.querySelectorAll('.dc-team-id').forEach((el, i)   => el.addEventListener('input', () => { dcTeams[i].id = parseInt(el.value) || i + 1; dcRenderPreview(); }));
+    list.querySelectorAll('.dc-rm-team').forEach((el, i)   => el.addEventListener('click', () => { dcTeams.splice(i, 1); dcRenderTeams(); dcRenderPreview(); }));
+}
+
+function dcRenderUsers() {
+    const list = document.getElementById('dc-users-list');
+    const teamOpts = dcTeams.map(t => `<option value="${t.id}">${escAttr(t.name)} (ID ${t.id})</option>`).join('');
+    list.innerHTML = dcUsers.map((u, i) => `
+    <div class="cfg-card" data-i="${i}">
+        <div class="cfg-card-row">
+            <span class="cfg-card-number">${i + 1}</span>
+            <div class="field">
+                <label>Username</label>
+                <input class="dc-user-name" type="text" value="${escAttr(u.name)}" placeholder="alice">
+            </div>
+            <div class="field">
+                <label>Team</label>
+                <select class="dc-user-team">${teamOpts}</select>
+            </div>
+            <button class="btn btn-danger dc-rm-user">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+    </div>`).join('');
+    list.querySelectorAll('.dc-user-name').forEach((el, i) => el.addEventListener('input', () => { dcUsers[i].name = el.value; dcRenderPreview(); }));
+    list.querySelectorAll('.dc-user-team').forEach((el, i) => {
+        el.value = dcUsers[i].teamId;
+        el.addEventListener('change', () => { dcUsers[i].teamId = parseInt(el.value); dcRenderPreview(); });
+    });
+    list.querySelectorAll('.dc-rm-user').forEach((el, i) => el.addEventListener('click', () => { dcUsers.splice(i, 1); dcRenderUsers(); dcRenderPreview(); }));
+}
+
+function dcRenderUserTeamOptions() {
+    dcRenderUsers(); // re-render to refresh select options
+}
+
+document.getElementById('dc-add-team').addEventListener('click', () => {
+    const nextId = dcTeams.length ? Math.max(...dcTeams.map(t => t.id)) + 1 : 1;
+    dcTeams.push({ name: 'New Team', id: nextId });
+    dcRenderTeams(); dcRenderPreview();
+});
+document.getElementById('dc-add-user').addEventListener('click', () => {
+    const defaultTeam = dcTeams[0]?.id || 1;
+    dcUsers.push({ name: 'newuser', teamId: defaultTeam });
+    dcRenderUsers(); dcRenderPreview();
+});
+document.getElementById('dc-directory').addEventListener('input', dcRenderPreview);
+document.getElementById('dc-output').addEventListener('input', dcRenderPreview);
+document.getElementById('dc-download').addEventListener('click', () => {
+    download('disk_checker_config.json', JSON.stringify(dcBuild(), null, 2));
+    toast('Downloaded disk_checker_config.json');
+});
+
+// ════════════════════════════════════════════════════════
+//  disks.json
+// ════════════════════════════════════════════════════════
+function disksBuild() {
+    return disksList.map(d => ({ id: d.id, name: d.name, path: d.path }));
+}
+
+function disksRenderPreview() {
+    document.getElementById('disks-preview').innerHTML = highlightJson(disksBuild());
+}
+
+const autoIdCheckbox = document.getElementById('disks-auto-id');
+
+function disksRender() {
+    const list = document.getElementById('disks-list');
+    const autoId = autoIdCheckbox.checked;
+    list.innerHTML = disksList.map((d, i) => `
+    <div class="cfg-card" data-i="${i}">
+        <div class="cfg-card-row">
+            <span class="cfg-card-number">${i + 1}</span>
+            <div class="field">
+                <label>Display Name</label>
+                <input class="disk-name" type="text" value="${escAttr(d.name)}" placeholder="Primary Storage">
+            </div>
+            <button class="btn btn-danger disk-rm">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="cfg-card-row" style="margin-top:8px">
+            <div style="width:22px;flex-shrink:0"></div>
+            <div class="field" style="flex:0.6">
+                <label>ID <span style="opacity:.5;font-weight:400;text-transform:none">(API key)</span></label>
+                <input class="disk-id" type="text" value="${escAttr(d.id)}" placeholder="disk_sda" ${autoId ? 'readonly style="opacity:.5"' : ''}>
+            </div>
+            <div class="field">
+                <label>Report Path <span style="opacity:.5;font-weight:400;text-transform:none">(relative)</span></label>
+                <input class="disk-path" type="text" value="${escAttr(d.path)}" placeholder="reports/disk_sda">
+            </div>
+        </div>
+    </div>`).join('');
+
+    list.querySelectorAll('.disk-name').forEach((el, i) => el.addEventListener('input', () => {
+        disksList[i].name = el.value;
+        if (autoIdCheckbox.checked) {
+            disksList[i].id = slugify(el.value);
+            const idInput = el.closest('.cfg-card').querySelector('.disk-id');
+            if (idInput) idInput.value = disksList[i].id;
+        }
+        disksRenderPreview();
+    }));
+    list.querySelectorAll('.disk-id').forEach((el, i)   => el.addEventListener('input', () => { disksList[i].id = el.value; disksRenderPreview(); }));
+    list.querySelectorAll('.disk-path').forEach((el, i) => el.addEventListener('input', () => { disksList[i].path = el.value; disksRenderPreview(); }));
+    list.querySelectorAll('.disk-rm').forEach((el, i)   => el.addEventListener('click', () => { disksList.splice(i, 1); disksRender(); disksRenderPreview(); }));
+}
+
+autoIdCheckbox.addEventListener('change', disksRender);
+
+document.getElementById('disks-add').addEventListener('click', () => {
+    disksList.push({ name: 'New Disk', id: 'new_disk', path: 'reports/new_disk' });
+    disksRender(); disksRenderPreview();
+});
+document.getElementById('disks-download').addEventListener('click', () => {
+    download('disks.json', JSON.stringify(disksBuild(), null, 2));
+    toast('Downloaded disks.json');
+});
+
+// ════════════════════════════════════════════════════════
+//  Utility
+// ════════════════════════════════════════════════════════
+function escAttr(s) { return String(s||'').replace(/"/g, '&quot;').replace(/</g,'&lt;'); }
+
+// ════════════════════════════════════════════════════════
+//  Init
+// ════════════════════════════════════════════════════════
+dcRenderTeams();
+dcRenderUsers();
+dcRenderPreview();
+disksRender();
+disksRenderPreview();
+</script>
+</body>
+</html>
