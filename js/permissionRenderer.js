@@ -73,15 +73,16 @@ function renderItem(item) {
 }
 
 // ── Fetch one page from the API ───────────────────────────────────────────────
-async function fetchPermPage(diskDir, offset = 0, userFilter = [], pathQ = '') {
+async function fetchPermPage(diskDir, offset = 0) {
     const params = new URLSearchParams({
         dir:    diskDir,
         offset,
         limit:  PERM_PAGE,
     });
-    // Pass active user filter to... actually we filter client-side since
-    // user_summary tells us counts; backend returns ALL items for selected page.
-    // For server-side user filtering we'd need more API params — keep it simple.
+    // server-side user filter
+    if (_activeUsers.size > 0 && _activeUsers.size < 50) {
+        params.set('users', [..._activeUsers].join(','));
+    }
     const res  = await fetch(`permission_api.php?${params}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
@@ -136,9 +137,7 @@ function renderFilterSidebar(userSummary) {
 // ── Render items honoring active filters ──────────────────────────────────────
 function renderItemList(items) {
     const filtered = items.filter(it => {
-        const userOk  = _activeUsers.size === 0 || _activeUsers.has(it.user);
-        const pathOk  = !_pathQuery || it.path.toLowerCase().includes(_pathQuery);
-        return userOk && pathOk;
+        return !_pathQuery || it.path.toLowerCase().includes(_pathQuery);
     });
     if (!filtered.length) return '<div class="perm-empty-filter">No items match current filters.</div>';
     return filtered.map(renderItem).join('');
@@ -248,13 +247,19 @@ async function _goToPage(root, page) {
         const offset = (page - 1) * PERM_PAGE;
         const data   = await fetchPermPage(_permDiskDir, offset);
         _permPage    = page;
+        _permTotal   = data.total ?? _permTotal;
 
-        if (list)  { list.innerHTML = renderItemList(data.items ?? []); list.style.opacity = ''; }
+        const items = data.items ?? [];
+        if (list) {
+            list.innerHTML = renderItemList(items);
+            list._rawItems = items;
+            list.style.opacity = '';
+        }
         if (badge) badge.textContent = `Page ${page} of ${_permTotalPages} · ${_permTotal.toLocaleString()} total`;
 
         // Replace pagination
         const oldPg = root.querySelector('.perm-pagination');
-        if (oldPg)  {
+        if (oldPg) {
             oldPg.outerHTML = renderPagination(page, _permTotalPages);
             _attachPaginationEvents(root);
         }
@@ -271,8 +276,9 @@ window._permToggle = function(el) {
     const key = el.dataset.key;
     if (el.classList.contains('selected')) { _activeUsers.add(key); if (chk) chk.textContent = '✓'; }
     else { _activeUsers.delete(key); if (chk) chk.textContent = ''; }
-    document.getElementById('perm-filter-count').textContent = `${_activeUsers.size} selected`;
-    _refilter();
+    const countEl = document.getElementById('perm-filter-count');
+    if (countEl) countEl.textContent = `${_activeUsers.size} selected`;
+    _refetchPage1(document.getElementById('permissions-body'));
 };
 
 window._permSelectAll = function() {
@@ -281,8 +287,9 @@ window._permSelectAll = function() {
         const chk = el.querySelector('.user-filter-check'); if (chk) chk.textContent = '✓';
         _activeUsers.add(el.dataset.key);
     });
-    document.getElementById('perm-filter-count').textContent = `${_activeUsers.size} selected`;
-    _refilter();
+    const countEl = document.getElementById('perm-filter-count');
+    if (countEl) countEl.textContent = `${_activeUsers.size} selected`;
+    _refetchPage1(document.getElementById('permissions-body'));
 };
 
 window._permClearAll = function() {
@@ -291,8 +298,9 @@ window._permClearAll = function() {
         const chk = el.querySelector('.user-filter-check'); if (chk) chk.textContent = '';
     });
     _activeUsers.clear();
-    document.getElementById('perm-filter-count').textContent = '0 selected';
-    _refilter();
+    const countEl = document.getElementById('perm-filter-count');
+    if (countEl) countEl.textContent = '0 selected';
+    _refetchPage1(document.getElementById('permissions-body'));
 };
 
 window._permUserSearch = function(q) {
@@ -304,16 +312,33 @@ window._permUserSearch = function(q) {
 
 window._permPathSearch = function(val) {
     _pathQuery = val.toLowerCase();
-    _refilter();
+    // path filter is client-side on current page items
+    const list = document.getElementById('perm-flat-list');
+    if (list && list._rawItems) list.innerHTML = renderItemList(list._rawItems);
 };
 
-function _refilter() {
-    const list = document.getElementById('perm-flat-list');
-    if (!list) return;
-    // Re-render the cached items with new filter
-    // We store the raw items on the list element as data
-    const rawItems = list._rawItems;
-    if (rawItems) list.innerHTML = renderItemList(rawItems);
+async function _refetchPage1(root) {
+    if (!_permDiskDir || !root) return;
+    const list  = root.querySelector('#perm-flat-list');
+    const badge = root.querySelector('#perm-total-badge');
+    const pager = root.querySelector('.perm-pagination');
+    if (list)  list.style.opacity = '0.4';
+    if (pager) pager.style.pointerEvents = 'none';
+    try {
+        const data = await fetchPermPage(_permDiskDir, 0);
+        _permPage       = 1;
+        _permTotal      = data.total ?? 0;
+        _permTotalPages = Math.max(1, Math.ceil(_permTotal / PERM_PAGE));
+        if (list) { list.innerHTML = renderItemList(data.items ?? []); list.style.opacity = ''; }
+        if (badge) badge.textContent = `Page 1 of ${_permTotalPages} · ${_permTotal.toLocaleString()} total`;
+        if (pager) {
+            pager.outerHTML = renderPagination(1, _permTotalPages);
+            _attachPaginationEvents(root);
+        }
+    } catch {
+        if (list)  list.style.opacity = '';
+        if (pager) pager.style.pointerEvents = '';
+    }
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────

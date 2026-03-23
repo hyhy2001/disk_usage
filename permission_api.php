@@ -96,16 +96,31 @@ if (isset($issues['items'])) {
     $total = count($allItems);
 }
 
-// ── Paginate ─────────────────────────────────────────────────────────────────
-$page_items = array_slice($allItems, $offset, $limit);
-$returned   = count($page_items);
-
-// Build user summary (for filter sidebar) — from full list, not page
+// ── User summary — always from the FULL list (for sidebar counts) ─────────────
 $userSummary = [];
 foreach ($allItems as $item) {
     $u = $item['user'] ?? '__unknown__';
     $userSummary[$u] = ($userSummary[$u] ?? 0) + 1;
 }
+
+// ── Server-side user filter (applied BEFORE pagination) ───────────────────────
+// ?users=alice,bob,__unknown__  — comma-separated. Empty = no filter (all).
+$userFilter = [];
+if (isset($_GET['users']) && trim($_GET['users']) !== '') {
+    $userFilter = array_filter(array_map('trim', explode(',', $_GET['users'])));
+}
+
+if (!empty($userFilter)) {
+    $filterSet = array_flip($userFilter);   // O(1) lookup
+    $allItems  = array_values(array_filter($allItems, function ($item) use ($filterSet) {
+        return isset($filterSet[$item['user'] ?? '']);
+    }));
+    $total = count($allItems);
+}
+
+// ── Paginate ─────────────────────────────────────────────────────────────────
+$page_items = array_slice($allItems, $offset, $limit);
+$returned   = count($page_items);
 
 echo json_encode([
     'status' => 'success',
@@ -117,6 +132,6 @@ echo json_encode([
         'limit'        => $limit,
         'has_more'     => $returned >= $limit && ($offset + $returned) < $total,
         'items'        => $page_items,
-        'user_summary' => $userSummary,   // { "alice": 5, "bob": 3, "__unknown__": 2 }
+        'user_summary' => $userSummary,   // always full counts, not filtered
     ],
 ]);
