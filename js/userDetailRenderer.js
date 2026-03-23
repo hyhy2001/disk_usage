@@ -211,7 +211,7 @@ function _renderError(msg) {
 async function _fetchDir(diskDir, user) {
     if (_abortCtrl) _abortCtrl.abort();
     _abortCtrl = new AbortController();
-    const url = `user_detail_api.php?dir=${encodeURIComponent(diskDir)}&user=${encodeURIComponent(user)}&type=dir`;
+    const url = `user_detail_api.php?dir=${encodeURIComponent(diskDir)}&u=${encodeURIComponent(user)}&t=dir`;
     const res = await fetch(url, { signal: _abortCtrl.signal });
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     const json = await res.json();
@@ -220,7 +220,7 @@ async function _fetchDir(diskDir, user) {
 }
 
 async function _fetchFilePage(diskDir, user, offset = 0, limit = FILE_PAGE) {
-    const url = `user_detail_api.php?dir=${encodeURIComponent(diskDir)}&user=${encodeURIComponent(user)}&type=file&offset=${offset}&limit=${limit}`;
+    const url = `user_detail_api.php?dir=${encodeURIComponent(diskDir)}&u=${encodeURIComponent(user)}&t=file&p=${offset}&n=${limit}`;
     const res = await fetch(url);
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     const json = await res.json();
