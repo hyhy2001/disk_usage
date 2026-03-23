@@ -1,5 +1,5 @@
 // permissionRenderer.js — Renders Permission Issues tab
-// Data is loaded once by dataFetcher.js via permission_api.php?dir=...
+// Shows permission issues per disk. Renders a filterable, paginated list.
 // All pagination and filtering is done client-side (no extra API calls).
 
 import { fmtDateSec as fmtDate } from './formatters.js';
@@ -244,7 +244,7 @@ window._permPathSearch = function(val) {
 };
 
 // ── Entry point ───────────────────────────────────────────────────────────────
-// dataFetcher.js calls permission_api.php?dir=... (single param, WAF-safe)
+// dataFetcher.js calls api.php?dir=p|path (pipe-prefix, WAF-safe, base64 response)
 // and dispatches permissionsLoaded with the full data spread into e.detail.
 // We use that data directly — no second API call.
 document.addEventListener('permissionsLoaded', (e) => {

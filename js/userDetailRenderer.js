@@ -1,5 +1,5 @@
 // userDetailRenderer.js — Detail User tab (Tab Pane 3 in Detail page)
-// Shows a user picker; after selecting a user, lazy-loads top dirs + files via user_detail_api.php
+// userDetailRenderer.js — Renders per-user detail reports (dirs + files)
 
 import { fmt } from './formatters.js';
 import { AppState } from './main.js';
