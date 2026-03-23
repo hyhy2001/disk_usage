@@ -42,7 +42,7 @@
         .cfg-hero-text h1 {
             font-size: 1.5rem; font-weight: 700;
             background: linear-gradient(120deg, #e2e8f0 30%, #94a3b8);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
         }
         .cfg-hero-text p {
             font-size: 0.82rem; color: var(--text-secondary, #64748b); margin-top: 3px;
@@ -293,10 +293,6 @@
                     <label>Scan Directory</label>
                     <input type="text" id="dc-directory" placeholder="/mnt/data" value="/www/wwwroot">
                 </div>
-                <div class="field">
-                    <label>Output File Name</label>
-                    <input type="text" id="dc-output" placeholder="disk_usage_report.json" value="disk_usage_report.json">
-                </div>
 
                 <!-- Teams -->
                 <div class="cfg-section-label">Teams</div>
@@ -426,7 +422,7 @@ function highlightJson(obj) {
 function dcBuild() {
     return {
         directory:   document.getElementById('dc-directory').value.trim() || '/mnt/data',
-        output_file: document.getElementById('dc-output').value.trim()    || 'disk_usage_report.json',
+        output_file: 'disk_usage_report.json',
         teams: dcTeams.map(t => ({ name: t.name, team_ID: t.id })),
         users: dcUsers.map(u => ({ name: u.name, team_ID: u.teamId })),
     };
@@ -503,7 +499,6 @@ document.getElementById('dc-add-user').addEventListener('click', () => {
     dcRenderUsers(); dcRenderPreview();
 });
 document.getElementById('dc-directory').addEventListener('input', dcRenderPreview);
-document.getElementById('dc-output').addEventListener('input', dcRenderPreview);
 document.getElementById('dc-download').addEventListener('click', () => {
     download('disk_checker_config.json', JSON.stringify(dcBuild(), null, 2));
     toast('Downloaded disk_checker_config.json');
@@ -516,8 +511,20 @@ function disksBuild() {
     return disksList.map(d => ({ id: d.id, name: d.name, path: d.path }));
 }
 
+// Compact one-line-per-entry format matching the original disks.json style
+function disksHighlightCompact(arr) {
+    const lines = arr.map(d => {
+        const line = JSON.stringify(d);
+        return '  ' + line
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"([^"]+)":/g, '<span class="key">"$1"</span>:')
+            .replace(/: "([^"]*)"/g, ': <span class="str">"$1"</span>');
+    });
+    return '[\n' + lines.join(',\n') + '\n]';
+}
+
 function disksRenderPreview() {
-    document.getElementById('disks-preview').innerHTML = highlightJson(disksBuild());
+    document.getElementById('disks-preview').innerHTML = disksHighlightCompact(disksBuild());
 }
 
 const autoIdCheckbox = document.getElementById('disks-auto-id');
@@ -541,7 +548,7 @@ function disksRender() {
             <div style="width:22px;flex-shrink:0"></div>
             <div class="field" style="flex:0.6">
                 <label>ID <span style="opacity:.5;font-weight:400;text-transform:none">(API key)</span></label>
-                <input class="disk-id" type="text" value="${escAttr(d.id)}" placeholder="disk_sda" ${autoId ? 'readonly style="opacity:.5"' : ''}>
+                <input class="disk-id" type="text" value="${escAttr(d.id)}" placeholder="disk_sda">
             </div>
             <div class="field">
                 <label>Report Path <span style="opacity:.5;font-weight:400;text-transform:none">(relative)</span></label>
@@ -571,7 +578,10 @@ document.getElementById('disks-add').addEventListener('click', () => {
     disksRender(); disksRenderPreview();
 });
 document.getElementById('disks-download').addEventListener('click', () => {
-    download('disks.json', JSON.stringify(disksBuild(), null, 2));
+    const arr = disksBuild();
+    const lines = arr.map(d => '  ' + JSON.stringify(d));
+    const content = '[\n' + lines.join(',\n') + '\n]\n';
+    download('disks.json', content);
     toast('Downloaded disks.json');
 });
 
