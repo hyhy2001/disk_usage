@@ -27,10 +27,11 @@ function pct(part, total) { return total ? ((part / total) * 100).toFixed(1) : '
 function barRow(label, used, total, fillClass = 'fill-emerald') {
     const p   = pct(used, total);
     const cls = parseFloat(p) > 85 ? 'text-rose' : parseFloat(p) > 65 ? 'text-amber' : 'text-emerald';
+    const tip = `${fmt(used)} · ${p}% of ${fmt(total)}`;
     return `
     <div class="sbar-row">
         <div class="sbar-name">${label}</div>
-        <div class="sbar-track">
+        <div class="sbar-track" data-tooltip="${tip}">
             <div class="sbar-fill ${fillClass}" style="width:${Math.min(parseFloat(p), 100)}%"></div>
         </div>
         <span class="sbar-pct ${cls}">${p}%</span>
@@ -78,7 +79,7 @@ function renderSnapshotView() {
     const userRows = top10.map((u, i) =>
         `<div class="sbar-row">
             <div class="sbar-name"><span class="rank-badge">#${i + 1}</span> <span class="user-name">${u.name}</span></div>
-            <div class="sbar-track">
+            <div class="sbar-track" data-tooltip="${fmt(u.used)} · ${pct(u.used, sys)}% of total">
                 <div class="sbar-fill fill-sky" style="width:${Math.min(parseFloat(pct(u.used, sys)), 100)}%"></div>
             </div>
             <span class="sbar-pct text-sky">${pct(u.used, sys)}%</span>
@@ -104,9 +105,9 @@ function renderSnapshotView() {
             <div class="sbar-name">Used</div>
             <div class="sbar-track sbar-track-stacked">
                 <div class="sbar-seg seg-amber" style="width:${scannedOfTotal}%"
-                     title="Scanned: ${fmt(scannedBytes)} (${scannedOfUsed}% of used)"></div>
+                     data-tooltip="Scanned: ${fmt(scannedBytes)} · ${scannedOfUsed}% of used space"></div>
                 <div class="sbar-seg seg-slate"  style="width:${gapOfTotal}%"
-                     title="Unknown: ${fmt(gapBytes)} (${gapOfUsed}% of used)"></div>
+                     data-tooltip="Unscanned: ${fmt(gapBytes)} · ${gapOfUsed}% of used space"></div>
             </div>
             <span class="sbar-pct ${pctCls}">${usedPct}%</span>
             <div class="general-val-col">

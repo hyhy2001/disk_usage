@@ -47,7 +47,7 @@ function _renderDirCard(dirData) {
         return `
         <div class="ud-path-row">
             <div class="ud-path-name" title="${d.path}">${_shortPath(d.path)}</div>
-            <div class="ud-path-bar-wrap">
+            <div class="ud-path-bar-wrap" data-tooltip="${fmt(d.used)} · ${pct}% of user total">
                 <div class="ud-path-bar-fill ${cls}" style="width:${pct}%"></div>
             </div>
             <span class="ud-path-val">${fmt(d.used)}</span>
@@ -132,7 +132,7 @@ function _renderFileCard(fileData) {
         <div class="ud-path-row">
             <span class="ud-ext-badge" style="background:${clr}20;color:${clr}">.${ext}</span>
             <div class="ud-path-name" title="${f.path}">${_shortPath(f.path)}</div>
-            <div class="ud-path-bar-wrap">
+            <div class="ud-path-bar-wrap" data-tooltip="${fmt(f.size)} · ${pct}% of page total">
                 <div class="ud-path-bar-fill ud-fill-emerald" style="width:${pct}%"></div>
             </div>
             <span class="ud-path-val">${fmt(f.size)}</span>
@@ -356,7 +356,7 @@ async function _goToPage(root, page) {
                 <div class="ud-path-row">
                     <span class="ud-ext-badge" style="background:${clr}20;color:${clr}">.${ext}</span>
                     <div class="ud-path-name" title="${f.path}">${_shortPath(f.path)}</div>
-                    <div class="ud-path-bar-wrap">
+                    <div class="ud-path-bar-wrap" data-tooltip="${fmt(f.size)} · ${pct}% of page total">
                         <div class="ud-path-bar-fill ud-fill-emerald" style="width:${pct}%"></div>
                     </div>
                     <span class="ud-path-val">${fmt(f.size)}</span>
