@@ -289,28 +289,29 @@ class DataFetcher {
         try {
             const diskConf = this.disksConfig?.find(d => d.id === this._activeDisk);
             const diskPath = diskConf?.path || this._activeDisk;
+            const res = await fetch(`permission_api.php?dir=${encodeURIComponent(diskPath)}`);
+            const json = await res.json();
 
-            // Guard: don't call API with empty path (would get 403 from server)
-            if (!diskPath) {
-                console.warn('[permissions] diskPath is empty, aborting fetch');
-                return;
+            if (json?.status === 'success') {
+                this._permissionsLoaded = true;
+                this.dataStore.permissionIssues = json.data ?? null;
+                document.dispatchEvent(new CustomEvent('permissionsLoaded', {
+                    detail: json.data ? { diskDir: diskPath, ...json.data } : { diskDir: diskPath },
+                }));
+            } else {
+                if (permBody) {
+                    permBody.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                                </svg>
+                            </div>
+                            <h3>No Issues Found</h3>
+                            <p>No permission problems detected for this disk.</p>
+                        </div>`;
+                }
             }
-
-            const res  = await fetch(`permission_api.php?dir=${encodeURIComponent(diskPath)}`);
-            const json = await res.json();   // always JSON now (even 403/404)
-
-            if (!res.ok || json?.status !== 'success') {
-                console.warn(`[permissions] API error ${res.status}:`, json?.message);
-                if (permBody) permBody.innerHTML = `<div class="empty-state"><div class="empty-state-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16"/></svg></div><h3>Permission Data Unavailable</h3><p>HTTP ${res.status}: ${json?.message ?? 'Unknown error'}</p></div>`;
-                return;
-            }
-
-            // Success path (error paths already returned above)
-            this._permissionsLoaded = true;
-            this.dataStore.permissionIssues = json.data ?? null;
-            document.dispatchEvent(new CustomEvent('permissionsLoaded', {
-                detail: json.data ? { diskDir: diskPath, ...json.data } : { diskDir: diskPath },
-            }));
         } catch (e) {
             console.warn('Could not load permission issues:', e);
             if (permBody) {

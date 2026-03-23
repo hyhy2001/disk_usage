@@ -1,17 +1,57 @@
 [
   {
-    "id":   "disk_sda",
+    "id": "disk_sda",
     "name": "Primary Storage",
     "path": "mock_reports/disk_sda"
   },
   {
-    "id":   "disk_sdb",
+    "id": "disk_sdb",
     "name": "Archive Pool",
     "path": "mock_reports/disk_sdb"
   },
   {
-    "id":   "disk_sdc",
+    "id": "disk_sdc",
     "name": "Backup Volume",
     "path": "mock_reports/disk_sdc"
+  },
+  {
+    "id": "disk_nvme0",
+    "name": "NVMe SSD Boot",
+    "path": "mock_reports/disk_nvme0"
+  },
+  {
+    "id": "disk_nvme1",
+    "name": "NVMe SSD Data",
+    "path": "mock_reports/disk_nvme1"
+  },
+  {
+    "id": "disk_sdd",
+    "name": "Media Library",
+    "path": "mock_reports/disk_sdd"
+  },
+  {
+    "id": "disk_sde",
+    "name": "Temp Scratch",
+    "path": "mock_reports/disk_sde"
+  },
+  {
+    "id": "disk_sdf",
+    "name": "ML Dataset",
+    "path": "mock_reports/disk_sdf"
+  },
+  {
+    "id": "disk_sdg",
+    "name": "Log Archive",
+    "path": "mock_reports/disk_sdg"
+  },
+  {
+    "id": "disk_sdh",
+    "name": "Dev Workspace",
+    "path": "mock_reports/disk_sdh"
+  },
+  {
+    "id": "disk_sdz",
+    "name": "Empty Disk",
+    "path": "mock_reports/disk_sdz"
   }
 ]
