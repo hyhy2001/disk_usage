@@ -275,19 +275,11 @@
 
                 <!-- Users -->
                 <div class="cfg-section-label" style="margin-top:20px">Users</div>
-                <div class="cfg-card">
-                    <div class="cfg-card-row" style="align-items:flex-start;gap:10px">
-                        <div class="field" style="flex:1;margin-bottom:0">
-                            <label>Usernames <span style="opacity:.5;font-weight:400;text-transform:none">(one per line)</span></label>
-                            <textarea id="dc-users-text" rows="6" placeholder="root&#10;alice&#10;bob&#10;www-data">root
-www</textarea>
-                        </div>
-                        <div class="field" style="flex:0 0 140px;margin-bottom:0">
-                            <label>Assign Team</label>
-                            <select id="dc-users-team" style="width:100%"></select>
-                        </div>
-                    </div>
-                </div>
+                <div class="cfg-list" id="dc-users-list"></div>
+                <button class="btn btn-add-row" id="dc-add-user-group" style="margin-top:8px">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Add User Group
+                </button>
 
             </div>
         </div>
@@ -322,6 +314,8 @@ www</textarea>
 <script>
 // ─── State ────────────────────────────────────────────────────────────────────
 let dcTeams = [{ name: 'Ops', id: 1 }];
+// Each group: { text: string, teamId: number }
+let dcUserGroups = [{ text: 'root\nwww', teamId: 1 }];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function escAttr(s) { return String(s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
@@ -368,14 +362,17 @@ function dcHighlightCompact(obj) {
 }
 
 function dcBuild() {
-    const teamId = parseInt(document.getElementById('dc-users-team')?.value) || (dcTeams[0]?.id ?? 1);
-    const names  = (document.getElementById('dc-users-text')?.value || '')
-        .split('\n').map(s => s.trim()).filter(Boolean);
+    const users = [];
+    dcUserGroups.forEach(g => {
+        const teamId = g.teamId || (dcTeams[0]?.id ?? 1);
+        g.text.split('\n').map(s => s.trim()).filter(Boolean)
+              .forEach(n => users.push({ name: n, team_ID: teamId }));
+    });
     return {
         directory:   document.getElementById('dc-directory').value.trim() || '/mnt/data',
         output_file: 'disk_usage_report.json',
         teams: dcTeams.map(t => ({ name: t.name, team_ID: t.id })),
-        users: names.map(n => ({ name: n, team_ID: teamId })),
+        users,
     };
 }
 
@@ -423,11 +420,60 @@ function dcRenderTeams() {
 }
 
 function dcRefreshUserTeamSelect() {
-    const sel = document.getElementById('dc-users-team');
-    if (!sel) return;
-    const cur = sel.value;
-    sel.innerHTML = dcTeams.map(t => `<option value="${t.id}">${escAttr(t.name)} (ID ${t.id})</option>`).join('');
-    if (cur) sel.value = cur;
+    // update all group selects to reflect current teams
+    document.querySelectorAll('.dc-ug-team').forEach((sel, i) => {
+        const cur = dcUserGroups[i]?.teamId;
+        sel.innerHTML = dcTeams.map(t =>
+            `<option value="${t.id}">${escAttr(t.name)} (ID ${t.id})</option>`
+        ).join('');
+        if (cur) sel.value = cur;
+    });
+}
+
+// ─── User Groups ─────────────────────────────────────────────────────────────
+function dcRenderUserGroups() {
+    const list = document.getElementById('dc-users-list');
+    const teamOpts = dcTeams.map(t =>
+        `<option value="${t.id}">${escAttr(t.name)} (ID ${t.id})</option>`
+    ).join('');
+
+    list.innerHTML = dcUserGroups.map((g, i) => `
+    <div class="cfg-card">
+        <div class="cfg-card-row" style="align-items:flex-start;gap:10px">
+            <div class="field" style="flex:1;margin-bottom:0">
+                <label>Usernames <span style="opacity:.5;font-weight:400;text-transform:none">(one per line)</span></label>
+                <textarea class="dc-ug-text" rows="4" placeholder="alice&#10;bob">${escAttr(g.text)}</textarea>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;flex:0 0 140px">
+                <div class="field" style="margin-bottom:0">
+                    <label>Assign Team</label>
+                    <select class="dc-ug-team" style="width:100%">${teamOpts}</select>
+                </div>
+                ${dcUserGroups.length > 1 ? `
+                <button class="btn btn-danger dc-ug-rm" style="width:100%;border-radius:8px;height:30px">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    <span style="font-size:0.72rem">Remove</span>
+                </button>` : ''}
+            </div>
+        </div>
+    </div>`).join('');
+
+    // wire events
+    list.querySelectorAll('.dc-ug-text').forEach((el, i) => {
+        el.value = dcUserGroups[i].text;  // restore real value (escAttr was for HTML attr only)
+        el.addEventListener('input', () => { dcUserGroups[i].text = el.value; dcRenderPreview(); });
+    });
+    list.querySelectorAll('.dc-ug-team').forEach((el, i) => {
+        el.value = dcUserGroups[i].teamId;
+        el.addEventListener('change', () => { dcUserGroups[i].teamId = parseInt(el.value); dcRenderPreview(); });
+    });
+    list.querySelectorAll('.dc-ug-rm').forEach((el, i) => {
+        el.addEventListener('click', () => {
+            dcUserGroups.splice(i, 1);
+            dcRenderUserGroups();
+            dcRenderPreview();
+        });
+    });
 }
 
 // ─── Events ───────────────────────────────────────────────────────────────────
@@ -439,9 +485,14 @@ document.getElementById('dc-add-team').addEventListener('click', () => {
     dcRenderPreview();
 });
 
+document.getElementById('dc-add-user-group').addEventListener('click', () => {
+    const defaultTeam = dcTeams[0]?.id ?? 1;
+    dcUserGroups.push({ text: '', teamId: defaultTeam });
+    dcRenderUserGroups();
+    dcRenderPreview();
+});
+
 document.getElementById('dc-directory').addEventListener('input', dcRenderPreview);
-document.getElementById('dc-users-text').addEventListener('input', dcRenderPreview);
-document.getElementById('dc-users-team').addEventListener('change', dcRenderPreview);
 
 document.getElementById('dc-download').addEventListener('click', () => {
     download('disk_checker_config.json', JSON.stringify(dcBuild(), null, 2));
@@ -451,6 +502,7 @@ document.getElementById('dc-download').addEventListener('click', () => {
 // ─── Init ─────────────────────────────────────────────────────────────────────
 dcRenderTeams();
 dcRefreshUserTeamSelect();
+dcRenderUserGroups();
 dcRenderPreview();
 </script>
 </body>
