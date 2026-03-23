@@ -72,7 +72,7 @@ if ($x === '1') {
             $data = ['date' => $raw['date'] ?? null, 'directory' => $raw['directory'] ?? null, 'total' => count($allItems), 'items' => $allItems];
         }
     }
-    echo json_encode(['status' => 'success', 'data' => $data]);
+    echo base64_encode(json_encode(['status' => 'success', 'data' => $data]));
     exit;
 }
 
@@ -96,18 +96,18 @@ if ($x === '2') {
             if ($dh) closedir($dh);
             sort($users);
         }
-        echo json_encode(['status' => 'success', 'data' => ['users' => $users]]);
+        echo base64_encode(json_encode(['status' => 'success', 'data' => ['users' => $users]]));
         exit;
     }
 
     if (!in_array($kind, ['d', 'f', 'b'], true)) {
         http_response_code(400);
-        echo json_encode(['status' => 'error', 'message' => 'Invalid k. Use: d, f, b']);
+        echo base64_encode(json_encode(['status' => 'error', 'message' => 'Invalid k']));
         exit;
     }
     if (!is_dir($detailPath)) {
         http_response_code(404);
-        echo json_encode(['status' => 'error', 'message' => 'detail_users/ not found']);
+        echo base64_encode(json_encode(['status' => 'error', 'message' => 'No detail_users/']));
         exit;
     }
 
@@ -115,14 +115,14 @@ if ($x === '2') {
 
     if ($kind === 'd' || $kind === 'b') {
         $file = $detailPath . DIRECTORY_SEPARATOR . "detail_report_dir_{$who}.json";
-        if (!is_file($file)) { http_response_code(404); echo json_encode(['status' => 'error', 'message' => "No dir report: $who"]); exit; }
+        if (!is_file($file)) { http_response_code(404); echo base64_encode(json_encode(['status' => 'error', 'message' => "No dir: $who"])); exit; }
         $c = file_get_contents($file);
         $data['dir'] = $c !== false ? json_decode($c, true) : null;
     }
 
     if ($kind === 'f' || $kind === 'b') {
         $file = $detailPath . DIRECTORY_SEPARATOR . "detail_report_file_{$who}.json";
-        if (!is_file($file)) { http_response_code(404); echo json_encode(['status' => 'error', 'message' => "No file report: $who"]); exit; }
+        if (!is_file($file)) { http_response_code(404); echo base64_encode(json_encode(['status' => 'error', 'message' => "No file: $who"])); exit; }
         $fh = @fopen($file, 'r');
         $date = 0; $userName = $who; $totalFiles = 0; $totalUsed = 0;
         while ($fh && ($line = fgets($fh)) !== false) {
@@ -152,7 +152,7 @@ if ($x === '2') {
         $data['file'] = ['date' => $date, 'user' => $userName, 'total_files' => $totalFiles, 'total_used' => $totalUsed, 'offset' => $offset, 'limit' => $limit, 'has_more' => count($collected) >= $limit, 'files' => $collected];
     }
 
-    echo json_encode(['status' => 'success', 'data' => $data]);
+    echo base64_encode(json_encode(['status' => 'success', 'data' => $data]));
     exit;
 }
 

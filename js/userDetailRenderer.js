@@ -214,7 +214,7 @@ async function _fetchDir(diskDir, user) {
     const url = `api.php?dir=${encodeURIComponent(diskDir)}&x=2&u=${encodeURIComponent(user)}&k=d`;
     const res = await fetch(url, { signal: _abortCtrl.signal });
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
-    const json = await res.json();
+    const json = JSON.parse(atob(await res.text()));
     if (json.status !== 'success') throw new Error(json.message || 'API error');
     return json.data.dir;
 }
@@ -223,7 +223,7 @@ async function _fetchFilePage(diskDir, user, offset = 0, limit = FILE_PAGE) {
     const url = `api.php?dir=${encodeURIComponent(diskDir)}&x=2&u=${encodeURIComponent(user)}&k=f&p=${offset}&n=${limit}`;
     const res = await fetch(url);
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
-    const json = await res.json();
+    const json = JSON.parse(atob(await res.text()));
     if (json.status !== 'success') throw new Error(json.message || 'API error');
     return json.data.file;
 }
@@ -232,7 +232,7 @@ async function _fetchUserList(diskDir) {
     const url = `api.php?dir=${encodeURIComponent(diskDir)}&x=2`;
     const res = await fetch(url);
     if (!res.ok) return [];
-    const json = await res.json();
+    const json = JSON.parse(atob(await res.text()));
     return json?.data?.users || [];
 }
 
