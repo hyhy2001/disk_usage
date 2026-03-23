@@ -52,9 +52,14 @@ class DataFetcher {
         if (userDetailTab) {
             userDetailTab.addEventListener('click', () => {
                 if (this._activeDisk) {
-                    const otherUsers = (this.dataStore?.latestSnapshot?.other || [])
-                        .map(o => ({ name: o.name, used: o.used }));
-                    initUserDetailTab(this._activeDisk, otherUsers);
+                    const snapshot = this.dataStore?.latestSnapshot;
+                    // Merge user_usage + other_usage so picker shows all known users
+                    // even when detail report files haven't been generated yet
+                    const snapshotUsers = [
+                        ...(snapshot?.users || []),
+                        ...(snapshot?.other || []),
+                    ].map(o => ({ name: o.name, used: o.used }));
+                    initUserDetailTab(this._activeDisk, snapshotUsers);
                 }
             });
         }
