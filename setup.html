@@ -304,11 +304,20 @@
 
                 <!-- Users -->
                 <div class="cfg-section-label" style="margin-top:20px">Users</div>
-                <div class="cfg-list" id="dc-users-list"></div>
-                <button class="btn btn-add-row" id="dc-add-user" style="margin-top:8px">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    Add User
-                </button>
+                <div class="cfg-card" style="padding:12px 14px">
+                    <div class="cfg-card-row" style="align-items:flex-start;gap:10px">
+                        <div class="field" style="flex:1">
+                            <label>Usernames <span style="opacity:.5;font-weight:400;text-transform:none">(one per line)</span></label>
+                            <textarea id="dc-users-text" rows="5" placeholder="root&#10;alice&#10;bob&#10;www-data"
+                                style="width:100%;resize:vertical;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:0.82rem;font-family:inherit;outline:none;line-height:1.5">root
+www</textarea>
+                        </div>
+                        <div class="field" style="flex:0 0 140px">
+                            <label>Assign Team</label>
+                            <select id="dc-users-team" style="width:100%"></select>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Preview -->
                 <div class="cfg-preview" style="margin-top:20px">
@@ -416,20 +425,47 @@ function highlightJson(obj) {
         .replace(/: (\d+)/g, ': <span class="num">$1</span>');
 }
 
-// ════════════════════════════════════════════════════════
-//  disk_checker_config
-// ════════════════════════════════════════════════════════
+// Compact preview for disk_checker_config.json
+function dcHighlightCompact(obj) {
+    const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const kv  = (k, v) => `<span class="key">"${esc(k)}"</span>: <span class="str">"${esc(v)}"</span>`;
+    const kvn = (k, v) => `<span class="key">"${esc(k)}"</span>: <span class="num">${v}</span>`;
+
+    const teamLines = obj.teams.map(t =>
+        '    { ' + kv('name', t.name) + ', ' + kvn('team_ID', t.team_ID) + ' }'
+    ).join(',\n');
+    const userLines = obj.users.map(u =>
+        '    { ' + kv('name', u.name) + ', ' + kvn('team_ID', u.team_ID) + ' }'
+    ).join(',\n');
+
+    return [
+        '{',
+        '  ' + kv('directory',   obj.directory) + ',',
+        '  ' + kv('output_file', obj.output_file) + ',',
+        '  <span class="key">"teams"</span>: [',
+        teamLines,
+        '  ],',
+        '  <span class="key">"users"</span>: [',
+        userLines,
+        '  ]',
+        '}',
+    ].join('\n');
+}
+
 function dcBuild() {
+    const teamId = parseInt(document.getElementById('dc-users-team')?.value) || (dcTeams[0]?.id ?? 1);
+    const names  = (document.getElementById('dc-users-text')?.value || '')
+        .split('\n').map(s => s.trim()).filter(Boolean);
     return {
         directory:   document.getElementById('dc-directory').value.trim() || '/mnt/data',
         output_file: 'disk_usage_report.json',
         teams: dcTeams.map(t => ({ name: t.name, team_ID: t.id })),
-        users: dcUsers.map(u => ({ name: u.name, team_ID: u.teamId })),
+        users: names.map(n => ({ name: n, team_ID: teamId })),
     };
 }
 
 function dcRenderPreview() {
-    document.getElementById('dc-preview').innerHTML = highlightJson(dcBuild());
+    document.getElementById('dc-preview').innerHTML = dcHighlightCompact(dcBuild());
 }
 
 function dcRenderTeams() {
@@ -456,36 +492,20 @@ function dcRenderTeams() {
     list.querySelectorAll('.dc-rm-team').forEach((el, i)   => el.addEventListener('click', () => { dcTeams.splice(i, 1); dcRenderTeams(); dcRenderPreview(); }));
 }
 
-function dcRenderUsers() {
-    const list = document.getElementById('dc-users-list');
-    const teamOpts = dcTeams.map(t => `<option value="${t.id}">${escAttr(t.name)} (ID ${t.id})</option>`).join('');
-    list.innerHTML = dcUsers.map((u, i) => `
-    <div class="cfg-card" data-i="${i}">
-        <div class="cfg-card-row">
-            <span class="cfg-card-number">${i + 1}</span>
-            <div class="field">
-                <label>Username</label>
-                <input class="dc-user-name" type="text" value="${escAttr(u.name)}" placeholder="alice">
-            </div>
-            <div class="field">
-                <label>Team</label>
-                <select class="dc-user-team">${teamOpts}</select>
-            </div>
-            <button class="btn btn-danger dc-rm-user">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-        </div>
-    </div>`).join('');
-    list.querySelectorAll('.dc-user-name').forEach((el, i) => el.addEventListener('input', () => { dcUsers[i].name = el.value; dcRenderPreview(); }));
-    list.querySelectorAll('.dc-user-team').forEach((el, i) => {
-        el.value = dcUsers[i].teamId;
-        el.addEventListener('change', () => { dcUsers[i].teamId = parseInt(el.value); dcRenderPreview(); });
-    });
-    list.querySelectorAll('.dc-rm-user').forEach((el, i) => el.addEventListener('click', () => { dcUsers.splice(i, 1); dcRenderUsers(); dcRenderPreview(); }));
+function dcRefreshUserTeamSelect() {
+    const sel = document.getElementById('dc-users-team');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = dcTeams.map(t => `<option value="${t.id}">${escAttr(t.name)} (ID ${t.id})</option>`).join('');
+    if (cur) sel.value = cur;
 }
 
+// ════════════════════════════════════════════════════════
+//  disk_checker_config — event wiring
+// ════════════════════════════════════════════════════════
 function dcRenderUserTeamOptions() {
-    dcRenderUsers(); // re-render to refresh select options
+    dcRefreshUserTeamSelect();
+    dcRenderPreview();
 }
 
 document.getElementById('dc-add-team').addEventListener('click', () => {
@@ -493,12 +513,10 @@ document.getElementById('dc-add-team').addEventListener('click', () => {
     dcTeams.push({ name: 'New Team', id: nextId });
     dcRenderTeams(); dcRenderPreview();
 });
-document.getElementById('dc-add-user').addEventListener('click', () => {
-    const defaultTeam = dcTeams[0]?.id || 1;
-    dcUsers.push({ name: 'newuser', teamId: defaultTeam });
-    dcRenderUsers(); dcRenderPreview();
-});
 document.getElementById('dc-directory').addEventListener('input', dcRenderPreview);
+document.getElementById('dc-users-text')?.addEventListener('input', dcRenderPreview);
+document.getElementById('dc-users-team')?.addEventListener('change', dcRenderPreview);
+
 document.getElementById('dc-download').addEventListener('click', () => {
     download('disk_checker_config.json', JSON.stringify(dcBuild(), null, 2));
     toast('Downloaded disk_checker_config.json');
@@ -594,7 +612,7 @@ function escAttr(s) { return String(s||'').replace(/"/g, '&quot;').replace(/</g,
 //  Init
 // ════════════════════════════════════════════════════════
 dcRenderTeams();
-dcRenderUsers();
+dcRefreshUserTeamSelect();
 dcRenderPreview();
 disksRender();
 disksRenderPreview();
