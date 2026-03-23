@@ -12,50 +12,49 @@ which generates the JSON reports this dashboard consumes.
 ## ✨ Features
 
 ### Overview & Navigation
-- **Multi-disk selector** — switch between any number of configured storage volumes from a single dropdown
+- **Multi-disk selector** — switch between any number of configured storage volumes
 - **Auto-load on visit** — data loads immediately without user interaction
-- **Tab-based layout** — Overview, Users, History, and Detail tabs with smooth transitions
-- **Disk history chart** — line chart tracking total/used/available capacity over time (per disk)
+- **Tab-based layout** — Overview, History & Analysis, Detail User, and Permission Issues tabs
+- **Sidebar clock** — live clock display in the navigation sidebar
+- **Smart tooltips** — custom glassmorphic tooltip system (JS singleton, immune to stacking contexts)
 
 ### Overview Tab
-- **System summary cards** — total capacity, used space, free space with visual usage bars
-- **Team usage donut chart** — proportional breakdown of disk usage by team
-- **User usage bar chart** — top users ranked by consumed space
-- **Top directories list** — largest directories across all users, with quick-jump to detail
+- **System summary cards** — total capacity, used, scanned, free space with dynamic units
+- **Disk capacity timeline** — line chart tracking capacity over time with range selector (7D / 30D / 6M / 1Y / 5Y / All)
+- **Team usage donut chart** — proportional breakdown by team
+- **Top consuming users bar chart** — ranked by disk usage, log/linear scale toggle
+- **Expandable charts** — click ⤢ to open any chart fullscreen
 
-### Users Tab
-- **Per-user usage table** — every configured user with team badge, used space, and percentage bar
-- **Other users section** — system UIDs not in config (e.g., `daemon`, `www-data`) shown separately
-- **Sort and filter** — filter by username substring, sort by name or usage
-- **Click-through to detail** — clicking any user jumps directly to their detail breakdown
+### History & Analysis Tab
+- **Time-range presets** — 7D, 30D, 3M, 6M, 1Y, All + custom date picker
+- **User filter sidebar** — select users to include, persist selection across time-range changes
+- **Usage trend chart** — per-user or combined usage over time
+- **Fastest-growing users chart** — identifies top growth rates in selected period
 
-### History Tab
-- **Time-series line charts** — total/used/available capacity history for the selected disk
-- **Stat deltas** — growth since last scan, average daily growth
-- **Empty-state handling** — gracefully shows placeholder when no history data exists
-
-### Detail Tab (User Breakdown)
-- **User picker dropdown** — searchable dropdown listing all users (configured + system UIDs)
-- **Directory card** — top directories for the selected user, sorted by size with usage bars
-- **File card** — all files sorted by size with extension badges, colour-coded by type
-- **Paginated file list** — numbered pagination `[◀] [1] [2] … [N] [▶]` for users with thousands of files; each page fetches and replaces content without a full reload
-- **Streaming PHP API** — `user_detail_api.php` reads large JSON reports (100 MB+) using a line-by-line brace-depth parser: O(page_size) RAM regardless of total file count
+### Detail User Tab *(Early Access)*
+- **User picker dropdown** — searchable, lists all users (configured + system UIDs)
+- **Directory card** — top directories sorted by size with colour-coded bars and CSV export
+- **File card** — files sorted by size with extension badges, paginated (500 rows/page)
+- **Streaming PHP API** — line-by-line parser: O(page_size) RAM regardless of file count
+- **CSV export** — download dirs or files for current user, or all users at once
+- **Beta notice banner** — dismissible session-persistent notice (stored in `sessionStorage`)
 
 ### Permission Issues Tab
-- **Flat item list** — every inaccessible file/directory across all users shown as rows: `[user badge] [path] [type] [error]`
-- **Server-side user filter** — select one or more users in the sidebar; the PHP API filters before paginating, so page 1 always shows results for the selected users
-- **Numbered pagination** — same `[◀] [1] [2] … [N] [▶]` widget, resets to page 1 on filter change
-- **Path search** — client-side substring filter on the current page (instant, no round-trip)
-- **User summary sidebar** — shows item count per user, always reflecting the full totals (not filtered)
-- **User badge per row** — blue badge for named users, amber badge for `__unknown__` (orphaned inodes)
-- **Backward-compatible API** — `permission_api.php` accepts both the new flat format and the old nested format (flattened on-the-fly)
+- **Flat item list** — every inaccessible path across all users: `[user] [path] [type] [error]`
+- **Server-side user filter** — filter by one or more users; PHP filters before paginating
+- **Item type filter** — filter by File / Directory / All (server-side)
+- **Path search** — debounced (350 ms) substring filter, processed server-side
+- **Numbered pagination** — resets to page 1 on any filter change
+- **User summary sidebar** — item counts per user (always reflects full unfiltered totals)
+- **CSV export** — Export Filtered (current filters) or Export All (raw dump)
+- **Backward-compatible API** — accepts both new flat format and old nested format
 
 ### UI / UX
-- **Dark glassmorphic theme** — `backdrop-filter: blur`, layered gradients, and CSS variable design tokens
-- **Micro-animations** — hover lifts, skeleton loading cards, fade-in transitions
-- **Fully responsive** — fluid Grid layout from ultra-wide monitors to mobile viewports
+- **Dark glassmorphic theme** — `backdrop-filter: blur`, layered gradients, CSS variable tokens
+- **Custom tooltip system** — `data-tooltip=""` attribute, auto-positions (flips/clamps at edges)
+- **Micro-animations** — hover lifts, skeleton loading, fade-in transitions
 - **SVG icons only** — no emoji, consistent cross-platform rendering
-- **Accessible** — ARIA roles, keyboard navigation for dropdown, focus indicators
+- **Accessible** — ARIA roles, keyboard navigation, focus-visible indicators
 
 ---
 
@@ -66,76 +65,76 @@ which generates the JSON reports this dashboard consumes.
 | Layer | Technology |
 |-------|-----------|
 | Frontend | HTML5, Vanilla JavaScript ES2020+, Vanilla CSS3 |
-| Backend | PHP 8+ (data aggregation & streaming API) |
+| Backend | PHP 5.4+ (aggregation & streaming API) |
 | Charts | [Chart.js](https://www.chartjs.org/) via CDN |
 | Data source | JSON files generated by [check_disk](https://github.com/hyhy2001/check_disk) |
+
+### Unified API — `api.php`
+
+All data endpoints are consolidated into a single `api.php`. The `?type=` parameter selects the
+operation; `?id=` maps to a disk via `disks.json` (path never exposed to the client).
+
+#### `?id=<disk_id>` (default — snapshot + history)
+
+Returns combined JSON with `history[]`, `latest` snapshot, team usage, user usage, top directories.
+
+#### `?id=<disk_id>&type=permissions` — Permission issues (paginated)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `offset` | `0` | Row offset |
+| `limit` | `100` | Rows per page (max 9999 for CSV export) |
+| `users` | _(omit)_ | Comma-separated usernames for server-side filter |
+| `item_type` | _(omit)_ | `file` \| `directory` — server-side type filter |
+| `path` | _(omit)_ | Substring match on path (server-side) |
+
+**Response:** `{ total, items[], user_summary{}, error_summary{} }`
+
+#### `?id=<disk_id>&type=users` — User list
+
+Returns `{ users: [{name, used}] }` — all users with detail reports for this disk.
+
+#### `?id=<disk_id>&type=dirs&user=<username>` — Directory report
+
+Returns the top-directory breakdown for a single user.
+
+#### `?id=<disk_id>&type=files&user=<username>&offset=N&limit=M` — Paginated file report
+
+Streams line-by-line (O(page_size) RAM, safe for 100 MB+ JSON files).
+
+### File Matching (Wildcard Support)
+
+The API auto-discovers report files using case-insensitive substring matching — no exact filenames
+required. Supported patterns:
+
+| File type | Matched patterns |
+|-----------|----------------|
+| Usage reports | `*disk_usage_report*.json`, `*usage_report*.json`, `report_*.json`, `report-*.json` |
+| Permission files | `*permission_issue*.json`, `*permission_issues*.json` (singular or plural, any prefix/suffix) |
+| Excluded | `*detail_report*.json` (per-user reports, separate endpoint) |
 
 ### Request Flow
 
 ```
 Browser
   │
-  ├── GET api.php?dir=...              <- aggregates disk_usage_report_*.json
-  │     PHP reads all dated reports,     returns combined timeline + latest snapshot
+  ├── GET api.php?id=disk_sda               ← snapshot + history
   │
-  ├── GET user_detail_api.php          <- list of users with detail reports
-  │     ?dir=...                          returns [username, ...]
+  ├── GET api.php?id=disk_sda&type=users    ← list users with detail reports
   │
-  ├── GET user_detail_api.php          <- full directory report for a user
-  │     ?dir=...&user=alice&type=dir      small file, loaded once
+  ├── GET api.php?id=disk_sda&type=dirs     ← top directories for a user
+  │     &user=alice
   │
-  ├── GET user_detail_api.php          <- paginated file report for a user
-  │     ?dir=...&user=alice              streams line-by-line, returns 500 rows/page
-  │     &type=file&offset=0&limit=500
+  ├── GET api.php?id=disk_sda&type=files    ← paginated file list for a user
+  │     &user=alice&offset=0&limit=500
   │
-  └── GET permission_api.php           <- paginated permission issues
-        ?dir=...&offset=0&limit=100       returns flat [{user,path,type,error}]
-        &users=alice,bob                  optional server-side user filter
+  └── GET api.php?id=disk_sda              ← paginated permission issues
+        &type=permissions                     with optional filters
+        &offset=0&limit=100
+        &users=alice,bob
+        &item_type=file
+        &path=/var/log
 ```
-
-### PHP API Endpoints
-
-#### `api.php` — Main aggregation
-
-| Parameter | Description |
-|-----------|-------------|
-| `dir` | Relative path to the disk report directory (`mock_reports/disk_sda`) |
-
-Returns a combined JSON object with `history[]`, `latest` snapshot, team usage, user usage,
-top directories, and other-user usage.
-
-#### `user_detail_api.php` — Per-user detail reports
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `dir` | — | Relative path to disk directory |
-| `user` | _(omit)_ | If omitted: returns list of users with detail reports |
-| `type` | — | `dir` \| `file` \| `both` |
-| `offset` | `0` | Row offset for pagination (file reports only) |
-| `limit` | `500` | Rows per page, max `2000` |
-
-**Pagination** (`type=file`):
-- Reads files line-by-line with brace-depth tracking — safe for 100 MB+ JSON files
-- `has_more: true` when `returned_count >= limit` (reliable end-of-file detection)
-- Works for both `indent=2` (multi-line per entry) and single-line-per-entry formats
-
-#### `permission_api.php` — Permission issues (paginated)
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `dir` | — | Relative path to disk directory |
-| `offset` | `0` | Row offset for pagination |
-| `limit` | `100` | Rows per page, max `5000` |
-| `users` | _(omit)_ | Comma-separated usernames for server-side filter (e.g. `alice,bob,__unknown__`) |
-
-**Response fields:**
-- `total` — item count after user filter (before pagination)
-- `items` — flat array `[{user, path, type, error}]` for the current page
-- `user_summary` — `{username: count}` for ALL users (always unfiltered, for sidebar)
-- `has_more` — `true` if more pages remain
-
-**Backward-compatible:** accepts both new flat format (`items: []`) and old nested
-format (`users[].inaccessible_items[]`) — flattened on-the-fly with no data loss.
 
 ---
 
@@ -143,7 +142,7 @@ format (`users[].inaccessible_items[]`) — flattened on-the-fly with no data lo
 
 ### Requirements
 
-- Linux web server (Nginx or Apache) with **PHP 8+** and `php-fpm` (or `mod_php`)
+- Linux web server (Nginx or Apache) with **PHP 5.4+** and `php-fpm` or `mod_php`
 - The companion [check_disk](https://github.com/hyhy2001/check_disk) scanner to generate reports
 - Web server process must have **read access** to the report directories
 
@@ -155,16 +154,17 @@ git clone https://github.com/hyhy2001/disk_usage.git
 cd disk_usage
 
 # 2. Configure disks
-cp disks.json.example disks.json   # or edit disks.json directly
-# Add an entry for each storage volume pointing to its report directory
+# Edit disks.json — add an entry for each storage volume:
+# {
+#   "id":   "disk_sda",
+#   "name": "Primary Storage",
+#   "path": "mock_reports/disk_sda"
+# }
 
-# 3. Nginx example (serve the directory with PHP)
-#    Ensure index.html is served and .php files pass through php-fpm
-
-# 4. Generate mock data (optional, for testing)
+# 3. Generate mock data (optional, for testing)
 python3 generate_mock_json.py
 
-# 5. Open in browser
+# 4. Open in browser
 # http://your-server/disk_usage/
 ```
 
@@ -173,19 +173,27 @@ python3 generate_mock_json.py
 ```json
 [
   {
+    "id":   "disk_nvme0",
     "name": "Primary NVMe",
-    "dir":  "mock_reports/disk_nvme0"
+    "path": "mock_reports/disk_nvme0"
   },
   {
+    "id":   "disk_sda",
     "name": "Archive HDD Array",
-    "dir":  "mock_reports/disk_sda"
+    "path": "mock_reports/disk_sda"
   }
 ]
 ```
 
-Each `dir` is a relative path (from the web root) to a directory containing:
+- `id` — unique identifier used in API calls (`?id=disk_sda`), never exposes the real path
+- `name` — display name shown in the disk selector
+- `path` — relative path from the web root to the disk report directory
+
+Each `path` directory should contain:
 - `disk_usage_report*.json` — one or more dated reports from check_disk
-- `detail_users/` — per-user directory and file JSON reports
+- `permission_issue*.json` — permission scan output (optional)
+- `detail_report_dir_<user>.json` — per-user directory breakdown (optional)
+- `detail_report_file_<user>.json` — per-user file list (optional, can be 100 MB+)
 
 ---
 
@@ -196,37 +204,35 @@ disk_usage/
 │
 ├── index.html                  # Single-page app container
 ├── disks.json                  # Disk volume configuration
-│
-├── api.php                     # Aggregates all report JSONs for a disk
-├── user_detail_api.php         # Paginated per-user detail report API
+├── api.php                     # Unified API (all endpoints)
 │
 ├── css/
-│   ├── variables.css           # Design tokens (colours, spacing, radii)
-│   ├── base.css                # Reset, typography, layout primitives
-│   ├── components.css          # Cards, tables, badges, pagination, skeletons
-│   └── animations.css          # Keyframes and transition utilities
+│   ├── index.css               # Design tokens (colours, spacing, radii)
+│   ├── layout.css              # Page layout, sidebar, responsive grid
+│   └── components.css          # Cards, tables, badges, tooltips, skeletons
 │
 ├── js/
 │   ├── main.js                 # App bootstrap, AppState, tab routing
-│   ├── diskSelector.js         # Multi-disk dropdown and auto-load
-│   ├── dataStore.js            # Centralised data cache and fetch orchestration
+│   ├── dataFetcher.js          # Fetch orchestration, disk switching, progress
+│   ├── dataStore.js            # Centralised data cache
 │   ├── chartManager.js         # Chart.js wrapper (line, doughnut, bar)
-│   ├── overviewRenderer.js     # Overview tab: summary cards + charts
-│   ├── usersRenderer.js        # Users tab: table, sort, filter
-│   ├── historyRenderer.js      # History tab: time-series charts + deltas
-│   ├── userDetailRenderer.js   # Detail tab: user picker, dir card, file card, pagination
-│   └── formatters.js           # fmt(), fmtDate(), etc. — shared formatting utils
+│   ├── chartModal.js           # Fullscreen chart modal
+│   ├── detailRenderer.js       # Snapshot + History tabs
+│   ├── userDetailRenderer.js   # Detail User tab (picker, dir/file cards, beta banner)
+│   ├── permissionRenderer.js   # Permission Issues tab (filters, pagination)
+│   ├── csvExport.js            # Shared CSV download utility (downloadCsv, toCsv)
+│   ├── tooltip.js              # Singleton JS tooltip (auto-positions, viewport-aware)
+│   ├── formatters.js           # fmt(), fmtDate(), fmtDateSec() — shared utils
+│   ├── themeToggle.js          # Dark / light mode toggle
+│   └── scrollToTop.js          # Scroll-to-top FAB
 │
 ├── generate_mock_json.py       # Generates realistic mock report data for testing
 │
 └── mock_reports/               # Auto-generated mock data (gitignored)
-    ├── disk_nvme0/
-    │   ├── disk_usage_report_*.json
-    │   └── detail_users/
-    │       ├── detail_report_dir_alice.json
-    │       └── detail_report_file_alice.json
     └── disk_sda/
-        └── ...
+        ├── disk_usage_report_20260322.json
+        ├── permission_issues_20260322.json
+        └── detail_report_dir_user1.json
 ```
 
 ---
@@ -236,41 +242,61 @@ disk_usage/
 ### Generate fresh mock data
 
 ```bash
-# Default: 10 disks, 20 users per disk, 2500 files per user (5 pages)
+# Default: multiple disks, ~20 users per disk, 2500 files per user
 python3 generate_mock_json.py
 
 # After changing user counts or format, always regenerate:
 python3 generate_mock_json.py && echo "Done"
 ```
 
-### Lint & test
+### API testing
 
-There are no build steps. Edit files directly and refresh the browser.
-
-For PHP API testing:
 ```bash
-curl "http://localhost/disk_usage/user_detail_api.php?dir=mock_reports/disk_nvme0&user=user1&type=file&offset=0&limit=500" | python3 -m json.tool | head -30
+# Snapshot + history
+curl "http://localhost/disk_usage/api.php?id=disk_sda" | base64 -d | python3 -m json.tool | head -30
+
+# Permission issues with filters
+curl "http://localhost/disk_usage/api.php?id=disk_sda&type=permissions&item_type=file&path=/var/log&limit=10" \
+  | base64 -d | python3 -m json.tool
+
+# Per-user files (paginated)
+curl "http://localhost/disk_usage/api.php?id=disk_sda&type=files&user=user1&offset=0&limit=50" \
+  | base64 -d | python3 -m json.tool | head -30
 ```
+
+### CSV Export
+
+Each data tab exposes export buttons:
+
+| Tab | Button | Behaviour |
+|-----|--------|-----------|
+| Permission Issues | Export Filtered | Downloads all items matching current user/type/path filters |
+| Permission Issues | Export All | Downloads raw full permission report |
+| Detail User | CSV (in card header) | Downloads dirs or files for the currently selected user |
+| Detail User | Dirs CSV / Files CSV (picker bar) | Downloads dirs or files for all users |
+
+Files are named `permissions_<disk_id>_filtered.csv`, `dirs_<disk_id>_<user>.csv`, etc.
 
 ---
 
-## 🗺️ Data Flow (Detail)
+## 🗺️ Data Flow
 
 ```
 check_disk (CLI, server-side)
-  └── Scans filesystem, produces JSON in report_dir/
-        ├── disk_usage_report_20260322.json
-        └── detail_users/
-              ├── detail_report_dir_alice.json   (< 1 MB, all dirs)
-              └── detail_report_file_alice.json  (can be 100 MB+, all files sorted by size)
+  └── Scans filesystem → writes JSON to report_dir/
+        ├── disk_usage_report_20260322.json      (snapshot + dirs + users)
+        ├── permission_issues_20260322.json       (inaccessible paths)
+        └── detail_report_file_alice.json         (can be 100 MB+, all files)
 
-user_detail_api.php (PHP, web-server)
-  └── Reads file_report line-by-line (O(page_size) RAM)
-        └── Returns 500 rows + has_more flag
+api.php (PHP, web server)
+  ├── Aggregates all disk_usage_report*.json → history timeline
+  ├── Streams detail_report_file_*.json line-by-line → O(page_size) RAM
+  └── Filters permission_issue*.json server-side → paginated JSON
 
-userDetailRenderer.js (Browser JS)
-  └── Fetches page 1 on user select
-  └── Numbered pagination: click page N → fetch offset=(N-1)×500, replace list
+Browser (Vanilla JS, no framework)
+  ├── Renders charts via Chart.js
+  ├── Paginates large lists in-place (no full reload)
+  └── Generates CSV entirely client-side from API JSON
 ```
 
 ---
