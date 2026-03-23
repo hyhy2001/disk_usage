@@ -1,7 +1,21 @@
 import json
+import re
 import random
 import os
 from datetime import datetime, timedelta
+
+
+def _compact_json(obj, indent: int = 4) -> str:
+    """Serialize JSON with plain-dict list items on a single line each."""
+    raw = json.dumps(obj, indent=indent, ensure_ascii=False)
+    pattern = re.compile(r"\{[^{}\[\]]*\}", re.DOTALL)
+    def collapse(m):
+        inner = m.group(0)
+        if "{" not in inner[1:] and "[" not in inner:
+            return re.sub(r"\s+", " ", inner).strip()
+        return inner
+    return pattern.sub(collapse, raw)
+
 
 DISK_CONFIGS = [
     # ── Existing disks ──────────────────────────────────────────────────────
@@ -255,8 +269,8 @@ def generate_permission_issues():
         }
 
         fname = f"permission_issues_{last_date}.json"
-        with open(os.path.join(output_dir, fname), "w") as f:
-            json.dump(payload, f, indent=4)
+        with open(os.path.join(output_dir, fname), "w", encoding="utf-8") as f:
+            f.write(_compact_json(payload))
 
         n_users = len(affected)
         print(f"🔒 permission_issues → {output_dir}/{fname}  ({n_users} users, {len(all_items)} items)")
