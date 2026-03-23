@@ -32,7 +32,7 @@
         <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
 
         <!-- Scroll to Top FAB — appears after scrolling down 300px in .main-content -->
-        <button id="btn-scroll-top" class="scroll-top-fab" aria-label="Scroll to top" title="Cuộn lên đầu trang">
+        <button id="btn-scroll-top" class="scroll-top-fab" aria-label="Scroll to top" data-tooltip="Back to the top" data-tooltip-pos="bottom">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M18 15l-6-6-6 6"/>
             </svg>
@@ -52,14 +52,14 @@
                         <span>Disk<span class="text-accent"> Usage</span></span>
                     </div>
                     <div class="brand-actions">
-                        <button id="btn-theme-toggle" class="theme-toggle-btn" title="Toggle light/dark mode" aria-label="Toggle theme">
+                        <button id="btn-theme-toggle" class="theme-toggle-btn" data-tooltip="Switch to dark / light mode" aria-label="Toggle theme">
                             <svg class="icon-moon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                             <svg class="icon-sun" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
                             <span class="toggle-label label-dark">Dark</span>
                             <span class="toggle-label label-light">Light</span>
                         </button>
                         <!-- Close button (mobile drawer only) -->
-                        <button id="btn-sidebar-close" class="sidebar-close-btn" aria-label="Close navigation" title="Close sidebar">
+                        <button id="btn-sidebar-close" class="sidebar-close-btn" aria-label="Close navigation" data-tooltip="Collapse sidebar">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                                 <line x1="18" y1="6" x2="6" y2="18"/>
                                 <line x1="6" y1="6" x2="18" y2="18"/>
@@ -87,7 +87,7 @@
             <!-- Disk Selector -->
             <div class="disk-selector-wrap">
                 <!-- Icon trigger for icon-only sidebar mode (640-960px) -->
-                <button class="disk-icon-trigger has-active" id="btn-disk-icon" title="Switch active disk" aria-label="Select disk">
+                <button class="disk-icon-trigger has-active" id="btn-disk-icon" data-tooltip="Choose a disk to inspect" aria-label="Select disk">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <ellipse cx="12" cy="5" rx="9" ry="3"/>
                         <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
@@ -149,7 +149,7 @@
             <!-- Row 1: disk name · path · quick stats (all inline) -->
             <div class="header-top-row">
                 <div class="header-identity">
-                    <button id="btn-hamburger" class="hamburger-btn" aria-label="Toggle navigation" title="Toggle sidebar">
+                    <button id="btn-hamburger" class="hamburger-btn" aria-label="Toggle navigation" data-tooltip="Toggle sidebar">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                             <line x1="3" y1="6" x2="21" y2="6"/>
                             <line x1="3" y1="12" x2="21" y2="12"/>
@@ -224,7 +224,7 @@
                                 <button class="range-btn" data-range="1825">5Y</button>
                                 <button class="range-btn active" data-range="all">All</button>
                             </div>
-                            <button class="chart-expand-btn" data-chart="timeline" title="Expand chart" aria-label="Expand chart"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                            <button class="chart-expand-btn" data-chart="timeline" data-tooltip="Open full-screen chart view" aria-label="Open full-screen chart view"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                         </div>
                     </div>
                     <div class="canvas-wrapper">
@@ -238,7 +238,7 @@
                 <div class="chart-container glass-panel">
                     <div class="panel-header">
                         <h2>Usage by Teams</h2>
-                        <button class="chart-expand-btn" data-chart="team" title="Expand chart" aria-label="Expand chart"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                        <button class="chart-expand-btn" data-chart="team" data-tooltip="Open full-screen chart view" aria-label="Open full-screen chart view"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                     </div>
                     <div class="canvas-wrapper">
                         <canvas id="teamChart"></canvas>
@@ -250,8 +250,8 @@
                     <div class="panel-header">
                         <h2>Top Consuming Users</h2>
                         <div class="flex-row-g6">
-                            <button id="users-scale-btn" class="scale-toggle-btn" title="Toggle log/linear scale">Lin</button>
-                            <button class="chart-expand-btn" data-chart="users" title="Expand chart" aria-label="Expand chart"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                            <button id="users-scale-btn" class="scale-toggle-btn" data-tooltip="Switch log / linear scale">Lin</button>
+                            <button class="chart-expand-btn" data-chart="users" data-tooltip="Open full-screen chart view" aria-label="Open full-screen chart view"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                         </div>
                     </div>
                     <div class="canvas-wrapper">
@@ -330,7 +330,7 @@
                                             <div class="flex-row-g6">
                                                 <span class="history-chart-stat" id="history-total-stat"></span>
                                                 <button id="btn-scale-toggle" class="scale-toggle-btn" data-scale="linear">Log</button>
-                                                <button class="chart-expand-btn" data-chart="trend" title="Expand chart" aria-label="Expand chart"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                                                <button class="chart-expand-btn" data-chart="trend" data-tooltip="Open full-screen chart view" aria-label="Open full-screen chart view"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                                             </div>
                                         </div>
                                         <div class="history-chart-body">
@@ -342,8 +342,8 @@
                                             <span class="history-chart-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Fastest Growing Users</span>
                                             <div class="flex-row-g6">
                                                 <span class="history-chart-stat" id="history-growers-stat"></span>
-                                                <button id="growers-scale-btn" class="scale-toggle-btn" title="Toggle log/linear scale">Lin</button>
-                                                <button class="chart-expand-btn" data-chart="growers" title="Expand chart" aria-label="Expand chart"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                                                <button id="growers-scale-btn" class="scale-toggle-btn" data-tooltip="Switch log / linear scale">Lin</button>
+                                                <button class="chart-expand-btn" data-chart="growers" data-tooltip="Open full-screen chart view" aria-label="Open full-screen chart view"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                                             </div>
                                         </div>
                                         <div class="history-chart-body">
@@ -403,6 +403,7 @@
     <script src="js/chartModal.js?v=32" type="module"></script>
     <script src="js/themeToggle.js?v=32"></script>
     <script src="js/scrollToTop.js?v=32" type="module"></script>
+    <script src="js/tooltip.js?v=1"></script>
 </body>
 </html>
 

@@ -52,11 +52,9 @@ class DataFetcher {
         if (userDetailTab) {
             userDetailTab.addEventListener('click', () => {
                 if (this._activeDisk) {
-                    const diskConf = this.disksConfig?.find(d => d.id === this._activeDisk);
-                    const diskPath = diskConf?.path || this._activeDisk;
                     const otherUsers = (this.dataStore?.latestSnapshot?.other || [])
                         .map(o => ({ name: o.name, used: o.used }));
-                    initUserDetailTab(diskPath, otherUsers);
+                    initUserDetailTab(this._activeDisk, otherUsers);
                 }
             });
         }
@@ -214,9 +212,7 @@ class DataFetcher {
 
             UINodes.statusText.textContent = "Connecting to API...";
             // Get disk path from disksConfig
-            const diskConf = this.disksConfig?.find(d => d.id === this._activeDisk);
-            const diskPath = diskConf?.path || this._activeDisk;
-            const response = await fetch(`api.php?dir=${encodeURIComponent(diskPath)}&type=reports`);
+            const response = await fetch(`api.php?id=${encodeURIComponent(this._activeDisk)}`);
             if (!response.ok) throw new Error(`HTTP error ${response.status} from api.php.`);
             const jsonResponse = await response.json();
             
@@ -287,16 +283,13 @@ class DataFetcher {
                 </div>`;
         }
         try {
-            const diskConf = this.disksConfig?.find(d => d.id === this._activeDisk);
-            const diskPath = diskConf?.path || this._activeDisk;
-            const res = await fetch(`api.php?dir=${encodeURIComponent(diskPath)}&t=p`);
+            const res = await fetch(`api.php?id=${encodeURIComponent(this._activeDisk)}&type=permissions`);
             const json = JSON.parse(atob(await res.text()));
 
             if (json?.status === 'success') {
                 this._permissionsLoaded = true;
-                this.dataStore.permissionIssues = json.data ?? null;
                 document.dispatchEvent(new CustomEvent('permissionsLoaded', {
-                    detail: json.data ? { diskDir: diskPath, ...json.data } : { diskDir: diskPath },
+                    detail: json.data ? { diskId: this._activeDisk, ...json.data } : { diskId: this._activeDisk },
                 }));
             } else {
                 if (permBody) {

@@ -1,3 +1,76 @@
+/* ==========================================================================
+   CUSTOM TOOLTIP — driven by tooltip.js
+   Singleton <div id="js-tooltip"> appended to <body>.
+   Reads data-tooltip="" on any element. Immune to stacking context.
+   ========================================================================== */
+
+#js-tooltip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 99999;
+    /* Solid dark background — no backdrop-filter (causes blur rectangle artifact) */
+    background: rgba(10, 14, 22, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 8px;
+    padding: 6px 11px;
+    /* Typography */
+    font-size: 0.71rem;
+    font-weight: 500;
+    font-family: inherit;
+    color: #e2e8f0;
+    letter-spacing: 0.015em;
+    line-height: 1.4;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.04);
+    /* Hidden by default */
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+#js-tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Downward arrow (tooltip above element) */
+#js-tooltip[data-arrow="down"]::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: rgba(255, 255, 255, 0.13);
+}
+
+/* Upward arrow (tooltip below element) */
+#js-tooltip[data-arrow="up"]::after {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-bottom-color: rgba(255, 255, 255, 0.13);
+}
+
+/* Light mode */
+:root[data-theme='light'] #js-tooltip {
+    background: rgba(15, 20, 30, 0.90);
+    border-color: rgba(0, 0, 0, 0.2);
+    color: #f1f5f9;
+}
+:root[data-theme='light'] #js-tooltip[data-arrow="down"]::after {
+    border-top-color: rgba(0, 0, 0, 0.2);
+}
+:root[data-theme='light'] #js-tooltip[data-arrow="up"]::after {
+    border-bottom-color: rgba(0, 0, 0, 0.2);
+}
+
+
 /* Glassmorphism Panel Component */
 .glass-panel {
     background: var(--bg-surface);
@@ -1303,54 +1376,6 @@
 }
 :root:not([data-theme='light']) .pivot-mini-bar {
     background: rgba(255,255,255,0.08);
-}
-
-/* -- Custom tooltip (matches Chart.js dark style) -- */
-[data-tooltip] {
-    position: relative;
-    cursor: default;
-}
-
-[data-tooltip]::before {
-    content: attr(data-tooltip);
-    position: absolute;
-    bottom: calc(100% + 8px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(10, 13, 18, 0.96);
-    color: #e2e8f0;
-    font-size: 0.75rem;
-    font-family: 'Inter', sans-serif;
-    font-weight: 500;
-    white-space: nowrap;
-    padding: 5px 10px;
-    border-radius: 6px;
-    border: 1px solid rgba(14,165,233,0.3);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.15s ease;
-    z-index: 100;
-}
-
-/* Arrow */
-[data-tooltip]::after {
-    content: '';
-    position: absolute;
-    bottom: calc(100% + 3px);
-    left: 50%;
-    transform: translateX(-50%);
-    border: 5px solid transparent;
-    border-top-color: rgba(14,165,233,0.3);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.15s ease;
-    z-index: 100;
-}
-
-[data-tooltip]:hover::before,
-[data-tooltip]:hover::after {
-    opacity: 1;
 }
 
 
@@ -3091,12 +3116,76 @@
 }
 .user-filter-search:focus { border-color: rgba(245,158,11,0.4); }
 
-/* Wraps both search inputs; goes side-by-side on mobile via responsive CSS */
-.perm-filter-searches {
+/* Wraps each filter group (type, path, users) */
+.perm-filter-section {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
 }
+.perm-filter-section:last-child { border-bottom: none; padding-bottom: 0; }
+
+.perm-filter-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+/* File / Dir type toggle buttons */
+.perm-type-group {
+    display: flex;
+    gap: 4px;
+}
+
+.perm-type-btn {
+    flex: 1;
+    padding: 4px 6px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.14s;
+    letter-spacing: 0.03em;
+}
+.perm-type-btn:hover { background: rgba(255,255,255,0.09); color: var(--text-primary); }
+.perm-type-btn.active {
+    background: rgba(14,165,233,0.15);
+    border-color: rgba(14,165,233,0.4);
+    color: #38bdf8;
+}
+
+:root[data-theme='light'] .perm-type-btn {
+    background: rgba(0,0,0,0.04);
+    border-color: rgba(0,0,0,0.08);
+    color: #6B7280;
+}
+:root[data-theme='light'] .perm-type-btn:hover {
+    background: rgba(0,0,0,0.08);
+    color: #374151;
+}
+:root[data-theme='light'] .perm-type-btn.active {
+    background: rgba(14,165,233,0.11);
+    border-color: rgba(14,165,233,0.35);
+    color: #0369a1;
+}
+
+/* Extend sidebar height for the extra sections */
+.user-filter-box { max-height: 580px; }
+
+.user-filter-footer .user-bar-btn { flex: 1; text-align: center; }
+
+
 
 .user-filter-list {
     flex: 1;
@@ -3109,6 +3198,7 @@
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.1) transparent;
 }
+
 
 .user-filter-item {
     display: flex;
@@ -4249,8 +4339,31 @@
 .ud-picker-hint {
     font-size: 0.75rem;
     color: var(--text-secondary);
-    margin-left: auto;
     white-space: nowrap;
+}
+
+/* Export all buttons group in the user picker bar */
+.ud-picker-export {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    border-left: 1px solid rgba(255,255,255,0.08);
+    padding-left: 12px;
+}
+
+.ud-picker-export-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    white-space: nowrap;
+}
+
+:root[data-theme='light'] .ud-picker-export {
+    border-left-color: rgba(0,0,0,0.09);
 }
 
 /* Two-column grid for cards */
@@ -4288,6 +4401,83 @@
     font-size: 0.72rem;
     color: var(--text-secondary);
     white-space: nowrap;
+}
+
+/* Groups badge + export buttons on the right side of card headers */
+.ud-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* Small CSV export button inside card headers (user detail) */
+.ud-export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.14s;
+    white-space: nowrap;
+    letter-spacing: 0.03em;
+}
+.ud-export-btn:hover {
+    background: rgba(16,185,129,0.12);
+    border-color: rgba(16,185,129,0.3);
+    color: #34d399;
+}
+.ud-export-btn:disabled { opacity: .5; cursor: wait; }
+
+/* Export buttons group in permission meta bar */
+.perm-export-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: auto;
+}
+
+.perm-export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-secondary);
+    font-size: 0.73rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.14s;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+}
+.perm-export-btn:hover {
+    background: rgba(16,185,129,0.12);
+    border-color: rgba(16,185,129,0.35);
+    color: #34d399;
+}
+.perm-export-btn:disabled { opacity: .5; cursor: wait; }
+
+/* Light mode overrides */
+:root[data-theme='light'] .ud-export-btn,
+:root[data-theme='light'] .perm-export-btn {
+    background: rgba(0,0,0,0.04);
+    border-color: rgba(0,0,0,0.09);
+    color: #6B7280;
+}
+:root[data-theme='light'] .ud-export-btn:hover,
+:root[data-theme='light'] .perm-export-btn:hover {
+    background: rgba(5,150,105,0.10);
+    border-color: rgba(5,150,105,0.3);
+    color: #059669;
 }
 
 /* Path list */
@@ -4385,6 +4575,93 @@
 .ud-empty-state p  { font-size: 0.83rem; color: var(--text-secondary); margin: 0; max-width: 300px; }
 
 /* Error */
+/* ── Beta / early-access notice banner ───────────────────────────────────── */
+.ud-beta-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    border-radius: 12px;
+    background: rgba(245, 158, 11, 0.07);
+    border: 1px solid rgba(245, 158, 11, 0.22);
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.06);
+    max-height: 120px;          /* for collapse animation */
+    overflow: hidden;
+}
+
+.ud-beta-banner-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.ud-beta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+    padding: 3px 9px;
+    border-radius: 20px;
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #fbbf24;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+
+.ud-beta-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.ud-beta-text strong {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #fcd34d;
+}
+
+.ud-beta-text span {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.ud-beta-close {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    background: transparent;
+    color: #fbbf24;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.15s, background 0.15s;
+}
+.ud-beta-close:hover {
+    opacity: 1;
+    background: rgba(245, 158, 11, 0.12);
+}
+
+/* Light mode */
+:root[data-theme='light'] .ud-beta-banner {
+    background: rgba(245, 158, 11, 0.06);
+    border-color: rgba(245, 158, 11, 0.25);
+}
+:root[data-theme='light'] .ud-beta-text strong { color: #b45309; }
+:root[data-theme='light'] .ud-beta-chip { color: #92400e; background: rgba(245,158,11,0.12); }
+:root[data-theme='light'] .ud-beta-close { color: #b45309; border-color: rgba(180,83,9,0.2); }
+
 .ud-error {
     padding: 16px;
     border-radius: 10px;

@@ -15,7 +15,7 @@ function buildModal() {
             <div class="chart-modal-header">
                 <span class="chart-modal-title" id="chart-modal-title"></span>
                 <div class="chart-modal-actions">
-                    <button class="chart-modal-btn" id="btn-modal-download" title="Download as PNG">
+                    <button class="chart-modal-btn" id="btn-modal-download" data-tooltip="Save chart as PNG image">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
@@ -23,7 +23,7 @@ function buildModal() {
                         </svg>
                         PNG
                     </button>
-                    <button class="chart-modal-btn chart-modal-close" id="btn-modal-close" title="Close (Esc)">✕</button>
+                    <button class="chart-modal-btn chart-modal-close" id="btn-modal-close" data-tooltip="Close (Esc)">✕</button>
                 </div>
             </div>
             <div class="chart-modal-body">

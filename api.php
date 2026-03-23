@@ -1,203 +1,321 @@
 <?php
-// api.php - Unified API endpoint (PHP 5.4+ compatible)
+// api.php - Disk Usage API (PHP 5.4+)
 //
-// Usage:
-//   ?dir=path              -> main disk data (plain JSON)
-//   ?dir=path&t=p          -> permission issues (base64 JSON)
-//   ?dir=path&t=u          -> user list (base64 JSON)
-//   ?dir=path&t=d&u=alice  -> user dir report (base64 JSON)
-//   ?dir=path&t=f&u=alice&o=0&n=500 -> user file report (base64 JSON)
+// All endpoints use ?id=<disk_id> (resolved server-side via disks.json).
+// The relative path is never exposed to the browser.
 //
-// Params (short/WAF-safe):
-//   t  - type: p=permission, u=users, d=dir, f=file
-//   u  - username
-//   o  - offset (default 0)
-//   n  - limit  (default 500, max 2000)
+// Endpoints:
+//   ?id=<disk_id>                                       -> main disk reports (plain JSON)
+//   ?id=<disk_id>&type=permissions                      -> paginated permission issues (base64 JSON)
+//   ?id=<disk_id>&type=permissions&offset=0&limit=100  -> with pagination
+//   ?id=<disk_id>&type=permissions&users=alice,bob      -> with user filter
+//   ?id=<disk_id>&type=users                            -> list users with detail reports (base64 JSON)
+//   ?id=<disk_id>&type=dirs&user=alice                  -> user directory report (base64 JSON)
+//   ?id=<disk_id>&type=files&user=alice&offset=0&limit=500 -> paginated file report (base64 JSON)
 
-function _g($arr, $key, $default) {
-    return isset($arr[$key]) ? $arr[$key] : $default;
+// =============================================================================
+// Helpers
+// =============================================================================
+
+function param($key, $default) {
+    return isset($_GET[$key]) ? $_GET[$key] : $default;
 }
 
-$baseDir = __DIR__;
-$reqDir  = isset($_GET['dir']) ? trim($_GET['dir'], '/\\') : '';
-$t       = isset($_GET['t'])   ? $_GET['t']               : '';
+function get_int($key, $default, $min, $max) {
+    return min($max, max($min, (int)param($key, $default)));
+}
 
-if (strpos($reqDir, '..') !== false || $reqDir === '') {
-    http_response_code(403);
-    echo 'Access denied.';
+function sanitize_name($raw) {
+    return preg_replace('/[^a-zA-Z0-9_\-]/', '', $raw);
+}
+
+function b64_success($data) {
+    echo base64_encode(json_encode(array('status' => 'success', 'data' => $data)));
     exit;
 }
 
-$rawPath = $baseDir . DIRECTORY_SEPARATOR . $reqDir;
+function b64_error($message, $code) {
+    http_response_code($code);
+    echo base64_encode(json_encode(array('status' => 'error', 'message' => $message)));
+    exit;
+}
 
-if (!is_dir($rawPath) && !is_link($rawPath)) {
+function json_success($data) {
+    echo json_encode($data);
+    exit;
+}
+
+// =============================================================================
+// Disk ID → Path resolution (via disks.json)
+// =============================================================================
+
+$req_id = sanitize_name(param('id', ''));
+
+if ($req_id === '') {
+    http_response_code(400);
+    echo 'Missing disk id.';
+    exit;
+}
+
+$disks_file = __DIR__ . DIRECTORY_SEPARATOR . 'disks.json';
+$disks_raw  = @file_get_contents($disks_file);
+$disks      = ($disks_raw !== false) ? json_decode($disks_raw, true) : array();
+
+$disk_entry = null;
+if (is_array($disks)) {
+    foreach ($disks as $d) {
+        if (isset($d['id']) && $d['id'] === $req_id) {
+            $disk_entry = $d;
+            break;
+        }
+    }
+}
+
+if (!$disk_entry || empty($disk_entry['path'])) {
     http_response_code(404);
-    echo 'Directory not found.';
+    echo 'Disk not found.';
+    exit;
+}
+
+$disk_path = __DIR__ . DIRECTORY_SEPARATOR . trim($disk_entry['path'], '/\\');
+
+if (!is_dir($disk_path) && !is_link($disk_path)) {
+    http_response_code(404);
+    echo 'Disk directory not found.';
     exit;
 }
 
 header('Content-Type: text/plain; charset=utf-8');
 
-// -----------------------------------------------------------------------------
-// t=p  permission issues
-// -----------------------------------------------------------------------------
-if ($t === 'p') {
-    $dh = @opendir($rawPath);
-    $pf = array();
+$type = param('type', '');
+
+// =============================================================================
+// type=permissions  — paginated permission issues
+// =============================================================================
+if ($type === 'permissions') {
+    $offset      = get_int('offset', 0,   0,    PHP_INT_MAX);
+    $limit       = get_int('limit',  100, 1,    5000);
+    $users_raw   = trim(param('users', ''));
+    $user_filter = ($users_raw !== '') ? explode(',', $users_raw) : array();
+    $item_type   = trim(param('item_type', ''));   // 'file' | 'directory' | ''
+    $path_query  = trim(param('path', ''));         // substring match on path
+
+    // Find newest permission_issues*.json
+    $perm_file  = null;
+    $perm_mtime = 0;
+    $dh = @opendir($disk_path);
     while ($dh && ($f = readdir($dh)) !== false) {
         if (strpos($f, 'permission_issues') !== false && substr($f, -5) === '.json') {
-            $fp = $rawPath . DIRECTORY_SEPARATOR . $f;
-            $pf[$fp] = @filemtime($fp);
+            $fp = $disk_path . DIRECTORY_SEPARATOR . $f;
+            $mt = @filemtime($fp);
+            if ($mt > $perm_mtime) { $perm_file = $fp; $perm_mtime = $mt; }
         }
     }
     if ($dh) closedir($dh);
-    arsort($pf);
-    $latest = !empty($pf) ? key($pf) : null;
 
-    $data = null;
-    if ($latest) {
-        $c = file_get_contents($latest);
-        if ($c !== false) {
-            $raw2  = json_decode($c, true);
-            $iss   = _g($raw2, 'permission_issues', array());
-            if (isset($iss['items'])) {
-                $items = $iss['items'];
-            } else {
-                $items = array();
-                foreach (_g($iss, 'users', array()) as $u) {
-                    foreach (_g($u, 'inaccessible_items', array()) as $it) {
-                        $items[] = array(
-                            'user'  => _g($u,  'name',  ''),
-                            'path'  => _g($it, 'path',  ''),
-                            'type'  => _g($it, 'type',  ''),
-                            'error' => _g($it, 'error', ''),
-                        );
-                    }
-                }
-                foreach (_g($iss, 'unknown_items', array()) as $it) {
-                    $items[] = array(
-                        'user'  => '__unknown__',
-                        'path'  => _g($it, 'path',  ''),
-                        'type'  => _g($it, 'type',  ''),
-                        'error' => _g($it, 'error', ''),
-                    );
-                }
+    if (!$perm_file) {
+        b64_success(null);
+    }
+
+    $raw_json = @file_get_contents($perm_file);
+    if ($raw_json === false) {
+        b64_error('Cannot read permission file.', 500);
+    }
+
+    $doc = json_decode($raw_json, true);
+    $iss = isset($doc['permission_issues']) ? $doc['permission_issues'] : array();
+
+    // Normalize: support both flat (items[]) and old nested (users[].inaccessible_items[])
+    if (isset($iss['items'])) {
+        $items = $iss['items'];
+    } else {
+        $items = array();
+        $users_list = isset($iss['users']) ? $iss['users'] : array();
+        foreach ($users_list as $u) {
+            $uname     = isset($u['name']) ? $u['name'] : '';
+            $uinaccess = isset($u['inaccessible_items']) ? $u['inaccessible_items'] : array();
+            foreach ($uinaccess as $it) {
+                $items[] = array(
+                    'user'  => $uname,
+                    'path'  => isset($it['path'])  ? $it['path']  : '',
+                    'type'  => isset($it['type'])  ? $it['type']  : '',
+                    'error' => isset($it['error']) ? $it['error'] : '',
+                );
             }
-            $data = array(
-                'date'      => _g($raw2, 'date',      null),
-                'directory' => _g($raw2, 'directory', null),
-                'total'     => count($items),
-                'items'     => $items,
+        }
+        $unknown = isset($iss['unknown_items']) ? $iss['unknown_items'] : array();
+        foreach ($unknown as $it) {
+            $items[] = array(
+                'user'  => '__unknown__',
+                'path'  => isset($it['path'])  ? $it['path']  : '',
+                'type'  => isset($it['type'])  ? $it['type']  : '',
+                'error' => isset($it['error']) ? $it['error'] : '',
             );
         }
     }
-    echo base64_encode(json_encode(array('status' => 'success', 'data' => $data)));
-    exit;
+
+    // Build user_summary and error_summary BEFORE filtering (always full totals)
+    $user_summary  = array();
+    $error_summary = array();
+    foreach ($items as $it) {
+        $u = isset($it['user'])  ? $it['user']  : '__unknown__';
+        $e = isset($it['error']) ? $it['error'] : '';
+        $user_summary[$u] = isset($user_summary[$u]) ? $user_summary[$u] + 1 : 1;
+        if ($e !== '') {
+            $error_summary[$e] = isset($error_summary[$e]) ? $error_summary[$e] + 1 : 1;
+        }
+    }
+
+    // Apply user filter
+    if (!empty($user_filter)) {
+        $uf    = $user_filter;
+        $items = array_values(array_filter($items, function ($it) use ($uf) {
+            return in_array(isset($it['user']) ? $it['user'] : '', $uf);
+        }));
+    }
+
+    // Apply item_type filter (file | directory)
+    if ($item_type === 'file' || $item_type === 'directory') {
+        $it_type = $item_type;
+        $items   = array_values(array_filter($items, function ($it) use ($it_type) {
+            return (isset($it['type']) ? $it['type'] : '') === $it_type;
+        }));
+    }
+
+    // Apply path substring filter (case-insensitive)
+    if ($path_query !== '') {
+        $pq    = strtolower($path_query);
+        $items = array_values(array_filter($items, function ($it) use ($pq) {
+            return strpos(strtolower(isset($it['path']) ? $it['path'] : ''), $pq) !== false;
+        }));
+    }
+
+    $total    = count($items);
+    $page     = array_slice($items, $offset, $limit);
+    $has_more = ($offset + count($page)) < $total;
+
+    b64_success(array(
+        'date'          => isset($doc['date'])      ? $doc['date']      : null,
+        'directory'     => isset($doc['directory']) ? $doc['directory'] : null,
+        'total'         => $total,
+        'offset'        => $offset,
+        'limit'         => $limit,
+        'has_more'      => $has_more,
+        'items'         => $page,
+        'user_summary'  => $user_summary,
+        'error_summary' => $error_summary,
+    ));
 }
 
-// -----------------------------------------------------------------------------
-// t=u  list users
-// -----------------------------------------------------------------------------
-if ($t === 'u') {
-    $dp = $rawPath . DIRECTORY_SEPARATOR . 'detail_users';
-    $us = array();
-    if (is_dir($dp)) {
-        $dh = @opendir($dp);
+// =============================================================================
+// type=users  — list users with detail reports
+// =============================================================================
+if ($type === 'users') {
+    $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
+    $users = array();
+    if (is_dir($detail_dir)) {
+        $dh = @opendir($detail_dir);
         while ($dh && ($f = readdir($dh)) !== false) {
             if (preg_match('/^detail_report_dir_(.+)\.json$/', $f, $m)) {
-                $us[] = $m[1];
+                $users[] = $m[1];
             }
         }
         if ($dh) closedir($dh);
-        sort($us);
+        sort($users);
     }
-    echo base64_encode(json_encode(array('status' => 'success', 'data' => array('users' => $us))));
-    exit;
+    b64_success(array('users' => $users));
 }
 
-// -----------------------------------------------------------------------------
-// t=d  user dir report
-// -----------------------------------------------------------------------------
-if ($t === 'd') {
-    $who = isset($_GET['u']) ? preg_replace('/[^a-zA-Z0-9_\-]/', '', $_GET['u']) : '';
-    $dp  = $rawPath . DIRECTORY_SEPARATOR . 'detail_users';
-    $f   = $dp . DIRECTORY_SEPARATOR . 'detail_report_dir_' . $who . '.json';
-    if (!is_file($f)) {
-        echo base64_encode(json_encode(array('status' => 'error', 'message' => 'no dir: ' . $who)));
-        exit;
+// =============================================================================
+// type=dirs  — full directory report for a user
+// =============================================================================
+if ($type === 'dirs') {
+    $who       = sanitize_name(param('user', ''));
+    $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
+    $file_path  = $detail_dir . DIRECTORY_SEPARATOR . 'detail_report_dir_' . $who . '.json';
+
+    if (!is_file($file_path)) {
+        b64_error('No directory report for user: ' . $who, 404);
     }
-    $c = file_get_contents($f);
-    echo base64_encode(json_encode(array(
-        'status' => 'success',
-        'data'   => array('dir' => ($c !== false ? json_decode($c, true) : null)),
-    )));
-    exit;
+
+    $c = file_get_contents($file_path);
+    b64_success(array('dir' => ($c !== false) ? json_decode($c, true) : null));
 }
 
-// -----------------------------------------------------------------------------
-// t=f  user file report (streaming paginated)
-// -----------------------------------------------------------------------------
-if ($t === 'f') {
-    $who = isset($_GET['u']) ? preg_replace('/[^a-zA-Z0-9_\-]/', '', $_GET['u']) : '';
-    $off = max(0,    (int)(isset($_GET['o']) ? $_GET['o'] : 0));
-    $lim = min(2000, max(1, (int)(isset($_GET['n']) ? $_GET['n'] : 500)));
-    $dp  = $rawPath . DIRECTORY_SEPARATOR . 'detail_users';
-    $f   = $dp . DIRECTORY_SEPARATOR . 'detail_report_file_' . $who . '.json';
-    if (!is_file($f)) {
-        echo base64_encode(json_encode(array('status' => 'error', 'message' => 'no file: ' . $who)));
-        exit;
+// =============================================================================
+// type=files  — paginated file report for a user (line-by-line streaming)
+// =============================================================================
+if ($type === 'files') {
+    $who        = sanitize_name(param('user', ''));
+    $offset     = get_int('offset', 0,   0,    PHP_INT_MAX);
+    $limit      = get_int('limit',  500, 1,    2000);
+    $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
+    $file_path  = $detail_dir . DIRECTORY_SEPARATOR . 'detail_report_file_' . $who . '.json';
+
+    if (!is_file($file_path)) {
+        b64_error('No file report for user: ' . $who, 404);
     }
-    $fh = @fopen($f, 'r');
-    $date = 0; $un = $who; $tf = 0; $tu = 0;
+
+    $fh = @fopen($file_path, 'r');
+
+    // Read header fields before the "files" array
+    $date = 0; $user_name = $who; $total_files = 0; $total_used = 0;
     while ($fh && ($ln = fgets($fh)) !== false) {
-        if      (preg_match('/"date"\s*:\s*(\d+)/', $ln, $m))          $date = (int)$m[1];
-        elseif  (preg_match('/"user"\s*:\s*"([^"]+)"/', $ln, $m))      $un   = $m[1];
-        elseif  (preg_match('/"total_files"\s*:\s*(\d+)/', $ln, $m))   $tf   = (int)$m[1];
-        elseif  (preg_match('/"total_used"\s*:\s*(\d+)/', $ln, $m))    $tu   = (int)$m[1];
+        if      (preg_match('/"date"\s*:\s*(\d+)/',        $ln, $m)) $date        = (int)$m[1];
+        elseif  (preg_match('/"user"\s*:\s*"([^"]+)"/',    $ln, $m)) $user_name   = $m[1];
+        elseif  (preg_match('/"total_files"\s*:\s*(\d+)/', $ln, $m)) $total_files = (int)$m[1];
+        elseif  (preg_match('/"total_used"\s*:\s*(\d+)/',  $ln, $m)) $total_used  = (int)$m[1];
         if (strpos($ln, '"files"') !== false && strpos($ln, '[') !== false) break;
     }
-    $idx = 0; $col = array(); $buf = ''; $dep = 0;
+
+    // Stream items with brace-depth parser — O(page_size) RAM
+    $idx = 0; $collected = array(); $buf = ''; $depth = 0;
     while ($fh && ($ln = fgets($fh)) !== false) {
-        $t2 = trim($ln);
-        if ($t2 === ']' || $t2 === '];') break;
-        if ($t2 === '' || $t2 === '[') continue;
-        $buf .= $ln;
-        $dep += substr_count($ln, '{') - substr_count($ln, '}');
-        if ($dep <= 0 && ltrim($buf) !== '') {
+        $trimmed = trim($ln);
+        if ($trimmed === ']' || $trimmed === '];') break;
+        if ($trimmed === '' || $trimmed === '[')   continue;
+
+        $buf   .= $ln;
+        $depth += substr_count($ln, '{') - substr_count($ln, '}');
+
+        if ($depth <= 0 && ltrim($buf) !== '') {
             $obj = @json_decode(rtrim(trim($buf), ','), true);
             if ($obj !== null && is_array($obj)) {
-                if ($idx >= $off && count($col) < $lim) $col[] = $obj;
+                if ($idx >= $offset && count($collected) < $limit) {
+                    $collected[] = $obj;
+                }
                 $idx++;
-                if (count($col) >= $lim && $idx >= $off + $lim) break;
+                if (count($collected) >= $limit && $idx >= $offset + $limit) break;
             }
-            $buf = ''; $dep = 0;
+            $buf = ''; $depth = 0;
         }
     }
     if ($fh) fclose($fh);
-    echo base64_encode(json_encode(array(
-        'status' => 'success',
-        'data'   => array('file' => array(
-            'date'        => $date,
-            'user'        => $un,
-            'total_files' => $tf,
-            'total_used'  => $tu,
-            'offset'      => $off,
-            'limit'       => $lim,
-            'has_more'    => count($col) >= $lim,
-            'files'       => $col,
-        )),
+
+    b64_success(array('file' => array(
+        'date'        => $date,
+        'user'        => $user_name,
+        'total_files' => $total_files,
+        'total_used'  => $total_used,
+        'offset'      => $offset,
+        'limit'       => $limit,
+        'has_more'    => count($collected) >= $limit,
+        'files'       => $collected,
     )));
-    exit;
 }
 
-// -----------------------------------------------------------------------------
-// Default: main disk data (plain JSON)
-// -----------------------------------------------------------------------------
-$dh    = @opendir($rawPath);
+// =============================================================================
+// Default  — aggregate all disk usage report JSON files (plain JSON)
+// =============================================================================
+$dh    = @opendir($disk_path);
 $files = array();
 while ($dh && ($f = readdir($dh)) !== false) {
-    if (substr($f, -5) === '.json' && strpos($f, 'permission_issues') === false) {
-        $files[] = $rawPath . DIRECTORY_SEPARATOR . $f;
+    $is_report = substr($f, -5) === '.json'
+              && strpos($f, 'permission_issues') === false
+              && strpos($f, 'detail_report')     === false
+              && (strpos($f, 'report_') === 0 || strpos($f, 'disk_usage_report') === 0);
+    if ($is_report) {
+        $files[] = $disk_path . DIRECTORY_SEPARATOR . $f;
     }
 }
 if ($dh) closedir($dh);
@@ -210,4 +328,10 @@ foreach ($files as $file) {
     $j = json_decode($c, true);
     if ($j !== null) $agg[] = $j;
 }
-echo json_encode(array('status' => 'success', 'total_files' => count($agg), 'data' => $agg));
+
+header('Cache-Control: public, max-age=60');
+json_success(array(
+    'status'      => 'success',
+    'total_files' => count($agg),
+    'data'        => $agg,
+));

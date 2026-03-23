@@ -227,13 +227,28 @@ PERM_ERRORS = [
 PERM_TYPES = ["directory", "file"]
 
 def generate_permission_issues():
-    """Generate one permission_issues_<date>.json per disk (latest date) — flat format."""
+    """Generate one permission_issues_<date>.json per disk (latest date) — flat format.
+
+    Output format mirrors the real script (report_generator.py):
+      - date: unix timestamp (int)
+      - general_system: {total, used, available} in bytes
+      - permission_issues: {total, items[{user, path, type, error}]}
+    """
     users = [f"user{i}" for i in range(1, 21)]
+
+    last_dt        = datetime(2025, 1, 1) + timedelta(days=499)
+    last_timestamp = int(last_dt.timestamp())   # unix int — matches real script
+    last_date_str  = last_dt.strftime("%Y%m%d")  # used only for the filename
 
     for disk in DISK_CONFIGS:
         output_dir = disk["dir"]
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
+
+        # Build general_system snapshot using base_fill (no trend noise for a static mock)
+        total_space     = disk["total_gb"] * 1024 * 1024 * 1024
+        used_space      = int(total_space * disk["base_fill"])
+        available_space = total_space - used_space
 
         # Pick 5-12 affected users, 10-40 items each → 50-480 total (multiple pages)
         affected = random.sample(users, random.randint(5, 12))
@@ -258,17 +273,21 @@ def generate_permission_issues():
                 "error": "Cannot stat: no such file or directory (orphaned inode)",
             })
 
-        last_date = (datetime(2025, 1, 1) + timedelta(days=499)).strftime("%Y%m%d")
         payload = {
-            "date":              last_date,
-            "directory":         disk["path"],
+            "date":      last_timestamp,        # unix int — matches real script output
+            "directory": disk["path"],
+            "general_system": {                 # matches real script output
+                "total":     total_space,
+                "used":      used_space,
+                "available": available_space,
+            },
             "permission_issues": {
                 "total": len(all_items),
                 "items": all_items,
-            }
+            },
         }
 
-        fname = f"permission_issues_{last_date}.json"
+        fname = f"permission_issues_{last_date_str}.json"
         with open(os.path.join(output_dir, fname), "w", encoding="utf-8") as f:
             f.write(_compact_json(payload))
 
@@ -439,7 +458,15 @@ if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--num-files", type=int, default=500)
+    ap.add_argument(
+        "--only-permissions", action="store_true",
+        help="Regenerate only permission_issues files (skips main reports and detail reports)",
+    )
     args = ap.parse_args()
-    generate_mock_data(args.num_files)
-    generate_permission_issues()
-    generate_detail_reports()
+
+    if args.only_permissions:
+        generate_permission_issues()
+    else:
+        generate_mock_data(args.num_files)
+        generate_permission_issues()
+        generate_detail_reports()

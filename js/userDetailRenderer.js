@@ -1,8 +1,9 @@
 // userDetailRenderer.js — Detail User tab (Tab Pane 3 in Detail page)
 // userDetailRenderer.js — Renders per-user detail reports (dirs + files)
 
-import { fmt } from './formatters.js';
-import { AppState } from './main.js';
+import { fmt }                  from './formatters.js';
+import { AppState }             from './main.js';
+import { downloadCsv, toCsv }  from './csvExport.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _selectedUser   = null;
@@ -60,7 +61,13 @@ function _renderDirCard(dirData) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 Top Directories
             </span>
-            <span class="ud-card-badge">${dirData.dirs.length} dirs &middot; ${fmt(total)} total</span>
+            <div class="ud-card-actions">
+                <span class="ud-card-badge">${dirData.dirs.length} dirs &middot; ${fmt(total)} total</span>
+                <button class="ud-export-btn" id="ud-export-dirs-user" data-tooltip="Download this user's top directories as CSV">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    CSV
+                </button>
+            </div>
         </div>
         <div class="ud-path-list">${rows}</div>
     </div>`;
@@ -139,7 +146,13 @@ function _renderFileCard(fileData) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                 Top Files
             </span>
-            <span class="ud-card-badge" id="ud-file-badge">${badge}</span>
+            <div class="ud-card-actions">
+                <span class="ud-card-badge" id="ud-file-badge">${badge}</span>
+                <button class="ud-export-btn" id="ud-export-files-user" data-tooltip="Download this user's largest files as CSV">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    CSV
+                </button>
+            </div>
         </div>
         <div class="ud-path-list" id="ud-file-list">${rows}</div>
         ${_renderPagination(currentPage, totalPages)}
@@ -188,6 +201,17 @@ function _renderPicker(users, otherUsers) {
             </div>
         </div>
         <span class="ud-picker-hint">${allUsers.length} users available</span>
+        <div class="ud-picker-export">
+            <span class="ud-picker-export-label">Export all:</span>
+            <button class="ud-export-btn" id="ud-export-dirs-all" data-tooltip="Download top directories for all users as CSV">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                Dirs CSV
+            </button>
+            <button class="ud-export-btn" id="ud-export-files-all" data-tooltip="Download all tracked files across users as CSV">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                Files CSV
+            </button>
+        </div>
     </div>`;
 }
 
@@ -208,10 +232,10 @@ function _renderError(msg) {
 
 // ── API fetch ─────────────────────────────────────────────────────────────────
 
-async function _fetchDir(diskDir, user) {
+async function _fetchDir(diskId, user) {
     if (_abortCtrl) _abortCtrl.abort();
     _abortCtrl = new AbortController();
-    const url = `api.php?dir=${encodeURIComponent(diskDir)}&t=d&u=${encodeURIComponent(user)}`;
+    const url = `api.php?id=${encodeURIComponent(diskId)}&type=dirs&user=${encodeURIComponent(user)}`;
     const res = await fetch(url, { signal: _abortCtrl.signal });
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     const json = JSON.parse(atob(await res.text()));
@@ -219,8 +243,8 @@ async function _fetchDir(diskDir, user) {
     return json.data.dir;
 }
 
-async function _fetchFilePage(diskDir, user, offset = 0, limit = FILE_PAGE) {
-    const url = `api.php?dir=${encodeURIComponent(diskDir)}&t=f&u=${encodeURIComponent(user)}&o=${offset}&n=${limit}`;
+async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE) {
+    const url = `api.php?id=${encodeURIComponent(diskId)}&type=files&user=${encodeURIComponent(user)}&offset=${offset}&limit=${limit}`;
     const res = await fetch(url);
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     const json = JSON.parse(atob(await res.text()));
@@ -228,8 +252,8 @@ async function _fetchFilePage(diskDir, user, offset = 0, limit = FILE_PAGE) {
     return json.data.file;
 }
 
-async function _fetchUserList(diskDir) {
-    const url = `api.php?dir=${encodeURIComponent(diskDir)}&t=u`;
+async function _fetchUserList(diskId) {
+    const url = `api.php?id=${encodeURIComponent(diskId)}&type=users`;
     const res = await fetch(url);
     if (!res.ok) return [];
     const json = JSON.parse(atob(await res.text()));
@@ -286,13 +310,22 @@ async function _loadAndRender(user) {
 
 function _attachPaginationEvents(root) {
     const pg = root.querySelector('#ud-pagination');
-    if (!pg) return;
-    pg.addEventListener('click', e => {
-        const btn = e.target.closest('.ud-page-btn');
-        if (!btn || btn.classList.contains('disabled') || btn.classList.contains('active')) return;
-        const page = parseInt(btn.dataset.page, 10);
-        if (!isNaN(page) && page >= 1 && page <= _fileTotalPages) _goToPage(root, page);
-    });
+    if (pg) {
+        pg.addEventListener('click', e => {
+            const btn = e.target.closest('.ud-page-btn');
+            if (!btn || btn.classList.contains('disabled') || btn.classList.contains('active')) return;
+            const page = parseInt(btn.dataset.page, 10);
+            if (!isNaN(page) && page >= 1 && page <= _fileTotalPages) _goToPage(root, page);
+        });
+    }
+
+    // Dir export buttons
+    root.querySelector('#ud-export-dirs-user')?.addEventListener('click', () => _udExportDirs(false));
+    root.querySelector('#ud-export-dirs-all')?.addEventListener('click',  () => _udExportDirs(true));
+
+    // File export buttons
+    root.querySelector('#ud-export-files-user')?.addEventListener('click', () => _udExportFiles(false));
+    root.querySelector('#ud-export-files-all')?.addEventListener('click',  () => _udExportFiles(true));
 }
 
 async function _goToPage(root, page) {
@@ -392,6 +425,10 @@ function _attachPickerEvents(root) {
 
     // Keyboard: Escape to close
     list.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+    // Export all buttons (in picker bar)
+    root.querySelector('#ud-export-dirs-all')?.addEventListener('click',  () => _udExportDirs(true));
+    root.querySelector('#ud-export-files-all')?.addEventListener('click', () => _udExportFiles(true));
 }
 
 async function _renderRoot(diskDir) {
@@ -405,18 +442,22 @@ async function _renderRoot(diskDir) {
 
     if (!total) {
         root.innerHTML = `
+            ${_renderBetaBanner()}
             <div class="ud-empty-state">
                 <div class="ud-empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
                 <h3>No Detail Reports</h3>
                 <p>No user detail reports found for this disk.</p>
             </div>`;
+        _attachBannerEvents(root);
         return;
     }
 
     root.innerHTML = `
+        ${_renderBetaBanner()}
         ${_renderPicker(users, _otherUsers)}
         <div id="ud-content">${_renderEmptyState()}</div>`;
 
+    _attachBannerEvents(root);
     _attachPickerEvents(root);
 
     // Restore previously selected user
@@ -426,15 +467,126 @@ async function _renderRoot(diskDir) {
     }
 }
 
+function _renderBetaBanner() {
+    // Dismissed for this session — don't render
+    if (sessionStorage.getItem('ud_beta_dismissed') === '1') return '';
+    return `
+    <div class="ud-beta-banner" id="ud-beta-banner" role="status">
+        <div class="ud-beta-banner-left">
+            <span class="ud-beta-chip">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Beta
+            </span>
+            <div class="ud-beta-text">
+                <strong>Feature in early access</strong>
+                <span>Detail User reports depend on whether your disk has been indexed. Some disks may not have breakdown data yet.</span>
+            </div>
+        </div>
+        <button class="ud-beta-close" id="ud-beta-close" aria-label="Dismiss notice" data-tooltip="Don't show again this session">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>`;
+}
+
+function _attachBannerEvents(root) {
+    root.querySelector('#ud-beta-close')?.addEventListener('click', () => {
+        sessionStorage.setItem('ud_beta_dismissed', '1');
+        const banner = root.querySelector('#ud-beta-banner');
+        if (banner) {
+            banner.style.transition = 'opacity 0.25s ease, max-height 0.3s ease, margin 0.3s ease';
+            banner.style.opacity    = '0';
+            banner.style.maxHeight  = '0';
+            banner.style.marginBottom = '0';
+            banner.style.overflow   = 'hidden';
+            setTimeout(() => banner.remove(), 320);
+        }
+    });
+}
+
+
+// ── CSV Export ────────────────────────────────────────────────────────────────
+
+async function _udExportDirs(allUsers) {
+    if (!_currentDisk) return;
+    const user = allUsers ? null : _selectedUser;
+    const btnId = allUsers ? '#ud-export-dirs-all' : '#ud-export-dirs-user';
+    const btn   = document.querySelector(btnId);
+    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+
+    try {
+        let rows = [];
+        const headers = ['User', 'Path', 'Used (bytes)'];
+
+        if (allUsers) {
+            // Fetch user list then all dirs
+            const users = await _fetchUserList(_currentDisk);
+            const named = users.filter(u => u.name && u.name !== '');
+            const results = await Promise.all(
+                named.map(u => _fetchDir(_currentDisk, u.name).catch(() => null))
+            );
+            named.forEach((u, i) => {
+                if (!results[i]?.dirs) return;
+                results[i].dirs.forEach(d => rows.push({ user: u.name, path: d.path, used: d.used }));
+            });
+        } else if (user) {
+            const dirData = await _fetchDir(_currentDisk, user);
+            (dirData?.dirs || []).forEach(d => rows.push({ user, path: d.path, used: d.used }));
+        }
+
+        const csv = toCsv(headers, rows, (row, h) =>
+            ({ User: row.user, Path: row.path, 'Used (bytes)': row.used })[h] ?? '');
+        const suffix = allUsers ? 'all_users' : (user || 'unknown');
+        downloadCsv(`dirs_${_currentDisk}_${suffix}.csv`, csv);
+    } catch (err) {
+        alert('Export failed: ' + err.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> CSV' + (allUsers ? ' All' : ''); }
+    }
+}
+
+async function _udExportFiles(allUsers) {
+    if (!_currentDisk) return;
+    const user  = allUsers ? null : _selectedUser;
+    const btnId = allUsers ? '#ud-export-files-all' : '#ud-export-files-user';
+    const btn   = document.querySelector(btnId);
+    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+
+    try {
+        let rows = [];
+        const headers = ['User', 'Path', 'Size (bytes)'];
+
+        if (allUsers) {
+            const users = await _fetchUserList(_currentDisk);
+            const named = users.filter(u => u.name && u.name !== '');
+            for (const u of named) {
+                const fileData = await _fetchFilePage(_currentDisk, u.name, 0, 999999).catch(() => null);
+                (fileData?.files || []).forEach(f => rows.push({ user: u.name, path: f.path, size: f.size }));
+            }
+        } else if (user) {
+            const fileData = await _fetchFilePage(_currentDisk, user, 0, 999999);
+            (fileData?.files || []).forEach(f => rows.push({ user, path: f.path, size: f.size }));
+        }
+
+        const csv = toCsv(headers, rows, (row, h) =>
+            ({ User: row.user, Path: row.path, 'Size (bytes)': row.size })[h] ?? '');
+        const suffix = allUsers ? 'all_users' : (user || 'unknown');
+        downloadCsv(`files_${_currentDisk}_${suffix}.csv`, csv);
+    } catch (err) {
+        alert('Export failed: ' + err.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> CSV' + (allUsers ? ' All' : ''); }
+    }
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
  * Called once when the Detail User tab button is clicked.
  * Pass the current disk directory (e.g. "mock_reports/disk_sda").
  */
-export async function initUserDetailTab(diskDir, otherUsers = []) {
-    const isNewDisk = diskDir !== _currentDisk;
-    _currentDisk = diskDir;
+export async function initUserDetailTab(diskId, otherUsers = []) {
+    const isNewDisk = diskId !== _currentDisk;
+    _currentDisk = diskId;
     _otherUsers  = otherUsers;
 
     if (isNewDisk) {
@@ -442,7 +594,7 @@ export async function initUserDetailTab(diskDir, otherUsers = []) {
         if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null; }
     }
 
-    await _renderRoot(diskDir);
+    await _renderRoot(diskId);
 }
 
 /**
