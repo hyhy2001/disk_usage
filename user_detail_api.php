@@ -1,21 +1,17 @@
 <?php
-// user_detail_api.php — Per-user detail reports with pagination
-//
+// user_detail_api.php — Per-user directory and file detail reports
 // Usage:
-//   ?dir=mock_reports/disk_sda                              → list users
-//   ?dir=mock_reports/disk_sda&user=user1&type=dir          → dir report (full)
-//   ?dir=mock_reports/disk_sda&user=user1&type=file         → file report (paginated)
-//   ?dir=mock_reports/disk_sda&user=user1&type=file&offset=500&limit=500
-//   ?dir=mock_reports/disk_sda&user=user1&type=both         → dir + first page of files
+//   ?dir=path                              → list users
+//   ?dir=path&user=alice&type=dir          → dir report
+//   ?dir=path&user=alice&type=file         → file report (paginated)
+//   ?dir=path&user=alice&type=file&offset=500&limit=500
+//   ?dir=path&user=alice&type=both         → dir + first file page
 //
-// Pagination (type=file or type=both):
-//   offset  — 0-indexed row to start from   (default: 0)
-//   limit   — max rows to return            (default: 500, max: 2000)
+// Response: base64_encode(json) — WAF-safe, decode with atob() in JS
 
 $baseDir = __DIR__;
 $reqDir  = isset($_GET['dir']) ? trim($_GET['dir'], '/\\') : '';
 
-// Block traversal
 if (strpos($reqDir, '..') !== false || $reqDir === '') {
     http_response_code(403);
     echo "Access denied.";
@@ -27,11 +23,10 @@ $detailPath = $rawPath . DIRECTORY_SEPARATOR . 'detail_users';
 
 if (!is_dir($rawPath) && !is_link($rawPath)) {
     http_response_code(404);
-    echo "Directory not found: $reqDir";
+    echo "Not found.";
     exit;
 }
 
-// Sanitise params
 $user   = isset($_GET['user'])   ? preg_replace('/[^a-zA-Z0-9_\-]/', '', $_GET['user']) : '';
 $type   = $_GET['type']   ?? '';
 $offset = max(0,    (int)($_GET['offset'] ?? 0));
@@ -39,7 +34,7 @@ $limit  = min(2000, max(1, (int)($_GET['limit'] ?? 500)));
 
 header('Content-Type: text/plain; charset=utf-8');
 
-// ── Mode A: list users ────────────────────────────────────────────────────────
+// ── List users ────────────────────────────────────────────────────────────────
 if ($user === '') {
     $users = [];
     if (is_dir($detailPath)) {
@@ -50,51 +45,54 @@ if ($user === '') {
         if ($dh) closedir($dh);
         sort($users);
     }
-    echo json_encode(['status' => 'success', 'data' => ['users' => $users]]);
+    echo base64_encode(json_encode(['status' => 'success', 'data' => ['users' => $users]]));
     exit;
 }
 
-// ── Mode B: get detail for user ───────────────────────────────────────────────
 if (!in_array($type, ['dir', 'file', 'both'], true)) {
     http_response_code(400);
-    echo json_encode(['status' => 'error', 'message' => 'Invalid type. Use: dir, file, or both']);
+    echo base64_encode(json_encode(['status' => 'error', 'message' => 'Invalid type']));
     exit;
 }
-
 if (!is_dir($detailPath)) {
     http_response_code(404);
-    echo json_encode(['status' => 'error', 'message' => 'detail_users/ not found for this disk']);
+    echo base64_encode(json_encode(['status' => 'error', 'message' => 'No detail_users/']));
     exit;
 }
 
-// ── Dir report: always small, load in full ────────────────────────────────────
-function readDirReport($detailPath, $user) {
+$data = [];
+
+// ── Dir report ────────────────────────────────────────────────────────────────
+if ($type === 'dir' || $type === 'both') {
     $file = $detailPath . DIRECTORY_SEPARATOR . "detail_report_dir_{$user}.json";
-    if (!is_file($file)) return null;
-    $content = file_get_contents($file);
-    return $content !== false ? json_decode($content, true) : null;
+    if (!is_file($file)) {
+        http_response_code(404);
+        echo base64_encode(json_encode(['status' => 'error', 'message' => "No dir: $user"]));
+        exit;
+    }
+    $c = file_get_contents($file);
+    $data['dir'] = $c !== false ? json_decode($c, true) : null;
 }
 
-// ── File report: streaming paginated reader ───────────────────────────────────
-function readFileReportPaginated($detailPath, $user, $offset, $limit) {
+// ── File report (streaming paginated) ────────────────────────────────────────
+if ($type === 'file' || $type === 'both') {
     $file = $detailPath . DIRECTORY_SEPARATOR . "detail_report_file_{$user}.json";
-    if (!is_file($file)) return null;
-
+    if (!is_file($file)) {
+        http_response_code(404);
+        echo base64_encode(json_encode(['status' => 'error', 'message' => "No file: $user"]));
+        exit;
+    }
     $fh = @fopen($file, 'r');
-    if (!$fh) return null;
-
     $date = 0; $userName = $user; $totalFiles = 0; $totalUsed = 0;
-
-    while (($line = fgets($fh)) !== false) {
+    while ($fh && ($line = fgets($fh)) !== false) {
         if      (preg_match('/"date"\s*:\s*(\d+)/', $line, $m))          $date       = (int)$m[1];
         elseif  (preg_match('/"user"\s*:\s*"([^"]+)"/', $line, $m))      $userName   = $m[1];
         elseif  (preg_match('/"total_files"\s*:\s*(\d+)/', $line, $m))   $totalFiles = (int)$m[1];
         elseif  (preg_match('/"total_used"\s*:\s*(\d+)/', $line, $m))    $totalUsed  = (int)$m[1];
         if (strpos($line, '"files"') !== false && strpos($line, '[') !== false) break;
     }
-
     $idx = 0; $collected = []; $buf = ''; $depth = 0;
-    while (($line = fgets($fh)) !== false) {
+    while ($fh && ($line = fgets($fh)) !== false) {
         $t = trim($line);
         if ($t === ']' || $t === '];') break;
         if ($t === '' || $t === '[') continue;
@@ -109,42 +107,8 @@ function readFileReportPaginated($detailPath, $user, $offset, $limit) {
             $buf = ''; $depth = 0;
         }
     }
-
-    $returned = count($collected);
-    fclose($fh);
-    return [
-        'date'        => $date,
-        'user'        => $userName,
-        'total_files' => $totalFiles,
-        'total_used'  => $totalUsed,
-        'offset'      => $offset,
-        'limit'       => $limit,
-        'has_more'    => $returned >= $limit,
-        'files'       => $collected,
-    ];
+    if ($fh) fclose($fh);
+    $data['file'] = ['date' => $date, 'user' => $userName, 'total_files' => $totalFiles, 'total_used' => $totalUsed, 'offset' => $offset, 'limit' => $limit, 'has_more' => count($collected) >= $limit, 'files' => $collected];
 }
 
-// ── Build response ────────────────────────────────────────────────────────────
-$data = [];
-
-if ($type === 'dir' || $type === 'both') {
-    $d = readDirReport($detailPath, $user);
-    if ($d === null) {
-        http_response_code(404);
-        echo json_encode(['status' => 'error', 'message' => "No dir report for user: $user"]);
-        exit;
-    }
-    $data['dir'] = $d;
-}
-
-if ($type === 'file' || $type === 'both') {
-    $d = readFileReportPaginated($detailPath, $user, $offset, $limit);
-    if ($d === null) {
-        http_response_code(404);
-        echo json_encode(['status' => 'error', 'message' => "No file report for user: $user"]);
-        exit;
-    }
-    $data['file'] = $d;
-}
-
-echo json_encode(['status' => 'success', 'data' => $data]);
+echo base64_encode(json_encode(['status' => 'success', 'data' => $data]));
