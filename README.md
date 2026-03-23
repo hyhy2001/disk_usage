@@ -41,6 +41,15 @@ which generates the JSON reports this dashboard consumes.
 - **Paginated file list** — numbered pagination `[◀] [1] [2] … [N] [▶]` for users with thousands of files; each page fetches and replaces content without a full reload
 - **Streaming PHP API** — `user_detail_api.php` reads large JSON reports (100 MB+) using a line-by-line brace-depth parser: O(page_size) RAM regardless of total file count
 
+### Permission Issues Tab
+- **Flat item list** — every inaccessible file/directory across all users shown as rows: `[user badge] [path] [type] [error]`
+- **Server-side user filter** — select one or more users in the sidebar; the PHP API filters before paginating, so page 1 always shows results for the selected users
+- **Numbered pagination** — same `[◀] [1] [2] … [N] [▶]` widget, resets to page 1 on filter change
+- **Path search** — client-side substring filter on the current page (instant, no round-trip)
+- **User summary sidebar** — shows item count per user, always reflecting the full totals (not filtered)
+- **User badge per row** — blue badge for named users, amber badge for `__unknown__` (orphaned inodes)
+- **Backward-compatible API** — `permission_api.php` accepts both the new flat format and the old nested format (flattened on-the-fly)
+
 ### UI / UX
 - **Dark glassmorphic theme** — `backdrop-filter: blur`, layered gradients, and CSS variable design tokens
 - **Micro-animations** — hover lifts, skeleton loading cards, fade-in transitions
@@ -75,9 +84,13 @@ Browser
   ├── GET user_detail_api.php          <- full directory report for a user
   │     ?dir=...&user=alice&type=dir      small file, loaded once
   │
-  └── GET user_detail_api.php          <- paginated file report for a user
-        ?dir=...&user=alice             streams line-by-line, returns 500 rows/page
-        &type=file&offset=0&limit=500
+  ├── GET user_detail_api.php          <- paginated file report for a user
+  │     ?dir=...&user=alice              streams line-by-line, returns 500 rows/page
+  │     &type=file&offset=0&limit=500
+  │
+  └── GET permission_api.php           <- paginated permission issues
+        ?dir=...&offset=0&limit=100       returns flat [{user,path,type,error}]
+        &users=alice,bob                  optional server-side user filter
 ```
 
 ### PHP API Endpoints
@@ -105,6 +118,24 @@ top directories, and other-user usage.
 - Reads files line-by-line with brace-depth tracking — safe for 100 MB+ JSON files
 - `has_more: true` when `returned_count >= limit` (reliable end-of-file detection)
 - Works for both `indent=2` (multi-line per entry) and single-line-per-entry formats
+
+#### `permission_api.php` — Permission issues (paginated)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `dir` | — | Relative path to disk directory |
+| `offset` | `0` | Row offset for pagination |
+| `limit` | `100` | Rows per page, max `5000` |
+| `users` | _(omit)_ | Comma-separated usernames for server-side filter (e.g. `alice,bob,__unknown__`) |
+
+**Response fields:**
+- `total` — item count after user filter (before pagination)
+- `items` — flat array `[{user, path, type, error}]` for the current page
+- `user_summary` — `{username: count}` for ALL users (always unfiltered, for sidebar)
+- `has_more` — `true` if more pages remain
+
+**Backward-compatible:** accepts both new flat format (`items: []`) and old nested
+format (`users[].inaccessible_items[]`) — flattened on-the-fly with no data loss.
 
 ---
 
