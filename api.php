@@ -219,14 +219,33 @@ if ($type === 'users') {
     if (is_dir($detail_dir)) {
         $dh = @opendir($detail_dir);
         while ($dh && ($f = readdir($dh)) !== false) {
-            if (preg_match('/^detail_report_dir_(.+)\.json$/', $f, $m)) {
+            // Match detail_report_dir_*.json, with optional prefix
+            if (preg_match('/(?:.*_)?detail_report_dir_(.+)\.json$/', $f, $m)) {
                 $users[] = $m[1];
             }
         }
         if ($dh) closedir($dh);
+        
+        // Deduplicate because multiple prefixes might generate same usernames
+        $users = array_unique($users);
         sort($users);
     }
     b64_success(array('users' => $users));
+}
+
+// Helper to find a file by pattern in a directory
+function find_file_by_pattern($dir, $pattern) {
+    if (!is_dir($dir)) return false;
+    $dh = @opendir($dir);
+    $found = false;
+    while ($dh && ($f = readdir($dh)) !== false) {
+        if (preg_match($pattern, $f)) {
+            $found = $dir . DIRECTORY_SEPARATOR . $f;
+            break;
+        }
+    }
+    if ($dh) closedir($dh);
+    return $found;
 }
 
 // =============================================================================
@@ -235,9 +254,12 @@ if ($type === 'users') {
 if ($type === 'dirs') {
     $who       = sanitize_name(param('user', ''));
     $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
-    $file_path  = $detail_dir . DIRECTORY_SEPARATOR . 'detail_report_dir_' . $who . '.json';
+    
+    // Look for file ending in detail_report_dir_{user}.json, prefixed optionally
+    $pattern = '/(?:.*_)?detail_report_dir_' . preg_quote($who, '/') . '\.json$/';
+    $file_path = find_file_by_pattern($detail_dir, $pattern);
 
-    if (!is_file($file_path)) {
+    if (!$file_path || !is_file($file_path)) {
         b64_error('No directory report for user: ' . $who, 404);
     }
 
@@ -253,9 +275,12 @@ if ($type === 'files') {
     $offset     = get_int('offset', 0,   0,    PHP_INT_MAX);
     $limit      = get_int('limit',  500, 1,    2000);
     $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
-    $file_path  = $detail_dir . DIRECTORY_SEPARATOR . 'detail_report_file_' . $who . '.json';
+    
+    // Look for file ending in detail_report_file_{user}.json, prefixed optionally
+    $pattern = '/(?:.*_)?detail_report_file_' . preg_quote($who, '/') . '\.json$/';
+    $file_path = find_file_by_pattern($detail_dir, $pattern);
 
-    if (!is_file($file_path)) {
+    if (!$file_path || !is_file($file_path)) {
         b64_error('No file report for user: ' . $who, 404);
     }
 
