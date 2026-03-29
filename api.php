@@ -120,86 +120,109 @@ if ($type === 'permissions') {
         b64_success(null);
     }
 
-    $raw_json = @file_get_contents($perm_file);
-    if ($raw_json === false) {
+    $fh = @fopen($perm_file, 'r');
+    if (!$fh) {
         b64_error('Cannot read permission file.', 500);
     }
 
-    $doc = json_decode($raw_json, true);
-    $iss = isset($doc['permission_issues']) ? $doc['permission_issues'] : array();
-
-    // Normalize: support both flat (items[]) and old nested (users[].inaccessible_items[])
-    if (isset($iss['items'])) {
-        $items = $iss['items'];
-    } else {
-        $items = array();
-        $users_list = isset($iss['users']) ? $iss['users'] : array();
-        foreach ($users_list as $u) {
-            $uname     = isset($u['name']) ? $u['name'] : '';
-            $uinaccess = isset($u['inaccessible_items']) ? $u['inaccessible_items'] : array();
-            foreach ($uinaccess as $it) {
-                $items[] = array(
-                    'user'  => $uname,
-                    'path'  => isset($it['path'])  ? $it['path']  : '',
-                    'type'  => isset($it['type'])  ? $it['type']  : '',
-                    'error' => isset($it['error']) ? $it['error'] : '',
-                );
-            }
-        }
-        $unknown = isset($iss['unknown_items']) ? $iss['unknown_items'] : array();
-        foreach ($unknown as $it) {
-            $items[] = array(
-                'user'  => '__unknown__',
-                'path'  => isset($it['path'])  ? $it['path']  : '',
-                'type'  => isset($it['type'])  ? $it['type']  : '',
-                'error' => isset($it['error']) ? $it['error'] : '',
-            );
-        }
-    }
-
-    // Build user_summary and error_summary BEFORE filtering (always full totals)
+    $date          = null;
+    $directory     = null;
+    $current_user  = '__unknown__';
+    $total         = 0;
     $user_summary  = array();
     $error_summary = array();
-    foreach ($items as $it) {
-        $u = isset($it['user'])  ? $it['user']  : '__unknown__';
-        $e = isset($it['error']) ? $it['error'] : '';
-        $user_summary[$u] = isset($user_summary[$u]) ? $user_summary[$u] + 1 : 1;
-        if ($e !== '') {
-            $error_summary[$e] = isset($error_summary[$e]) ? $error_summary[$e] + 1 : 1;
+    $page          = array();
+
+    $in_string = false;
+    $escape    = false;
+    $depth     = 0;
+    
+    $obj_depth = 0;
+    $obj_buf   = '';
+    $recording = false;
+    $window    = '';
+
+    while (($ln = fgets($fh)) !== false) {
+        if ($date === null && preg_match('/"date"\s*:\s*(\d+)/', $ln, $m)) $date = (int)$m[1];
+        if ($directory === null && preg_match('/"directory"\s*:\s*"([^"]+)"/', $ln, $m)) $directory = $m[1];
+
+        $len = strlen($ln);
+        for ($i = 0; $i < $len; $i++) {
+            $c = $ln[$i];
+            
+            $window .= $c;
+            if (strlen($window) > 200) $window = substr($window, -100);
+
+            if ($escape) {
+                $escape = false;
+            } elseif ($c === '\\') {
+                $escape = true;
+            } elseif ($c === '"') {
+                $in_string = !$in_string;
+            }
+
+            if (!$in_string) {
+                if ($c === '{') {
+                    $depth++;
+                    $recording = true;
+                    $obj_depth = $depth;
+                    $obj_buf   = '{';
+                    continue;
+                } elseif ($c === '}') {
+                    if ($recording && $depth === $obj_depth) {
+                        $obj_buf .= '}';
+                        $recording = false;
+                        
+                        if (strpos($obj_buf, '"error"') !== false && strpos($obj_buf, '"path"') !== false) {
+                            $item = @json_decode($obj_buf, true);
+                            if (is_array($item) && isset($item['path']) && isset($item['error'])) {
+                                $u = isset($item['user']) ? $item['user'] : $current_user;
+                                $t = isset($item['type']) ? $item['type'] : '';
+                                $e = $item['error'];
+                                $item['user'] = $u;
+
+                                $user_summary[$u] = isset($user_summary[$u]) ? $user_summary[$u] + 1 : 1;
+                                if ($e !== '') {
+                                    $error_summary[$e] = isset($error_summary[$e]) ? $error_summary[$e] + 1 : 1;
+                                }
+
+                                $pass_user = empty($user_filter) || in_array($u, $user_filter);
+                                $pass_type = ($item_type === '' || $t === $item_type);
+                                $pass_path = ($path_query === '' || stripos($item['path'], $path_query) !== false);
+
+                                if ($pass_user && $pass_type && $pass_path) {
+                                    if ($total >= $offset && count($page) < $limit) {
+                                        $page[] = $item;
+                                    }
+                                    $total++;
+                                }
+                            }
+                        }
+                        $obj_buf = '';
+                    }
+                    $depth--;
+                    continue;
+                }
+            }
+
+            if ($recording) {
+                $obj_buf .= $c;
+            }
+
+            if ($c === '"' && preg_match('/"name"\s*:\s*"([^"]+)"$/', $window, $m)) {
+                $current_user = $m[1];
+            } elseif ($c === '[' && preg_match('/"unknown_items"\s*:\s*\[$/', $window)) {
+                $current_user = '__unknown__';
+            }
         }
     }
+    if ($fh) fclose($fh);
 
-    // Apply user filter
-    if (!empty($user_filter)) {
-        $uf    = $user_filter;
-        $items = array_values(array_filter($items, function ($it) use ($uf) {
-            return in_array(isset($it['user']) ? $it['user'] : '', $uf);
-        }));
-    }
-
-    // Apply item_type filter (file | directory)
-    if ($item_type === 'file' || $item_type === 'directory') {
-        $it_type = $item_type;
-        $items   = array_values(array_filter($items, function ($it) use ($it_type) {
-            return (isset($it['type']) ? $it['type'] : '') === $it_type;
-        }));
-    }
-
-    // Apply path substring filter (case-insensitive)
-    if ($path_query !== '') {
-        $pq    = strtolower($path_query);
-        $items = array_values(array_filter($items, function ($it) use ($pq) {
-            return strpos(strtolower(isset($it['path']) ? $it['path'] : ''), $pq) !== false;
-        }));
-    }
-
-    $total    = count($items);
-    $page     = array_slice($items, $offset, $limit);
     $has_more = ($offset + count($page)) < $total;
 
     b64_success(array(
-        'date'          => isset($doc['date'])      ? $doc['date']      : null,
-        'directory'     => isset($doc['directory']) ? $doc['directory'] : null,
+        'date'          => $date,
+        'directory'     => $directory,
         'total'         => $total,
         'offset'        => $offset,
         'limit'         => $limit,
