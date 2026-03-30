@@ -112,7 +112,10 @@ export function initSettingsDropdown() {
     
     btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (dropdown.style.display === 'none') {
+        // Check if currently hidden
+        const isHidden = dropdown.style.display === 'none' || window.getComputedStyle(dropdown).display === 'none';
+        
+        if (isHidden) {
             dropdown.style.display = 'flex';
             dropdown.style.animation = 'dropdownPop 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
         } else {
@@ -127,5 +130,5 @@ export function initSettingsDropdown() {
     });
 }
 
-// Call on load
-document.addEventListener('DOMContentLoaded', initSettingsDropdown);
+// Call on module execution (HTML is parsed because type="module")
+initSettingsDropdown();
