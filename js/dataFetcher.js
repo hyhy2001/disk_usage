@@ -367,6 +367,9 @@ class DataFetcher {
         const pathEl = document.getElementById('header-disk-path');
         if (pathEl) pathEl.textContent = 'Aggregated usage';
         
+        const teamTitleEl = document.getElementById('team-overview-title-text');
+        if (teamTitleEl) teamTitleEl.textContent = teamName ? teamName + ' Drives' : 'All Team Drives';
+        
         // Reset dropdown label
         const titleText = document.getElementById('disk-title-text');
         if (titleText) titleText.textContent = "Select a disk...";
