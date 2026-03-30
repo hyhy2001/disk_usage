@@ -393,7 +393,7 @@ class DataFetcher {
         if (syncStatusPill) syncStatusPill.style.display = 'none';
 
         const sharedHeader = document.getElementById('shared-header');
-        if (sharedHeader) sharedHeader.style.display = '';
+        if (sharedHeader) sharedHeader.style.display = 'none'; // Hide entirely on Team view
 
         // Switch to Team Overview Page via Router
         navigateTo('team');
@@ -724,15 +724,15 @@ class DataFetcher {
 function initMobileSidebar() {
     const sidebar   = document.querySelector('.sidebar');
     const backdrop  = document.getElementById('sidebar-backdrop');
-    const hamburger = document.getElementById('btn-hamburger');
+    const hamburgers = document.querySelectorAll('.hamburger-btn');
     const closeBtn  = document.getElementById('btn-sidebar-close');
-    if (!sidebar || !backdrop || !hamburger) return;
+    if (!sidebar || !backdrop || hamburgers.length === 0) return;
 
     const open  = () => { sidebar.classList.add('open');    backdrop.classList.add('visible');    document.body.style.overflow = 'hidden'; };
     const close = () => { sidebar.classList.remove('open'); backdrop.classList.remove('visible'); document.body.style.overflow = ''; };
     const toggle = () => sidebar.classList.contains('open') ? close() : open();
 
-    hamburger.addEventListener('click', toggle);
+    hamburgers.forEach(btn => btn.addEventListener('click', toggle));
     backdrop.addEventListener('click', close);
     if (closeBtn) closeBtn.addEventListener('click', close);
 
