@@ -304,6 +304,7 @@ class DataFetcher {
                     else { teamNode = node.teams[tIdx]; pName = node.project; }
                     
                     this._activeDisk = null;
+                    saveFilters({ activeDisk: null, activeTeamPIdx: pIdx, activeTeamTIdx: tIdx });
                     const list = document.getElementById('disk-list');
                     if (list) list.querySelectorAll('.disk-list-item').forEach(el => el.classList.remove('active'));
 
@@ -327,7 +328,11 @@ class DataFetcher {
                 });
             });
 
-            const savedDisk = loadFilters().activeDisk;
+            const savedFilters = loadFilters();
+            const savedDisk = savedFilters.activeDisk;
+            const savedPIdx = savedFilters.activeTeamPIdx;
+            const savedTIdx = savedFilters.activeTeamTIdx;
+            
             if (savedDisk) {
                 let foundTeamEl = null;
                 rawD.forEach((p, pIdx) => {
@@ -352,6 +357,14 @@ class DataFetcher {
                 } else {
                    const firstTeam = projectContainer.querySelector('.disk-team-group');
                    if (firstTeam) firstTeam.click();
+                }
+            } else if (savedPIdx !== undefined && savedTIdx !== undefined) {
+                const teamEl = projectContainer.querySelector(`.disk-team-group[data-pidx="${savedPIdx}"][data-tidx="${savedTIdx}"]`);
+                if (teamEl) {
+                    teamEl.click();
+                } else {
+                    const firstTeam = projectContainer.querySelector('.disk-team-group');
+                    if (firstTeam) firstTeam.click();
                 }
             } else {
                 const firstTeam = projectContainer.querySelector('.disk-team-group');
