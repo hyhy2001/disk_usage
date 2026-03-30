@@ -102,3 +102,30 @@ export function showToast(title, desc = '', type = 'success', duration = 3200) {
     // Auto-dismiss
     setTimeout(dismiss, duration);
 }
+
+// ── TASK-07: Settings Dropdown ────────────────────────────────────────────────
+export function initSettingsDropdown() {
+    const btn = document.getElementById('btn-settings-toggle');
+    const dropdown = document.getElementById('settings-dropdown');
+    
+    if (!btn || !dropdown) return;
+    
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (dropdown.style.display === 'none') {
+            dropdown.style.display = 'flex';
+            dropdown.style.animation = 'dropdownPop 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
+        } else {
+            dropdown.style.display = 'none';
+        }
+    });
+    
+    document.addEventListener('click', (e) => {
+        if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+}
+
+// Call on load
+document.addEventListener('DOMContentLoaded', initSettingsDropdown);

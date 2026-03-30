@@ -5286,3 +5286,35 @@ body[data-design='pro-max'] .team-disk-card:hover {
     font-weight: 600;
     color: var(--text-primary);
 }
+
+/* --- Settings Dropdown --- */
+@keyframes dropdownPop {
+    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.dropdown-item:hover {
+    background: rgba(255,255,255,0.05) !important;
+}
+
+:root[data-theme='light'] .dropdown-item:hover {
+    background: rgba(0,0,0,0.04) !important;
+}
+
+:root[data-theme='light'] .settings-dropdown {
+    background: #ffffff !important;
+    border-color: rgba(0,0,0,0.05) !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1) !important;
+}
+:root[data-theme='light'] .settings-dropdown .dropdown-header {
+    border-bottom-color: rgba(0,0,0,0.05) !important;
+}
+
+/* Toggle icons logic for dropdowns */
+:root[data-theme='light'] .dropdown-item .icon-sun { display: block !important; }
+:root[data-theme='light'] .dropdown-item .icon-moon { display: none !important; }
+
+:root[data-theme='light'] .dropdown-item .theme-label::before { content: "Dark Mode"; }
+:root[data-theme='dark'] .dropdown-item .theme-label::before { content: "Light Mode"; }
+.dropdown-item .theme-label { font-size: 0; }
+.dropdown-item .theme-label::before { font-size: 13px; }

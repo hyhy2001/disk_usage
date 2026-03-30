@@ -20,14 +20,17 @@ function applyDesign(design) {
     if (btn) {
         const legacyIcon = btn.querySelector('.icon-legacy');
         const promaxIcon = btn.querySelector('.icon-promax');
+        const labelText = btn.querySelector('.design-label');
         if (design === 'pro-max') {
             if(legacyIcon) legacyIcon.style.display = 'block';
             if(promaxIcon) promaxIcon.style.display = 'none';
-            btn.setAttribute('data-tooltip', 'Switch to Legacy Design');
+            if(labelText) labelText.textContent = 'Legacy UI';
+            btn.removeAttribute('data-tooltip'); // Remove tooltip for dropdown item
         } else {
             if(legacyIcon) legacyIcon.style.display = 'none';
             if(promaxIcon) promaxIcon.style.display = 'block';
-            btn.setAttribute('data-tooltip', 'Switch to Pro-Max Design');
+            if(labelText) labelText.textContent = 'Pro-Max UI';
+            btn.removeAttribute('data-tooltip'); // Remove tooltip for dropdown item
         }
     }
     
