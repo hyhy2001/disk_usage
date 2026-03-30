@@ -5307,7 +5307,8 @@ body[data-design='pro-max'] .team-disk-card:hover {
     right: 0;
     min-width: 140px;
     padding: 6px;
-    background: var(--bg-surface-elevated, #1e293b);
+    background-color: var(--bg-base);
+    background-image: linear-gradient(var(--bg-surface-elevated, #1e293b), var(--bg-surface-elevated, #1e293b));
     border: var(--glass-border, 1px solid rgba(255,255,255,0.08));
     border-radius: 8px;
     box-shadow: var(--glass-shadow, 0 8px 24px rgba(0,0,0,0.6));

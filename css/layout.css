@@ -1105,7 +1105,7 @@ body.sidebar-collapsed .sidebar {
     }
 
     /* Hide all text-only elements inside sidebar */
-    body.sidebar-collapsed .sidebar .brand span,
+    body.sidebar-collapsed .sidebar .brand .logo span,
     body.sidebar-collapsed .sidebar .nav-item span,
     body.sidebar-collapsed .sidebar .disk-selector-label,
     body.sidebar-collapsed .sidebar .disk-search-wrap,
@@ -1148,7 +1148,8 @@ body.sidebar-collapsed .sidebar {
         top: 0;
         width: 260px;
         max-height: 400px;
-        background: var(--bg-surface-elevated);
+        background-color: var(--bg-base);
+        background-image: linear-gradient(var(--bg-surface-elevated), var(--bg-surface-elevated));
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
         border: var(--glass-border);
