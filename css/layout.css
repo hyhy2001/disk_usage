@@ -1144,21 +1144,29 @@ body.sidebar-collapsed .sidebar {
     
     body.sidebar-collapsed #project-team-list {
         position: absolute;
-        left: calc(100% + 16px);
+        left: calc(100% + 4px);
         top: 0;
         width: 260px;
         max-height: 400px;
-        background: var(--bg-surface, #1e293b);
-        border: var(--glass-border);
+        background: rgba(15, 23, 42, 0.98);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255,255,255,0.12);
         border-radius: 12px;
-        box-shadow: var(--glass-shadow);
+        box-shadow: 0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.1);
         z-index: 500;
         opacity: 0;
         pointer-events: none;
-        transform: translateX(-10px);
+        transform: translateX(-8px);
         transition: opacity 0.15s ease, transform 0.15s ease;
         display: flex !important;
         flex-direction: column;
+    }
+    
+    :root[data-theme='light'] body.sidebar-collapsed #project-team-list {
+        background: rgba(255, 255, 255, 0.98);
+        border: 1px solid rgba(0,0,0,0.1);
+        box-shadow: 0 16px 48px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.05);
     }
     
     body.sidebar-collapsed .team-selector-wrapper:hover #project-team-list {
@@ -1172,7 +1180,7 @@ body.sidebar-collapsed .sidebar {
         position: absolute;
         right: 100%;
         top: 0;
-        width: 20px;
+        width: 24px;
         height: 100%;
     }
 
