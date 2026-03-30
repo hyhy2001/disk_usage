@@ -446,7 +446,7 @@ class DataFetcher {
                 
                 const diskName = d._disk_name || 'Disk';
                 const diskId = d._disk_id || '';
-                const dirPath = d._disk_path || sys.directory || 'Unknown path';
+                const dirPath = d.directory || sys.directory || d._disk_path || 'Unknown path';
                 
                 let usedColor = 'var(--text-secondary)';
                 if (usedPct >= 85) usedColor = '#f43f5e'; // rose-500
