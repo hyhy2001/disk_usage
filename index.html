@@ -442,16 +442,50 @@
 
 
 
-    <script src="js/dataFetcher.js?v=41" type="module"></script>
-    <script src="js/dataStore.js?v=36" type="module"></script>
-    <script src="js/chartManager.js?v=36" type="module"></script>
-    <script src="js/permissionRenderer.js?v=36" type="module"></script>
-    <script src="js/userDetailRenderer.js?v=36" type="module"></script>
-    <script src="js/main.js?v=36" type="module"></script>
-    <script src="js/chartModal.js?v=36" type="module"></script>
-    <script src="js/themeToggle.js?v=36"></script>
-    <script src="js/designToggle.js?v=2"></script>
-    <script src="js/scrollToTop.js?v=36" type="module"></script>
-    <script src="js/tooltip.js?v=2"></script>
+    <script src="js/dataFetcher.js?v=42" type="module"></script>
+    <script src="js/dataStore.js?v=37" type="module"></script>
+    <script src="js/chartManager.js?v=37" type="module"></script>
+    <script src="js/permissionRenderer.js?v=37" type="module"></script>
+    <script src="js/userDetailRenderer.js?v=37" type="module"></script>
+    <script src="js/main.js?v=37" type="module"></script>
+    <script src="js/chartModal.js?v=37" type="module"></script>
+    <script src="js/themeToggle.js?v=37"></script>
+    <script src="js/designToggle.js?v=3"></script>
+    <script src="js/scrollToTop.js?v=37" type="module"></script>
+    <script src="js/tooltip.js?v=3"></script>
+    
+    <!-- Bulletproof dropdown initializer -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btn = document.getElementById('btn-settings-toggle');
+            const dropdown = document.getElementById('settings-dropdown');
+            if (btn && dropdown) {
+                // Ensure it's hidden initially just in case
+                dropdown.style.display = 'none';
+                dropdown.dataset.visible = 'false';
+                
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const isVisible = dropdown.dataset.visible === 'true' || dropdown.style.display === 'flex';
+                    if (isVisible) {
+                        dropdown.style.display = 'none';
+                        dropdown.dataset.visible = 'false';
+                    } else {
+                        dropdown.style.display = 'flex';
+                        dropdown.dataset.visible = 'true';
+                        dropdown.style.animation = 'dropdownPop 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
+                    }
+                });
+                
+                document.addEventListener('click', (e) => {
+                    if (dropdown.dataset.visible === 'true' && !dropdown.contains(e.target) && !btn.contains(e.target)) {
+                        dropdown.style.display = 'none';
+                        dropdown.dataset.visible = 'false';
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>
