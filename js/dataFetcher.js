@@ -134,16 +134,16 @@ class DataFetcher {
             
             // Flatten the disks for internal application logic
             const flatDisks = [];
-            rawDisks.forEach(p_or_d => {
+            rawDisks.forEach((p_or_d, pIdx) => {
                 if (p_or_d.project && p_or_d.teams) {
-                    p_or_d.teams.forEach(t => {
+                    p_or_d.teams.forEach((t, tIdx) => {
                         t.disks?.forEach(d => {
-                            flatDisks.push({ ...d, project: p_or_d.project, team: t.name });
+                            flatDisks.push({ ...d, project: p_or_d.project, team: t.name, pIdx, tIdx });
                         });
                     });
                 } else if (p_or_d.name && p_or_d.disks) {
                     p_or_d.disks.forEach(d => {
-                        flatDisks.push({ ...d, project: "Workspace", team: p_or_d.name });
+                        flatDisks.push({ ...d, project: "Workspace", team: p_or_d.name, pIdx, tIdx: -1 });
                     });
                 } else if (p_or_d.id) {
                     flatDisks.push(p_or_d);
@@ -176,8 +176,20 @@ class DataFetcher {
                 const breadcrumbEl = document.getElementById('shared-page-breadcrumb');
                 if (breadcrumbEl && activeCfg) {
                     if (activeCfg.project && activeCfg.project !== "Workspace") {
-                        breadcrumbEl.textContent = `${activeCfg.project} / ${activeCfg.team} / ${activeCfg.name}`;
+                        breadcrumbEl.innerHTML = `<span class="bc-link" data-pidx="${activeCfg.pIdx}" data-tidx="${activeCfg.tIdx}" style="cursor:pointer; transition:color 0.2s;" title="Back to Team Overview">${activeCfg.project} / ${activeCfg.team}</span> / ${activeCfg.name}`;
                         breadcrumbEl.style.display = 'block';
+                        
+                        const linkEl = breadcrumbEl.querySelector('.bc-link');
+                        if (linkEl) {
+                            linkEl.addEventListener('mouseenter', e => e.currentTarget.style.color = 'var(--text-primary)');
+                            linkEl.addEventListener('mouseleave', e => e.currentTarget.style.color = '');
+                            linkEl.addEventListener('click', (e) => {
+                                const pIdx = e.currentTarget.dataset.pidx;
+                                const tIdx = e.currentTarget.dataset.tidx;
+                                const teamGroup = document.querySelector(`.disk-team-group[data-pidx="${pIdx}"][data-tidx="${tIdx}"]`);
+                                if (teamGroup) teamGroup.click();
+                            });
+                        }
                     } else {
                         breadcrumbEl.style.display = 'none';
                     }
