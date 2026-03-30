@@ -445,31 +445,37 @@ class DataFetcher {
             let cardsHTML = '';
 
             result.data.forEach(d => {
-                const total = (d.overview && d.overview.total) ? d.overview.total : 0;
-                const used = (d.overview && d.overview.used) ? d.overview.used : 0;
+                const sys = d.general_system || {};
+                const total = sys.total || 0;
+                const used = sys.used || 0;
+                const scanned = (d.team_usage || []).reduce((sum, t) => sum + (t.used || 0), 0);
+                const unknown = Math.max(0, used - scanned);
+
                 totalBytes += total;
                 usedBytes += used;
                 
-                const percent = total > 0 ? (used/total * 100).toFixed(1) : 0;
+                const scannedPct = total > 0 ? ((scanned / total) * 100).toFixed(1) : 0;
+                const unknownPct = total > 0 ? ((unknown / total) * 100).toFixed(1) : 0;
+                const usedPct = total > 0 ? ((used / total) * 100).toFixed(1) : 0;
+                
                 const diskName = d._disk_name || 'Disk';
                 const diskId = d._disk_id || '';
                 
                 cardsHTML += `<div class="team-disk-card" onclick="document.querySelector('.disk-list-item[data-id=\\'${diskId}\\']')?.click()">
-                    <div class="card-header">
+                    <div class="card-header" style="margin-bottom: 12px;">
                         <span class="disk-name">${diskName}</span>
-                        <span class="disk-path">${percent}% full</span>
+                        <span class="disk-path text-secondary" style="font-size: 0.8rem;">${usedPct}% Used</span>
                     </div>
-                    <div class="card-stats">
-                        <div class="card-stat-block">
-                            <span class="stat-label">Used Space</span>
-                            <span class="card-stat-val text-rose">${fmt(used)}</span>
-                        </div>
-                        <div class="card-stat-block" style="text-align:right;">
-                            <span class="stat-label">Total Allocated</span>
-                            <span class="card-stat-val">${fmt(total)}</span>
-                        </div>
+                    
+                    <div class="sbar-track sbar-track-stacked" style="height: 10px; margin-bottom: 12px; border-radius: 5px;">
+                        <div class="sbar-seg seg-amber" style="width:${scannedPct}%;" data-tooltip="Scanned: ${fmt(scanned)}"></div>
+                        <div class="sbar-seg seg-slate" style="width:${unknownPct}%;" data-tooltip="Unknown: ${fmt(unknown)}"></div>
                     </div>
-                    <div class="progress-container"><div class="progress-track"><div class="progress-fill" style="width: ${percent}%;"></div></div></div>
+                    
+                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
+                        <span class="text-secondary"><span class="legend-dot dot-amber"></span> Scanned <strong>${scannedPct}%</strong></span>
+                        <span class="text-secondary"><span class="legend-dot dot-slate"></span> Unknown <strong>${unknownPct}%</strong></span>
+                    </div>
                 </div>`;
             });
 
