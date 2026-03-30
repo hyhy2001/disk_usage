@@ -123,9 +123,14 @@
                             <line x1="3" y1="18" x2="21" y2="18"/>
                         </svg>
                     </button>
-                    <h1 id="shared-page-title" style="margin:0; font-size:1.25rem; font-weight:700; color:var(--text-primary);">Disk Usage Overview</h1>
-                    <span class="header-sep">·</span>
-                    <p id="header-disk-path" class="header-disk-path">—</p>
+                    <div style="display:flex; flex-direction:column; justify-content:center; gap: 2px;">
+                        <div id="shared-page-breadcrumb" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: none;"></div>
+                        <div style="display:flex; align-items:center; gap: 10px;">
+                            <h1 id="shared-page-title" style="margin:0; font-size:1.25rem; font-weight:700; color:var(--text-primary);">Disk Usage Overview</h1>
+                            <span class="header-sep">·</span>
+                            <p id="header-disk-path" class="header-disk-path">—</p>
+                        </div>
+                    </div>
                 </div>
                 <!-- Hidden logic store for list items used by dataFetcher -->
                 <div id="disk-list" style="display: none;"></div>

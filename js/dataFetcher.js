@@ -173,6 +173,15 @@ class DataFetcher {
                 if (pathEl && activeCfg) {
                     pathEl.textContent = '...'; // Will be replaced by actual directory path after sync
                 }
+                const breadcrumbEl = document.getElementById('shared-page-breadcrumb');
+                if (breadcrumbEl && activeCfg) {
+                    if (activeCfg.project && activeCfg.project !== "Workspace") {
+                        breadcrumbEl.textContent = `${activeCfg.project} / ${activeCfg.team} / ${activeCfg.name}`;
+                        breadcrumbEl.style.display = 'block';
+                    } else {
+                        breadcrumbEl.style.display = 'none';
+                    }
+                }
 
                 this._permissionsLoaded = false;
                 const permBody = document.getElementById('permissions-body');
