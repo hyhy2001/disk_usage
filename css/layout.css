@@ -86,10 +86,10 @@
 .main-content {
     flex: 1;
     margin-left: var(--sidebar-width);
-    padding: 24px 24px 24px 24px;
+    padding: 32px 32px 32px 24px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 32px;
     /* CRITICAL: allow flex child to shrink below its content width */
     min-width: 0;
     /* All scrolling happens here, not on the page */
@@ -97,6 +97,11 @@
     overflow-x: hidden;
     height: 100vh;
     transition: margin-left 0.25s ease;
+}
+
+body[data-design='pro-max'] .main-content {
+    padding: 24px;
+    gap: 20px;
 }
 
 /* -- Headers --------------------------------------------------------------- */
@@ -175,10 +180,14 @@
 .charts-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
+    gap: 24px;
     /* Prevent grid from overflowing its container */
     min-width: 0;
     width: 100%;
+}
+
+body[data-design='pro-max'] .charts-grid {
+    gap: 16px;
 }
 
 .large-span {
@@ -186,16 +195,21 @@
 }
 
 .chart-container {
-    padding: 16px 20px;
+    padding: 24px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
     min-height: 350px;
     /* CRITICAL: prevents grid/flex children from overflowing their container */
     min-width: 0;
     width: 100%;
-    box-sizing: border-box;
+    position: relative; /* Context for empty overlay */
     /* NOTE: no overflow:hidden -- would clip Chart.js tooltips and expand buttons */
+}
+
+body[data-design='pro-max'] .chart-container {
+    padding: 16px 20px;
+    gap: 12px;
 }
 
 .panel-header h2 {

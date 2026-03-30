@@ -71,12 +71,19 @@
 }
 
 
-/* Solid Brutalist Panel Component */
+/* Glassmorphism Panel Component */
 .glass-panel {
     background: var(--bg-surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border: var(--glass-border);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--glass-shadow);
+}
+
+body[data-design='pro-max'] .glass-panel {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 /* ── Utility Classes (IMP-02) ─────────────────────────────────────────────── */
@@ -5211,21 +5218,38 @@
 }
 
 .team-disk-card {
-    background: var(--bg-surface);
-    border: var(--glass-border);
-    border-radius: var(--border-radius-lg);
+    background: var(--glass-bg, var(--bg-surface));
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
     padding: 20px;
     display: flex;
     flex-direction: column;
     gap: 16px;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Brutal/Spring interaction */
+    transition: all 0.3s ease;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
 }
 
 .team-disk-card:hover {
+    transform: translateY(-4px);
+    background: rgba(255, 255, 255, 0.08); /* slight brightening */
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+body[data-design='pro-max'] .team-disk-card {
+    background: var(--bg-surface);
+    border-radius: var(--border-radius-lg);
+    border: var(--glass-border);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+body[data-design='pro-max'] .team-disk-card:hover {
     transform: translateY(-2px);
     background: var(--bg-surface-elevated);
-    border-color: rgba(255, 255, 255, 0.2);
     box-shadow: var(--glass-shadow);
 }
 
