@@ -740,7 +740,8 @@ body[data-design='pro-max'] .chart-container {
     .sidebar .disk-search-wrap,
     .sidebar .disk-list,
     .sidebar .status-monitor,
-    .sidebar .sidebar-clock {
+    .sidebar .sidebar-clock,
+    .sidebar .sidebar-search {
         display: flex !important;
     }
 
@@ -1143,7 +1144,7 @@ body.sidebar-collapsed .sidebar {
         overflow: visible;
     }
     
-    body.sidebar-collapsed #project-team-list {
+    body.sidebar-collapsed #team-flyout-panel {
         position: absolute;
         left: calc(100% + 4px);
         top: 0;
@@ -1165,14 +1166,14 @@ body.sidebar-collapsed .sidebar {
         flex-direction: column;
     }
     
-    body.sidebar-collapsed .team-selector-wrapper:hover #project-team-list {
+    body.sidebar-collapsed .team-selector-wrapper:hover #team-flyout-panel {
         opacity: 1;
         visibility: visible;
         transform: translateX(0);
         transition-delay: 0s;
     }
     
-    body.sidebar-collapsed #project-team-list::before {
+    body.sidebar-collapsed #team-flyout-panel::before {
         content: '';
         position: absolute;
         right: 100%;

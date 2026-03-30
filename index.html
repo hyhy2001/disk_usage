@@ -86,20 +86,22 @@
 
             <!-- Navigation — directly below logo -->
             <div class="team-selector-wrapper">
-                <button id="btn-team-flyout-trigger" class="team-flyout-trigger" aria-label="Select Team" data-tooltip="Select Space" data-tooltip-pos="right" style="display:none;">
+                <button id="btn-team-flyout-trigger" class="team-flyout-trigger" aria-label="Select Team" data-tooltip="Select Space" data-tooltip-pos="right">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
                         <polyline points="2 17 12 22 22 17"></polyline>
                         <polyline points="2 12 12 17 22 12"></polyline>
                     </svg>
                 </button>
-                <div class="sidebar-search sidebar-label" style="padding: 0 15px; margin-bottom: 10px; margin-top: 10px;">
-                    <div style="position:relative;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                        <input type="text" id="sidebar-team-search" placeholder="Search spaces..." style="width: 100%; padding: 6px 10px 6px 30px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.15); color: var(--text-primary); font-size: 0.75rem; outline: none; transition: border-color 0.2s, background 0.2s;" onfocus="this.style.borderColor='var(--accent-color)'; this.style.background='rgba(0,0,0,0.3)';" onblur="this.style.borderColor='var(--border-color)'; this.style.background='rgba(0,0,0,0.15)';">
+                <div id="team-flyout-panel" style="display:flex; flex-direction:column; flex:1; min-height:0;">
+                    <div class="sidebar-search sidebar-label" style="padding: 0 15px; margin-bottom: 10px; margin-top: 10px;">
+                        <div style="position:relative;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input type="text" id="sidebar-team-search" placeholder="Search spaces..." style="width: 100%; padding: 6px 10px 6px 30px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.15); color: var(--text-primary); font-size: 0.75rem; outline: none; transition: border-color 0.2s, background 0.2s;" onfocus="this.style.borderColor='var(--accent-color)'; this.style.background='rgba(0,0,0,0.3)';" onblur="this.style.borderColor='var(--border-color)'; this.style.background='rgba(0,0,0,0.15)';">
+                        </div>
                     </div>
+                    <div id="project-team-list" style="flex:1; overflow-y:auto; padding: 0 15px 10px 15px;"></div>
                 </div>
-                <div id="project-team-list" style="flex:1; overflow-y:auto; padding: 0 15px 10px 15px;"></div>
             </div>
         </aside>
 
