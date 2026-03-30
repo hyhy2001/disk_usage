@@ -96,7 +96,18 @@
     overflow-y: auto;
     overflow-x: hidden;
     height: 100vh;
-    transition: margin-left 0.25s ease;
+    min-width: 0;
+}
+
+/* -- Team Selector Wrapper -- */
+.team-selector-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Important for scrollable children in flex column */
+}
+.team-flyout-trigger {
+    display: none;
 }
 
 body[data-design='pro-max'] .main-content {
@@ -1101,22 +1112,68 @@ body.sidebar-collapsed .sidebar {
     body.sidebar-collapsed .sidebar .disk-list,
     body.sidebar-collapsed .sidebar .status-monitor,
     body.sidebar-collapsed .sidebar .sidebar-clock,
-    body.sidebar-collapsed .sidebar-clock,
-    body.sidebar-collapsed .disk-project-header span,
-    body.sidebar-collapsed .disk-team-header span { 
+    body.sidebar-collapsed .sidebar-clock { 
         display: none;
     }
 
-    body.sidebar-collapsed .disk-project-header,
-    body.sidebar-collapsed .disk-team-header {
-        padding-left: 0;
-        padding-right: 0;
+    /* Flyout logic for the Team Selector */
+    body.sidebar-collapsed .team-flyout-trigger {
+        display: flex;
         justify-content: center;
+        align-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        margin: 0 auto 12px;
+        transition: background 0.2s, color 0.2s;
     }
-
-    body.sidebar-collapsed .disk-project-header svg,
-    body.sidebar-collapsed .disk-team-header svg {
-        margin-right: 0 !important;
+    body.sidebar-collapsed .team-flyout-trigger:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-primary);
+    }
+    
+    body.sidebar-collapsed .team-selector-wrapper {
+        position: relative;
+        flex: 0 0 auto;
+        overflow: visible;
+    }
+    
+    body.sidebar-collapsed #project-team-list {
+        position: absolute;
+        left: calc(100% + 16px);
+        top: 0;
+        width: 260px;
+        max-height: 400px;
+        background: var(--bg-surface, #1e293b);
+        border: var(--glass-border);
+        border-radius: 12px;
+        box-shadow: var(--glass-shadow);
+        z-index: 500;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(-10px);
+        transition: opacity 0.15s ease, transform 0.15s ease;
+        display: flex !important;
+        flex-direction: column;
+    }
+    
+    body.sidebar-collapsed .team-selector-wrapper:hover #project-team-list {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateX(0);
+    }
+    
+    body.sidebar-collapsed #project-team-list::before {
+        content: '';
+        position: absolute;
+        right: 100%;
+        top: 0;
+        width: 20px;
+        height: 100%;
     }
 
     /* Center nav icons */
