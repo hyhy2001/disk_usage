@@ -1184,6 +1184,14 @@ body.sidebar-collapsed .sidebar {
         height: 100%;
     }
 
+    /* Keep Settings Dropdown inside screen on collapsed mode */
+    body.sidebar-collapsed .brand-actions .settings-dropdown {
+        top: 0;
+        right: auto !important;
+        left: calc(100% + 6px);
+        transform-origin: top left;
+    }
+
     /* Center nav icons */
 body.sidebar-collapsed .sidebar .nav-links { 
         align-items: center;
