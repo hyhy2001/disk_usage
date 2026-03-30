@@ -454,6 +454,29 @@ body[data-design='pro-max'] .chart-container {
         height: 32px;
     }
 
+    /* flat icon button for settings */
+    .settings-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px;
+        width: 32px;
+        height: 32px;
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.2s, color 0.2s;
+    }
+    .settings-btn:hover {
+        background: rgba(255,255,255,0.08);
+        color: var(--text-primary);
+    }
+    :root[data-theme='light'] .settings-btn:hover {
+        background: rgba(0,0,0,0.06);
+    }
+
     /* -- Disk selector: compact icon button with flyout popup -- */
     .sidebar .disk-selector-wrap {
         display: flex;
