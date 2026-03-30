@@ -170,19 +170,24 @@ class DataFetcher {
                     titleEl.textContent = activeCfg.name;
                 }
                 const pathEl = document.getElementById('header-disk-path');
-                if (pathEl && activeCfg) {
-                    pathEl.textContent = '...'; // Will be replaced by actual directory path after sync
+                if (pathEl) {
+                    pathEl.style.display = '';
+                    pathEl.textContent = '...';
                 }
+                const headerSepEl = document.querySelector('.header-sep');
+                if (headerSepEl) headerSepEl.style.display = '';
+
                 const breadcrumbEl = document.getElementById('shared-page-breadcrumb');
                 if (breadcrumbEl && activeCfg) {
                     if (activeCfg.project && activeCfg.project !== "Workspace") {
-                        breadcrumbEl.innerHTML = `<span class="bc-link" data-pidx="${activeCfg.pIdx}" data-tidx="${activeCfg.tIdx}" style="cursor:pointer; transition:color 0.2s; padding-bottom: 2px;" data-tooltip="Back to Team Overview" data-tooltip-pos="bottom">${activeCfg.team}</span> / ${activeCfg.name}`;
+                        const backSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>`;
+                        breadcrumbEl.innerHTML = `<button class="bc-link" data-pidx="${activeCfg.pIdx}" data-tidx="${activeCfg.tIdx}" style="cursor:pointer; display:inline-flex; align-items:center; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:var(--text-secondary); font-family:inherit; font-size:0.75rem; font-weight:600; padding:4px 10px; margin-bottom:8px; text-transform:none; letter-spacing:normal;" data-tooltip="Back to Team Overview" data-tooltip-pos="bottom">${backSvg}Back to ${activeCfg.team}</button>`;
                         breadcrumbEl.style.display = 'inline-block';
                         
                         const linkEl = breadcrumbEl.querySelector('.bc-link');
                         if (linkEl) {
-                            linkEl.addEventListener('mouseenter', e => e.currentTarget.style.color = 'var(--text-primary)');
-                            linkEl.addEventListener('mouseleave', e => e.currentTarget.style.color = '');
+                            linkEl.addEventListener('mouseenter', e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; });
+                            linkEl.addEventListener('mouseleave', e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; });
                             linkEl.addEventListener('click', (e) => {
                                 const pIdx = e.currentTarget.dataset.pidx;
                                 const tIdx = e.currentTarget.dataset.tidx;
@@ -276,6 +281,8 @@ class DataFetcher {
             const projectContainer = document.getElementById('project-team-list');
 
             const chevronSVG = `<svg class="toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="vertical-align: middle; margin-right: 6px; transition: transform 0.2s;"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+            const projectSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right: 6px; opacity: 0.6;"><rect width="16" height="16" x="4" y="4" rx="2"></rect><rect width="6" height="6" x="9" y="9" rx="1"></rect><path d="M15 2v2"></path><path d="M15 20v2"></path><path d="M2 15h2"></path><path d="M2 9h2"></path><path d="M20 15h2"></path><path d="M20 9h2"></path><path d="M9 2v2"></path><path d="M9 20v2"></path></svg>`;
+            const teamSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right: 6px; opacity: 0.6;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`;
             let phtml = '';
             
             const rawD = rawDisks;
@@ -283,23 +290,57 @@ class DataFetcher {
             rawD.forEach((p_or_d, pIdx) => {
                 if (p_or_d.project) {
                     phtml += `<div class="disk-project-group">
-                                <div class="disk-project-header" data-tooltip="${p_or_d.project}" data-tooltip-pos="right">${chevronSVG} <span>${p_or_d.project}</span></div>`;
+                                <div class="disk-project-header" data-tooltip="${p_or_d.project}" data-tooltip-pos="right">${chevronSVG}${projectSVG}<span>${p_or_d.project}</span></div>`;
                     p_or_d.teams?.forEach((t, tIdx) => {
                         const tooltipText = `${p_or_d.project} - ${t.name}`;
                         phtml += `<div class="disk-team-group" data-pidx="${pIdx}" data-tidx="${tIdx}" data-tooltip="${tooltipText}" data-tooltip-pos="right">
-                                    <div class="disk-team-header"><span>${t.name}</span></div>
+                                    <div class="disk-team-header">${teamSVG}<span>${t.name}</span></div>
                                   </div>`;
                     });
                     phtml += `</div>`;
                 } else if (p_or_d.name && p_or_d.disks) {
                     phtml += `<div class="disk-project-group">
                                 <div class="disk-team-group standalone" data-pidx="${pIdx}" data-tidx="-1" data-tooltip="${p_or_d.name}" data-tooltip-pos="right">
-                                    <div class="disk-team-header"><span>${p_or_d.name}</span></div>
+                                    <div class="disk-team-header">${teamSVG}<span>${p_or_d.name}</span></div>
                                 </div>
                               </div>`;
                 }
             });
             projectContainer.innerHTML = phtml;
+
+            // Sidebar Search Handler
+            const sidebarSearch = document.getElementById('sidebar-team-search');
+            if (sidebarSearch && !sidebarSearch.hasAttribute('data-bound')) {
+                sidebarSearch.setAttribute('data-bound', 'true');
+                sidebarSearch.addEventListener('input', (e) => {
+                    const term = e.target.value.toLowerCase().trim();
+                    const groupNodes = projectContainer.querySelectorAll('.disk-project-group');
+                    
+                    groupNodes.forEach(group => {
+                        const projectHeader = group.querySelector('.disk-project-header');
+                        const projectName = projectHeader ? projectHeader.textContent.toLowerCase() : '';
+                        const teams = group.querySelectorAll('.disk-team-group');
+                        let hasMatchingTeam = false;
+                        
+                        teams.forEach(team => {
+                            const teamName = team.textContent.toLowerCase();
+                            if (projectName.includes(term) || teamName.includes(term)) {
+                                team.style.display = '';
+                                hasMatchingTeam = true;
+                            } else {
+                                team.style.display = 'none';
+                            }
+                        });
+                        
+                        // Auto-expand if searching
+                        if (term && hasMatchingTeam) {
+                            group.classList.remove('collapsed');
+                        }
+                        
+                        group.style.display = hasMatchingTeam ? '' : 'none';
+                    });
+                });
+            }
 
             projectContainer.querySelectorAll('.disk-project-header').forEach(header => {
                 header.style.cursor = 'pointer';
@@ -407,7 +448,7 @@ class DataFetcher {
         if (pathEl) pathEl.textContent = 'Aggregated usage';
         
         const teamTitleEl = document.getElementById('team-overview-title-text');
-        if (teamTitleEl) teamTitleEl.textContent = teamName ? teamName + ' Drives' : 'All Team Drives';
+        if (teamTitleEl) teamTitleEl.textContent = teamName ? teamName : 'All Teams';
         
         // Reset dropdown label
         const titleText = document.getElementById('disk-title-text');
@@ -452,6 +493,8 @@ class DataFetcher {
             let usedBytes = 0;
             let cardsHTML = '';
 
+            const diskIcon = `<svg viewBox="0 0 24 24" fill="none" class="icon-disk-card" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="flex-shrink:0; color:var(--text-secondary); opacity:0.8;"><path d="M22 12H2"></path><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path><line x1="6" y1="16" x2="6.01" y2="16"></line><line x1="10" y1="16" x2="10.01" y2="16"></line></svg>`;
+
             result.data.forEach(d => {
                 const sys = d.general_system || {};
                 const total = sys.total || 0;
@@ -477,7 +520,10 @@ class DataFetcher {
                 
                 cardsHTML += `<div class="team-disk-card" onclick="document.querySelector('.disk-list-item[data-id=\\'${diskId}\\']')?.click()" data-tooltip="Path: ${dirPath}">
                     <div class="card-header" style="margin-bottom: 12px;">
-                        <span class="disk-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${diskName}">${diskName}</span>
+                        <span class="disk-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display: flex; align-items: center; gap: 6px;" title="${diskName}">
+                            ${diskIcon}
+                            ${diskName}
+                        </span>
                         <span class="disk-path" style="font-size: 0.8rem; white-space:nowrap; font-weight:700; color:${usedColor}; font-family:'JetBrains Mono', monospace;">${usedPct}% Used</span>
                     </div>
                     
@@ -496,6 +542,26 @@ class DataFetcher {
             });
 
             grid.innerHTML = cardsHTML;
+            
+            // Team Disk Search Handler
+            const teamSearch = document.getElementById('team-disk-search');
+            if (teamSearch) {
+                teamSearch.value = ''; // Reset when switching teams
+                if (!teamSearch.hasAttribute('data-bound')) {
+                    teamSearch.setAttribute('data-bound', 'true');
+                    teamSearch.addEventListener('input', (e) => {
+                        const term = e.target.value.toLowerCase().trim();
+                        const cards = grid.querySelectorAll('.team-disk-card');
+                        cards.forEach(card => {
+                            const name = card.querySelector('.disk-name')?.textContent.toLowerCase() || '';
+                            const path = card.getAttribute('data-tooltip')?.toLowerCase() || '';
+                            card.style.display = (name.includes(term) || path.includes(term)) ? '' : 'none';
+                        });
+                    });
+                }
+                // Trigger a re-filter just in case
+                teamSearch.dispatchEvent(new Event('input'));
+            }
             
             const txtTotal = document.getElementById('team-stat-total');
             const txtUsed = document.getElementById('team-stat-used');
@@ -703,12 +769,17 @@ class DataFetcher {
             UINodes.valPct.style.color = usagePct > 80 ? '#f43f5e' : '';
         }
 
-        // Update disk path from the actual report directory
+        // Show disk path
         const dirPath = this.dataStore.latestSnapshot?.directory;
         const activeDisk = this.disksConfig?.find(d => d.id === this._activeDisk);
         const diskPathEl = document.getElementById('header-disk-path');
         if (diskPathEl) {
+            diskPathEl.style.display = '';
             diskPathEl.textContent = dirPath || activeDisk?.name || '';
+        }
+        const headerSepEl = document.querySelector('.header-sep');
+        if (headerSepEl) {
+            headerSepEl.style.display = '';
         }
 
         // Update page title based on active page

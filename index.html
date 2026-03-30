@@ -86,13 +86,20 @@
 
             <!-- Navigation — directly below logo -->
             <div class="team-selector-wrapper">
-                <button id="btn-team-flyout-trigger" class="team-flyout-trigger" aria-label="Select Team" data-tooltip="Select Space" data-tooltip-pos="right">
+                <button id="btn-team-flyout-trigger" class="team-flyout-trigger" aria-label="Select Team" data-tooltip="Select Space" data-tooltip-pos="right" style="display:none;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                        <polyline points="22,6 12,13 2,6"></polyline>
+                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                        <polyline points="2 17 12 22 22 17"></polyline>
+                        <polyline points="2 12 12 17 22 12"></polyline>
                     </svg>
                 </button>
-                <div id="project-team-list" style="flex:1; overflow-y:auto; padding: 10px 15px;"></div>
+                <div class="sidebar-search sidebar-label" style="padding: 0 15px; margin-bottom: 10px; margin-top: 10px;">
+                    <div style="position:relative;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" id="sidebar-team-search" placeholder="Search spaces..." style="width: 100%; padding: 6px 10px 6px 30px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.15); color: var(--text-primary); font-size: 0.75rem; outline: none; transition: border-color 0.2s, background 0.2s;" onfocus="this.style.borderColor='var(--accent-color)'; this.style.background='rgba(0,0,0,0.3)';" onblur="this.style.borderColor='var(--border-color)'; this.style.background='rgba(0,0,0,0.15)';">
+                    </div>
+                </div>
+                <div id="project-team-list" style="flex:1; overflow-y:auto; padding: 0 15px 10px 15px;"></div>
             </div>
         </aside>
 
@@ -257,8 +264,13 @@
                                 <line x1="6" y1="18" x2="6.01" y2="18"/>
                             </svg>
                         </span>
-                        <span id="team-overview-title-text" style="padding-top:2px;">All Team Drives</span>
+                        <span id="team-overview-title-text" style="color:var(--text-primary);">All Teams</span>
                     </h2>
+                    
+                    <div class="team-overview-search-container" style="position:relative; width:240px; max-width:100%;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" id="team-disk-search" placeholder="Search disks..." style="width: 100%; padding: 8px 12px 8px 34px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); font-size: 0.85rem; outline: none; transition: border-color 0.2s, background 0.2s;" onfocus="this.style.borderColor='var(--accent-color)'; this.style.background='rgba(0,0,0,0.4)';" onblur="this.style.borderColor='var(--border-color)'; this.style.background='rgba(0,0,0,0.2)';">
+                    </div>
                     <div class="view-toggle" id="team-view-toggle">
                         <button class="view-toggle-btn active" data-view="grid" title="Grid View" aria-label="Grid View">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>

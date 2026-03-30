@@ -7,8 +7,8 @@ function ct() {
         grid:    light ? 'rgba(0,0,0,0.065)' : 'rgba(255,255,255,0.05)',
         gridSm:  light ? 'rgba(0,0,0,0.05)'  : 'rgba(255,255,255,0.04)',
         gridXs:  light ? 'rgba(0,0,0,0.04)'  : 'rgba(255,255,255,0.03)',
-        tick:    light ? '#6B7280'            : '#475569',
-        tickDim: light ? '#9CA3AF'            : '#94a3b8',
+        tick:    light ? '#374151'            : '#CBD5E1',
+        tickDim: light ? '#6B7280'            : '#94A3B8',
         tipBg:   light ? 'rgba(250,249,246,0.97)' : 'rgba(10,14,20,0.94)',
         tipTitle:light ? '#1F2937'            : '#fbbf24',
         tipBody: light ? '#374151'            : '#cbd5e1',
@@ -147,7 +147,8 @@ export class ChartManager {
 
     _updateChartDefaults() {
         const light = document.documentElement.dataset.theme === 'light';
-        Chart.defaults.color = light ? '#6B7280' : '#94a3b8';
+        Chart.defaults.color = light ? '#4B5563' : '#CBD5E1';
+        Chart.defaults.font.weight = '600';
     }
 
     // ── Resize registry ───────────────────────────────────────────────────────
