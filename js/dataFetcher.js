@@ -308,9 +308,10 @@ class DataFetcher {
 
                     if (!window._isRestoringDisk) {
                         // Logic defined by user: 
-                        // - Standalone Team or any team with exactly 1 disk -> Jump directly to the disk view
-                        // - Project Team with >1 disks -> Show Team Overview grid
-                        if ((tIdx === -1 || (teamNode.disks && teamNode.disks.length === 1)) && teamNode.disks && teamNode.disks.length > 0) {
+                        // Logic defined by user: 
+                        // - Standalone Team (tIdx === -1) -> Jump directly to its first disk
+                        // - Project Team (tIdx >= 0) -> ALWAYS show Team Overview grid
+                        if (tIdx === -1 && teamNode.disks && teamNode.disks.length > 0) {
                             setTimeout(() => {
                                 const diskEl = document.querySelector(`.disk-list-item[data-id="${teamNode.disks[0].id}"]`);
                                 if (diskEl) diskEl.click();
