@@ -191,13 +191,13 @@ class DataFetcher {
                 
                 // Restore nav tabs and sync button if we came from team view
                 const workspaceHeader = document.querySelector('.workspace-header');
-                if (workspaceHeader) workspaceHeader.style.display = '';
+                if (workspaceHeader) workspaceHeader.style.display = 'flex';
                 const navTabs = document.querySelector('.workspace-nav-tabs');
-                if (navTabs) navTabs.style.display = '';
+                if (navTabs) navTabs.style.display = 'flex';
                 const syncBtn = document.getElementById('btn-fetch');
-                if (syncBtn) syncBtn.style.display = '';
+                if (syncBtn) syncBtn.style.display = 'flex';
                 const syncStatusPill = document.getElementById('sync-status-pill');
-                if (syncStatusPill) syncStatusPill.style.display = '';
+                if (syncStatusPill) syncStatusPill.style.display = 'flex';
 
                 // Show shared-header and switch to correct page
                 const sharedHeader = document.getElementById('shared-header');
