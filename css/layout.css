@@ -415,8 +415,8 @@ body[data-design='pro-max'] .chart-container {
         display: flex;
         align-items: center;
         justify-content: center;
-        position: absolute;
-        right: -14px;
+        position: fixed;
+        left: calc(var(--sidebar-width) - 14px);
         top: 50%;
         transform: translateY(-50%);
         width: 28px;
@@ -426,9 +426,9 @@ body[data-design='pro-max'] .chart-container {
         border-radius: 50%;
         color: var(--text-secondary);
         cursor: pointer;
-        z-index: 50;
+        z-index: 210; /* Above sidebar 200 */
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        transition: background 0.2s, color 0.2s, border-color 0.2s;
+        transition: left 0.25s ease, background 0.2s, color 0.2s, border-color 0.2s;
     }
     .sidebar-edge-collapse-btn:hover {
         background: #334155;
@@ -1101,8 +1101,22 @@ body.sidebar-collapsed .sidebar {
     body.sidebar-collapsed .sidebar .disk-list,
     body.sidebar-collapsed .sidebar .status-monitor,
     body.sidebar-collapsed .sidebar .sidebar-clock,
-    body.sidebar-collapsed .sidebar-clock { 
+    body.sidebar-collapsed .sidebar-clock,
+    body.sidebar-collapsed .disk-project-header span,
+    body.sidebar-collapsed .disk-team-header span { 
         display: none;
+    }
+
+    body.sidebar-collapsed .disk-project-header,
+    body.sidebar-collapsed .disk-team-header {
+        padding-left: 0;
+        padding-right: 0;
+        justify-content: center;
+    }
+
+    body.sidebar-collapsed .disk-project-header svg,
+    body.sidebar-collapsed .disk-team-header svg {
+        margin-right: 0 !important;
     }
 
     /* Center nav icons */

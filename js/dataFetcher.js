@@ -255,6 +255,9 @@ class DataFetcher {
             const projectContainer = document.getElementById('project-team-list');
 
             const chevronSVG = `<svg class="toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="vertical-align: middle; margin-right: 6px; transition: transform 0.2s;"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+            const teamSVG = `<svg class="team-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; flex-shrink: 0;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>`;
+            const standaloneSVG = `<svg class="team-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; flex-shrink: 0;"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>`;
+            
             let phtml = '';
             
             const rawD = rawDisks;
@@ -262,17 +265,18 @@ class DataFetcher {
             rawD.forEach((p_or_d, pIdx) => {
                 if (p_or_d.project) {
                     phtml += `<div class="disk-project-group">
-                                <div class="disk-project-header">${chevronSVG} <span>${p_or_d.project}</span></div>`;
+                                <div class="disk-project-header" data-tooltip="${p_or_d.project}" data-tooltip-pos="right">${chevronSVG} <span>${p_or_d.project}</span></div>`;
                     p_or_d.teams?.forEach((t, tIdx) => {
-                        phtml += `<div class="disk-team-group" data-pidx="${pIdx}" data-tidx="${tIdx}">
-                                    <div class="disk-team-header">${t.name}</div>
+                        const tooltipText = `${p_or_d.project} - ${t.name}`;
+                        phtml += `<div class="disk-team-group" data-pidx="${pIdx}" data-tidx="${tIdx}" data-tooltip="${tooltipText}" data-tooltip-pos="right">
+                                    <div class="disk-team-header">${teamSVG}<span>${t.name}</span></div>
                                   </div>`;
                     });
                     phtml += `</div>`;
                 } else if (p_or_d.name && p_or_d.disks) {
                     phtml += `<div class="disk-project-group">
-                                <div class="disk-team-group standalone" data-pidx="${pIdx}" data-tidx="-1">
-                                    <div class="disk-team-header">${p_or_d.name}</div>
+                                <div class="disk-team-group standalone" data-pidx="${pIdx}" data-tidx="-1" data-tooltip="${p_or_d.name}" data-tooltip-pos="right">
+                                    <div class="disk-team-header">${standaloneSVG}<span>${p_or_d.name}</span></div>
                                 </div>
                               </div>`;
                 }
