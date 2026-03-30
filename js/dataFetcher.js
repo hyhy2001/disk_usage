@@ -467,14 +467,16 @@ class DataFetcher {
                         <span class="disk-path text-secondary" style="font-size: 0.8rem;">${usedPct}% Used</span>
                     </div>
                     
-                    <div class="sbar-track sbar-track-stacked" style="height: 10px; margin-bottom: 12px; border-radius: 5px;">
-                        <div class="sbar-seg seg-amber" style="width:${scannedPct}%;" data-tooltip="Scanned: ${fmt(scanned)}"></div>
-                        <div class="sbar-seg seg-slate" style="width:${unknownPct}%;" data-tooltip="Unknown: ${fmt(unknown)}"></div>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
-                        <span class="text-secondary"><span class="legend-dot dot-amber"></span> Scanned <strong>${scannedPct}%</strong></span>
-                        <span class="text-secondary"><span class="legend-dot dot-slate"></span> Unknown <strong>${unknownPct}%</strong></span>
+                    <div class="team-card-bar-wrapper" style="width: 100%;">
+                        <div class="sbar-track sbar-track-stacked" style="height: 10px; margin-bottom: 12px; border-radius: 5px;">
+                            <div class="sbar-seg seg-amber" style="width:${scannedPct}%;" data-tooltip="Scanned: ${fmt(scanned)}"></div>
+                            <div class="sbar-seg seg-slate" style="width:${unknownPct}%;" data-tooltip="Unknown: ${fmt(unknown)}"></div>
+                        </div>
+                        
+                        <div class="team-card-stats" style="display: flex; justify-content: space-between; font-size: 0.75rem;">
+                            <span class="text-secondary"><span class="legend-dot dot-amber"></span> Scanned <strong>${scannedPct}%</strong></span>
+                            <span class="text-secondary"><span class="legend-dot dot-slate"></span> Unknown <strong>${unknownPct}%</strong></span>
+                        </div>
                     </div>
                 </div>`;
             });

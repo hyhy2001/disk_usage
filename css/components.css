@@ -5266,35 +5266,26 @@ body[data-design='pro-max'] .team-disk-card:hover {
 }
 
 .disk-card-grid.list-view .team-disk-card .card-header {
+    flex: 0 0 200px;
+    margin-bottom: 0 !important;
+    white-space: nowrap;
+}
+
+.disk-card-grid.list-view .team-disk-card .team-card-bar-wrapper {
     flex: 1;
-    min-width: 150px;
     display: flex;
-    flex-direction: row;
     align-items: center;
-    justify-content: flex-start;
-    gap: 12px;
+    gap: 24px;
 }
 
-.disk-card-grid.list-view .team-disk-card .card-stats {
-    flex: 2;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-around;
-    min-width: 300px;
-}
-
-.disk-card-grid.list-view .team-disk-card .card-stat-block {
-    text-align: left !important;
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-}
-
-.disk-card-grid.list-view .team-disk-card .progress-container {
+.disk-card-grid.list-view .team-disk-card .sbar-track {
     flex: 1;
-    max-width: 150px;
-    margin-top: 0;
+    margin-bottom: 0 !important;
+}
+
+.disk-card-grid.list-view .team-disk-card .team-card-stats {
+    flex: 0 0 auto;
+    gap: 16px;
 }
 
 .team-disk-card .card-header {
