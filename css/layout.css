@@ -631,8 +631,8 @@ body[data-design='pro-max'] .chart-container {
         flex-direction: column;
         gap: 6px;
         opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.15s ease;
+        visibility: hidden;
+        transition: opacity 0.2s ease, visibility 0s linear 0.25s;
     }
 
     /* Invisible bridge: fills the gap between icon and flyout panel.
@@ -649,7 +649,8 @@ body[data-design='pro-max'] .chart-container {
     .sidebar .disk-selector-wrap:hover .disk-flyout,
     .sidebar .disk-flyout:hover {
         opacity: 1;
-        pointer-events: auto;
+        visibility: visible;
+        transition-delay: 0s;
     }
 
     .sidebar .disk-flyout-title {
@@ -1157,17 +1158,18 @@ body.sidebar-collapsed .sidebar {
         box-shadow: var(--glass-shadow);
         z-index: 500;
         opacity: 0;
-        pointer-events: none;
+        visibility: hidden;
         transform: translateX(-8px);
-        transition: opacity 0.15s ease, transform 0.15s ease;
+        transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.25s;
         display: flex !important;
         flex-direction: column;
     }
     
     body.sidebar-collapsed .team-selector-wrapper:hover #project-team-list {
         opacity: 1;
-        pointer-events: auto;
+        visibility: visible;
         transform: translateX(0);
+        transition-delay: 0s;
     }
     
     body.sidebar-collapsed #project-team-list::before {
@@ -1292,8 +1294,8 @@ body.sidebar-collapsed .sidebar .disk-flyout {
         flex-direction: column;
         gap: 6px;
         opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.15s ease;
+        visibility: hidden;
+        transition: opacity 0.2s ease, visibility 0s linear 0.25s;
     }
 
     /* Invisible bridge: fills the gap between icon and flyout panel.
@@ -1310,7 +1312,8 @@ body.sidebar-collapsed .sidebar .disk-flyout::before {
     body.sidebar-collapsed .sidebar .disk-selector-wrap:hover .disk-flyout,
 body.sidebar-collapsed .sidebar .disk-flyout:hover { 
         opacity: 1;
-        pointer-events: auto;
+        visibility: visible;
+        transition-delay: 0s;
     }
 
 body.sidebar-collapsed .sidebar .disk-flyout-title { 
