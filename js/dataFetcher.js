@@ -176,8 +176,8 @@ class DataFetcher {
                 const breadcrumbEl = document.getElementById('shared-page-breadcrumb');
                 if (breadcrumbEl && activeCfg) {
                     if (activeCfg.project && activeCfg.project !== "Workspace") {
-                        breadcrumbEl.innerHTML = `<span class="bc-link" data-pidx="${activeCfg.pIdx}" data-tidx="${activeCfg.tIdx}" style="cursor:pointer; transition:color 0.2s;" title="Back to Team Overview">${activeCfg.project} / ${activeCfg.team}</span> / ${activeCfg.name}`;
-                        breadcrumbEl.style.display = 'block';
+                        breadcrumbEl.innerHTML = `<span class="bc-link" data-pidx="${activeCfg.pIdx}" data-tidx="${activeCfg.tIdx}" style="cursor:pointer; transition:color 0.2s; padding-bottom: 2px;" data-tooltip="Back to Team Overview" data-tooltip-pos="bottom">${activeCfg.team}</span> / ${activeCfg.name}`;
+                        breadcrumbEl.style.display = 'inline-block';
                         
                         const linkEl = breadcrumbEl.querySelector('.bc-link');
                         if (linkEl) {
