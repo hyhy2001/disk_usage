@@ -13,7 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <!-- CSS -->
     <link rel="stylesheet" href="css/index.css?v=39">
-    <link rel="stylesheet" href="css/layout.css?v=39">
+    <link rel="stylesheet" href="css/layout.css?v=40">
     <link rel="stylesheet" href="css/components.css?v=41">
     
     <!-- Chart.js -->
@@ -495,6 +495,18 @@
                     } else {
                         dropdown.style.display = 'flex';
                         dropdown.dataset.visible = 'true';
+                        
+                        // Wait a tick for display:flex to layout, then check bounds
+                        requestAnimationFrame(() => {
+                            const rect = dropdown.getBoundingClientRect();
+                            if (rect.bottom > window.innerHeight - 10) {
+                                dropdown.style.top = 'auto';
+                                dropdown.style.bottom = '0'; // Align bottom with container
+                            } else {
+                                dropdown.style.top = '';
+                                dropdown.style.bottom = '';
+                            }
+                        });
                         dropdown.style.animation = 'dropdownPop 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
                     }
                 });
