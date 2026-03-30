@@ -168,7 +168,9 @@ async function _fetchPage(page) {
 
     try {
         const res  = await fetch(url, { signal: _abortCtrl.signal });
-        const json = JSON.parse(atob(await res.text()));
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); } catch { json = JSON.parse(atob(text)); }
 
         if (json?.status !== 'success') throw new Error(json?.message || 'API error');
 
@@ -384,7 +386,10 @@ async function _exportCsv(useFilters, btn) {
             if (_pathSearch) params.set('path', _pathSearch);
         }
         const res  = await fetch('api.php?' + params.toString());
-        const json = JSON.parse(atob(await res.text()));
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); } catch { json = JSON.parse(atob(text)); }
+
         if (json?.status !== 'success') throw new Error(json?.message || 'API error');
 
         const items = json.data.items || [];
