@@ -194,6 +194,8 @@ class DataFetcher {
                 if (navTabs) navTabs.style.display = '';
                 const syncBtn = document.getElementById('btn-fetch');
                 if (syncBtn) syncBtn.style.display = '';
+                const syncStatusPill = document.getElementById('sync-status-pill');
+                if (syncStatusPill) syncStatusPill.style.display = '';
 
                 // Show shared-header and switch to correct page
                 const sharedHeader = document.getElementById('shared-header');
@@ -381,6 +383,9 @@ class DataFetcher {
         
         const syncBtn = document.getElementById('btn-fetch');
         if (syncBtn) syncBtn.style.display = 'none';
+        
+        const syncStatusPill = document.getElementById('sync-status-pill');
+        if (syncStatusPill) syncStatusPill.style.display = 'none';
 
         const sharedHeader = document.getElementById('shared-header');
         if (sharedHeader) sharedHeader.style.display = '';
