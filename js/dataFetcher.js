@@ -446,13 +446,14 @@ class DataFetcher {
                 
                 const diskName = d._disk_name || 'Disk';
                 const diskId = d._disk_id || '';
+                const dirPath = sys.directory || 'Unknown path';
                 
                 let usedColor = 'var(--text-secondary)';
                 if (usedPct >= 85) usedColor = '#f43f5e'; // rose-500
                 else if (usedPct >= 70) usedColor = '#f59e0b'; // amber-500
                 else usedColor = '#10b981'; // emerald-500
                 
-                cardsHTML += `<div class="team-disk-card" onclick="document.querySelector('.disk-list-item[data-id=\\'${diskId}\\']')?.click()">
+                cardsHTML += `<div class="team-disk-card" onclick="document.querySelector('.disk-list-item[data-id=\\'${diskId}\\']')?.click()" data-tooltip="Path: ${dirPath}">
                     <div class="card-header" style="margin-bottom: 12px;">
                         <span class="disk-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${diskName}">${diskName}</span>
                         <span class="disk-path" style="font-size: 0.8rem; white-space:nowrap; font-weight:700; color:${usedColor}; font-family:'JetBrains Mono', monospace;">${usedPct}% Used</span>
