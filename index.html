@@ -9,22 +9,18 @@
     <meta property="og:title" content="StorageOS Dashboard">
     <meta property="og:description" content="Real-time static dashboard for disk usage analysis and storage capacity tracking.">
     <meta property="og:type" content="website">
-    
     <!-- Modern Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- CSS -->
-    <link rel="stylesheet" href="css/index.css?v=31">
+    <link rel="stylesheet" href="css/index.css?v=39">
     <link rel="stylesheet" href="css/layout.css?v=31">
-    <link rel="stylesheet" href="css/components.css?v=31">
+    <link rel="stylesheet" href="css/components.css?v=40">
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 </head>
 <body>
     <div class="background-mesh">
-        <div class="glow-orb orb-1"></div>
-        <div class="glow-orb orb-2"></div>
     </div>
 
     <div class="app-container">
@@ -72,80 +68,25 @@
             </div>
 
             <!-- Navigation — directly below logo -->
-            <nav class="nav-links">
-                <button id="nav-overview" class="nav-item">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                    <span>Overview</span>
-                </button>
-                <button id="nav-detail" class="nav-item">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                    <span>Detail</span>
-                </button>
+            
 
-            </nav>
+            
+<div id="project-team-list" style="flex:1; overflow-y:auto; padding: 10px 15px;"></div>
 
-            <!-- Disk Selector -->
-            <div class="disk-selector-wrap">
-                <!-- Icon trigger for icon-only sidebar mode (640-960px) -->
-                <button class="disk-icon-trigger has-active" id="btn-disk-icon" data-tooltip="Choose a disk to inspect" aria-label="Select disk">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-                    </svg>
-                </button>
-
-                <!-- Flyout (icon-only mode) -->
-                <div class="disk-flyout">
-                    <div class="disk-flyout-title">Active Disk</div>
-                    <div class="disk-search-wrap">
-                        <svg class="disk-search-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                        <input type="text" id="disk-search-flyout" class="disk-search-input" placeholder="Search disk..." autocomplete="off" aria-label="Search disk (flyout)">
-                    </div>
-                    <div id="disk-list-flyout" class="disk-list"></div>
-                </div>
-
-                <!-- Full sidebar mode -->
-                <label class="disk-selector-label">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16"/></svg>
-                    Active Disk
-                </label>
-                <div class="disk-search-wrap">
-                    <svg class="disk-search-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <input type="text" id="disk-search" class="disk-search-input" placeholder="Search disk..." autocomplete="off" aria-label="Search disk">
-                </div>
-                <div id="disk-list" class="disk-list">
-                    <div class="disk-list-item loading">Loading disks…</div>
-                </div>
-            </div>
-
-            <!-- Status Monitor — pushed to bottom -->
-            <div class="status-monitor">
-                <div class="status-header">
-                    <span class="status-dot scanning"></span>
-                    <span id="system-status">System Standing By</span>
-                    <span id="last-sync-time" class="last-sync-time"></span>
-                </div>
-                <div class="progress-container">
-                    <div class="progress-track">
-                        <div id="scan-progress-bar" class="progress-fill" style="width: 0%"></div>
-                    </div>
-                </div>
-                <div class="status-details">
-                    <span id="files-processed">0/0 files</span>
-                    <label style="display:none;" for="btn-fetch">Sync Server Data</label>
-                    <button id="btn-fetch" class="btn-primary">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                        Sync Now
-                    </button>
-                </div>
-            </div>
         </aside>
 
         <!-- Main Content Area -->
         <main class="main-content">
-        <!-- ===== SHARED HEADER (always visible) ===== -->
-        <header id="shared-header" class="top-header">
+
+
+<div class="workspace-body" style="display:flex; flex:1; overflow:hidden; min-height: calc(100vh - 40px); gap: 24px;">
+
+
+
+<div id="workspace-canvas" class="workspace-canvas" style="flex:1; overflow-y:auto; position:relative; display:flex; flex-direction:column;">
+
+        <!-- ===== DISK HEADER — shown only on disk detail/overview pages ===== -->
+        <header id="shared-header" class="top-header" style="display:none;">
             <!-- Row 1: disk name · path · quick stats (all inline) -->
             <div class="header-top-row">
                 <div class="header-identity">
@@ -156,7 +97,24 @@
                             <line x1="3" y1="18" x2="21" y2="18"/>
                         </svg>
                     </button>
-                    <h1 id="shared-page-title">Disk Usage Overview</h1>
+                    <div class="dropdown-wrapper" id="disk-dropdown-wrapper" style="position:relative;">
+                        <button id="disk-dropdown-trigger" class="disk-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <h1 id="shared-page-title" style="margin:0; font-size:inherit;">Disk Usage Overview</h1>
+                            <svg class="dropdown-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <!-- Overflow Disk Dropdown Menu -->
+                        <div id="disk-dropdown-menu" class="disk-dropdown-menu glass-panel" style="display:none; position:absolute; top:calc(100% + 8px); left:0; width:280px; z-index:1000; flex-direction:column; padding:0; overflow:hidden;">
+                            <div class="disk-search-wrap" style="margin: 10px 10px 5px 10px;">
+                                <svg class="disk-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                <input type="text" id="disk-search" class="disk-search-input" placeholder="Search disk..." autocomplete="off" style="width:100%; min-width:0;">
+                            </div>
+                            <div id="disk-list" class="disk-list" style="flex:1; padding: 10px; max-height: 350px; overflow-y:auto;">
+                                <div class="disk-list-item" style="opacity:0.5; padding:8px 12px; font-size:13px;">No disks available.</div>
+                            </div>
+                        </div>
+                    </div>
                     <span class="header-sep">·</span>
                     <p id="header-disk-path" class="header-disk-path">—</p>
                 </div>
@@ -201,7 +159,105 @@
             </div>
             <!-- Row 2: timestamp -->
             <p class="subtitle" id="data-timerange">Waiting for data payload...</p>
+
+            <!-- Row 3: Tabs & Actions -->
+            <div class="workspace-header" style="padding-bottom: 16px; margin-bottom: 24px; border-bottom: 2px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between; align-items:center;">
+                <div class="workspace-nav-tabs">
+                    <button id="nav-overview" class="tab-btn active">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                        Overview
+                    </button>
+                    <button id="nav-detail" class="tab-btn">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="8" y1="6" x2="21" y2="6"></line>
+                            <line x1="8" y1="12" x2="21" y2="12"></line>
+                            <line x1="8" y1="18" x2="21" y2="18"></line>
+                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                        </svg>
+                        Detail
+                    </button>
+                </div>
+                <div class="workspace-actions" style="display:flex; align-items:center; gap:16px;">
+                    <!-- System Monitor Horizontal Pill (Moved from Sidebar) -->
+                    <div style="display:flex; align-items:stretch; background:rgba(0,0,0,0.15); border:1px solid rgba(255,255,255,0.06); border-radius:8px; position:relative; overflow:hidden;">
+                        <!-- Progress bar at the absolute bottom -->
+                        <div id="scan-progress-bar" style="position:absolute; bottom:0; left:0; height:2px; background:linear-gradient(90deg, var(--emerald-500), #0ea5e9); transition:width 0.3s ease; width:0%;"></div>
+                        
+                        <!-- System Status -->
+                        <div style="display:flex; align-items:center; gap:8px; padding:6px 14px;">
+                            <span class="status-dot scanning" style="width:6px; height:6px;"></span>
+                            <span id="system-status" style="font-size:0.75rem; font-weight:600; color:var(--text-primary); letter-spacing:0.02em;">System Standing By</span>
+                        </div>
+                        
+                        <!-- Divider -->
+                        <div style="width:1px; background:rgba(255,255,255,0.06);"></div>
+                        
+                        <!-- Last Sync Time -->
+                        <div id="last-sync-time" style="display:flex; align-items:center; padding:6px 14px; font-family:'JetBrains Mono', monospace; font-size:0.75rem; color:var(--emerald-400); font-weight:500;">
+                            --/--/---- --:--:--
+                        </div>
+                        
+                        <!-- Divider -->
+                        <div style="width:1px; background:rgba(255,255,255,0.06);"></div>
+                        
+                        <!-- Files / Stats -->
+                        <div style="display:flex; align-items:center; padding:6px 14px;">
+                            <span id="files-processed" style="font-size:0.75rem; font-family:'JetBrains Mono', monospace; color:var(--text-secondary);">0/0 files</span>
+                        </div>
+                    </div>
+                    
+                    <button id="btn-fetch" class="btn-sync">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                        Sync
+                    </button>
+                </div>
+            </div>
         </header>
+
+            <!-- ===== TEAM OVERVIEW PAGE ===== -->
+            <section id="page-team-overview" class="page-section page-hidden">
+                <div class="charts-grid" style="grid-template-columns: 1fr; margin-bottom: 24px;">
+                    <div class="chart-container large-span glass-panel widget-anim">
+                        <h2 class="section-title"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg> Team Infrastructure Overview</h2>
+                        <div style="display: flex; gap: 40px; padding: 20px; flex-wrap: wrap;">
+                            <div class="doughnut-wrapper" style="width: 220px; height: 220px;">
+                                <canvas id="teamUsageChart"></canvas>
+                            </div>
+                            <div style="display: flex; flex-direction: column; justify-content: center; gap: 24px;">
+                                <div class="stat-block" style="text-align:left;">
+                                    <span class="stat-label">Total Allocated Storage</span>
+                                    <div class="stat-num-row" style="justify-content:flex-start;">
+                                        <span class="stat-number" id="team-stat-total">0.00</span>
+                                        <span class="stat-unit">TB</span>
+                                    </div>
+                                </div>
+                                <div class="stat-block" style="text-align:left;">
+                                    <span class="stat-label">Total Used Space</span>
+                                    <div class="stat-num-row" style="justify-content:flex-start;">
+                                        <span class="stat-number text-rose" id="team-stat-used">0.00</span>
+                                        <span class="stat-unit">TB</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-header">
+                    <h2 class="section-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px; vertical-align:middle; margin-top:-2px;"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg> Member Disks</h2>
+                </div>
+                
+                <div class="disk-card-grid" id="team-disk-grid">
+                    <!-- Cards will be populated by JS -->
+                </div>
+            </section>
 
             <!-- ===== OVERVIEW PAGE ===== -->
             <section id="page-overview" class="page-section page-hidden">
@@ -386,7 +442,8 @@
 
 
 
-        </main>
+        </div></div>
+</main>
     </div>
 
     <!-- TASK-06: Toast Notification Container -->
@@ -394,15 +451,15 @@
 
 
 
-    <script src="js/dataFetcher.js?v=32" type="module"></script>
-    <script src="js/dataStore.js?v=32" type="module"></script>
-    <script src="js/chartManager.js?v=32" type="module"></script>
-    <script src="js/permissionRenderer.js?v=32" type="module"></script>
-    <script src="js/userDetailRenderer.js?v=32" type="module"></script>
-    <script src="js/main.js?v=32" type="module"></script>
-    <script src="js/chartModal.js?v=32" type="module"></script>
-    <script src="js/themeToggle.js?v=32"></script>
-    <script src="js/scrollToTop.js?v=32" type="module"></script>
+    <script src="js/dataFetcher.js?v=40" type="module"></script>
+    <script src="js/dataStore.js?v=35" type="module"></script>
+    <script src="js/chartManager.js?v=35" type="module"></script>
+    <script src="js/permissionRenderer.js?v=35" type="module"></script>
+    <script src="js/userDetailRenderer.js?v=35" type="module"></script>
+    <script src="js/main.js?v=35" type="module"></script>
+    <script src="js/chartModal.js?v=35" type="module"></script>
+    <script src="js/themeToggle.js?v=35"></script>
+    <script src="js/scrollToTop.js?v=35" type="module"></script>
     <script src="js/tooltip.js?v=1"></script>
 </body>
 </html>

@@ -71,11 +71,9 @@
 }
 
 
-/* Glassmorphism Panel Component */
+/* Solid Brutalist Panel Component */
 .glass-panel {
     background: var(--bg-surface);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
     border: var(--glass-border);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--glass-shadow);
@@ -282,6 +280,76 @@
 
 .disk-search-input::placeholder {
     color: #475569;
+}
+
+/* Nested Disk Configuration Styles */
+.disk-project-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 20px;
+}
+
+.disk-project-header {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    padding: 0 10px 8px 10px;
+    display: flex;
+    align-items: center;
+    user-select: none;
+    transition: color 0.2s ease;
+}
+
+.disk-project-header:hover {
+    color: var(--text-secondary);
+}
+
+.disk-team-group {
+    border-radius: 8px;
+    margin: 0;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.disk-team-group:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.disk-team-group.active-team {
+    background: rgba(16, 185, 129, 0.08); /* Emerald hint */
+    border-color: rgba(16, 185, 129, 0.2);
+}
+
+.disk-team-header {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    transition: color 0.2s ease;
+}
+
+.disk-team-group.active-team .disk-team-header {
+    color: var(--emerald-400);
+    font-weight: 600;
+}
+
+.disk-team-group.standalone {
+    margin: 0;
+}
+
+.disk-list-item.nested {
+    padding-left: 22px;
+}
+
+.disk-list-item.nested::before {
+    margin-left: 2px;
 }
 
 .disk-list-item {
@@ -587,7 +655,8 @@
 
 .data-table tbody tr {
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    transition: background 0.15s ease;
+    border-left: 2px solid transparent;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .data-table tbody tr:last-child {
@@ -596,6 +665,8 @@
 
 .data-table tbody tr:hover {
     background: rgba(255, 255, 255, 0.03);
+    border-left: 2px solid var(--text-accent);
+    transform: translateX(4px);
 }
 
 .data-table tbody td {
@@ -4891,3 +4962,257 @@
     font-size: 0.85rem;
 }
 .perm-pagination { margin-top: 8px; }
+
+/* Collapsible sidebar styles */
+.disk-project-group.collapsed > .disk-team-group,
+.disk-project-group.collapsed > .disk-list-item,
+.disk-team-group.collapsed > .disk-list-item {
+    display: none !important;
+}
+
+.collapsed > .disk-project-header .toggle-icon,
+.collapsed > .disk-team-header .toggle-icon {
+    transform: rotate(-90deg) !important;
+}
+
+/* Workspace Tab Styles */
+.workspace-nav-tabs .tab-btn {
+    padding: 10px 15px;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    background: transparent;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.workspace-nav-tabs .tab-btn:hover {
+    color: var(--text-primary);
+}
+
+.workspace-nav-tabs .tab-btn.active {
+    border-bottom: 2px solid var(--emerald-500, #10b981);
+    color: var(--text-primary);
+}
+
+/* ── Workspace Header ─────────────────────────────────────────────── */
+.workspace-header {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    height: 42px;
+    margin-top: 16px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+}
+
+.workspace-nav-tabs {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+}
+
+.workspace-nav-tabs .tab-btn {
+    position: relative;
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.workspace-nav-tabs .tab-btn::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: transparent;
+    transition: background 0.2s;
+}
+
+.workspace-nav-tabs .tab-btn:hover {
+    color: var(--text-primary);
+}
+
+.workspace-nav-tabs .tab-btn.active {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.workspace-nav-tabs .tab-btn.active::after {
+    background: var(--emerald-500, #10b981);
+}
+
+/* ── Workspace Actions (right side) ─────────────────────────── */
+.workspace-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-sync {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--emerald-400, #34d399);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-sync:hover {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: rgba(16, 185, 129, 0.5);
+    color: var(--emerald-300, #6ee7b7);
+}
+
+.btn-sync:active {
+    transform: scale(0.97);
+}
+
+.btn-sync:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ── Active team highlight in sidebar ─────────────────────────── */
+.disk-team-group.active-team {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-left: 2px solid var(--accent);
+    padding-left: 6px;
+}
+
+/* ── Overhead Disk Dropdown ─────────────────────────── */
+.disk-dropdown-trigger {
+    background: transparent;
+    border: none;
+    padding: 6px 10px;
+    margin: -6px -10px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.disk-dropdown-trigger:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.disk-dropdown-trigger .dropdown-chevron {
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+
+.disk-dropdown-trigger[aria-expanded="true"] .dropdown-chevron {
+    transform: rotate(180deg);
+}
+
+.disk-dropdown-menu {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
+.disk-dropdown-menu .disk-list-item {
+    transition: background 0.2s;
+    border-radius: 6px;
+    margin: 2px 5px;
+}
+
+.disk-dropdown-menu .disk-list-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* ── Team Overview Disk Cards ─────────────────────────── */
+.disk-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.team-disk-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
+.team-disk-card:hover {
+    transform: translateY(-4px);
+    background: rgba(255, 255, 255, 0.08); /* slight brightening */
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+.team-disk-card .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.team-disk-card .disk-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.team-disk-card .disk-path {
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary);
+    background: rgba(0,0,0,0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.team-disk-card .card-stats {
+    display: flex;
+    justify-content: space-between;
+}
+
+.team-disk-card .card-stat-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.team-disk-card .card-stat-val {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}

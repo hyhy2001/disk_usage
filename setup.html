@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StorageOS · Config Generator</title>
     <meta name="description" content="Visual configuration generator for disk_checker_config.json">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/index.css?v=31">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Fira Sans', sans-serif;
             background: var(--bg-base, #0b0f1a);
             color: var(--text-primary, #e2e8f0);
             min-height: 100vh;
@@ -122,6 +122,38 @@
         .cfg-preview-pre .key { color: #818cf8; }
         .cfg-preview-pre .str { color: #34d399; }
         .cfg-preview-pre .num { color: #fb923c; }
+
+        
+        /* Tabs */
+        .cfg-tabs {
+            display: flex; gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            padding-bottom: 8px;
+        }
+        .cfg-tab {
+            padding: 10px 18px;
+            font-size: 0.85rem; font-weight: 600;
+            color: var(--text-secondary);
+            background: transparent; border: none; cursor: pointer;
+            border-radius: 8px; transition: all 0.15s;
+        }
+        .cfg-tab:hover { color: #e2e8f0; background: rgba(255,255,255,0.04); }
+        .cfg-tab.active {
+            color: #fff; background: rgba(14,165,233,0.15);
+            box-shadow: 0 0 0 1px rgba(14,165,233,0.3);
+        }
+
+        .cfg-pane { display: none; }
+        .cfg-pane.active { display: block; }
+        
+        /* Nesting */
+        .cfg-nest-team {
+            margin-left: 14px; margin-top: 8px; border-left: 2px solid rgba(255,255,255,0.1); padding-left: 12px;
+        }
+        .cfg-nest-disk {
+            margin-left: 14px; margin-top: 8px; border-left: 2px solid rgba(14,165,233,0.3); padding-left: 12px;
+        }
 
         /* Form elements */
         .field { margin-bottom: 14px; }
@@ -275,7 +307,15 @@
         </a>
     </div>
 
+    
+    <!-- Tabs -->
+    <div class="cfg-tabs">
+        <button class="cfg-tab active" data-tab="dc">Scanner Config (disk_checker_config.json)</button>
+        <button class="cfg-tab" data-tab="dj">Dashboard Config (disks.json)</button>
+    </div>
+
     <!-- Layout: form left, preview right -->
+
     <div class="cfg-layout">
 
         <!-- LEFT: Config Form -->
@@ -284,10 +324,11 @@
                 <div class="cfg-panel-icon">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
                 </div>
-                <span class="cfg-panel-title">Scanner Configuration</span>
-                <span class="cfg-panel-file">disk_checker_config.json</span>
+                <span class="cfg-panel-title" id="dyn-title">Scanner Configuration</span>
+                <span class="cfg-panel-file" id="dyn-file">disk_checker_config.json</span>
             </div>
             <div class="cfg-panel-body">
+            <div class="cfg-pane active" id="pane-dc">
 
                 <div class="field">
                     <label>Scan Directory</label>
@@ -310,8 +351,25 @@
                     Add User Group
                 </button>
 
-            </div>
-        </div>
+            </div><!-- /pane-dc -->
+
+            <div class="cfg-pane" id="pane-dj">
+                <div class="cfg-section-label">Projects</div>
+                <div class="cfg-list" id="dj-projects-list"></div>
+                <div style="display:flex; gap:8px;">
+<button class="btn btn-add-row" id="dj-add-project" style="margin-top:16px; flex: 1;">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Add Project
+                </button>
+                <button class="btn btn-add-row" id="dj-add-team" style="margin-top:16px; flex: 1;">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Add Standalone Team
+                </button>
+</div>
+            </div><!-- /pane-dj -->
+
+            </div><!-- /cfg-panel-body -->
+        </div><!-- /cfg-form-panel -->
 
         <!-- RIGHT: Preview + Download (sticky) -->
         <div class="cfg-preview-panel">
@@ -320,13 +378,13 @@
                     <span class="dot dot-red"></span>
                     <span class="dot dot-amber"></span>
                     <span class="dot dot-green"></span>
-                    <span style="margin-left:6px">disk_checker_config.json</span>
+                    <span style="margin-left:6px" id="dyn-preview-file">disk_checker_config.json</span>
                 </div>
                 <pre class="cfg-preview-pre" id="dc-preview"></pre>
             </div>
             <button class="btn btn-download" id="dc-download">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                Download disk_checker_config.json
+                Download <span id="dyn-dl-name">disk_checker_config.json</span>
             </button>
         </div>
 
@@ -370,10 +428,10 @@ function dcHighlightCompact(obj) {
     const kvn = (k, v) => `<span class="key">"${esc(k)}"</span>: <span class="num">${v}</span>`;
 
     const teamLines = obj.teams.length
-        ? obj.teams.map(t => '    { ' + kv('name', t.name) + ', ' + kvn('team_ID', t.team_ID) + ' }').join(',\n')
+        ? obj.teams.map(t => '    { ' + kv('name', t.name) + ', ' + kvn('team_id', t.team_id) + ' }').join(',\n')
         : '    ';
     const userLines = obj.users.length
-        ? obj.users.map(u => '    { ' + kv('name', u.name) + ', ' + kvn('team_ID', u.team_ID) + ' }').join(',\n')
+        ? obj.users.map(u => '    { ' + kv('name', u.name) + ', ' + kvn('team_id', u.team_id) + ' }').join(',\n')
         : '    ';
 
     return [
@@ -395,12 +453,12 @@ function dcBuild() {
     dcUserGroups.forEach(g => {
         const teamId = g.teamId || (dcTeams[0]?.id ?? 1);
         g.text.split('\n').map(s => s.trim()).filter(Boolean)
-              .forEach(n => users.push({ name: n, team_ID: teamId }));
+              .forEach(n => users.push({ name: n, team_id: teamId }));
     });
     return {
         directory:   document.getElementById('dc-directory').value.trim() || '/mnt/data',
         output_file: 'disk_usage_report.json',
-        teams: dcTeams.map(t => ({ name: t.name, team_ID: t.id })),
+        teams: dcTeams.map(t => ({ name: t.name, team_id: t.id })),
         users,
     };
 }
@@ -576,16 +634,220 @@ document.getElementById('dc-add-user-group').addEventListener('click', () => {
 
 document.getElementById('dc-directory').addEventListener('input', dcRenderPreview);
 
-document.getElementById('dc-download').addEventListener('click', () => {
-    download('disk_checker_config.json', JSON.stringify(dcBuild(), null, 2));
-    toast('Downloaded disk_checker_config.json');
+
+
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab = 'dc'; // 'dc' or 'dj'
+document.querySelectorAll('.cfg-tab').forEach(tab => {
+    tab.addEventListener('click', (e) => {
+        document.querySelectorAll('.cfg-tab').forEach(t => t.classList.remove('active'));
+        e.target.classList.add('active');
+        activeTab = e.target.getAttribute('data-tab');
+        
+        document.querySelectorAll('.cfg-pane').forEach(p => p.classList.remove('active'));
+        document.getElementById('pane-' + activeTab).classList.add('active');
+        
+        if (activeTab === 'dc') {
+            document.getElementById('dyn-title').textContent = 'Scanner Configuration';
+            document.getElementById('dyn-file').textContent = 'disk_checker_config.json';
+            document.getElementById('dyn-preview-file').textContent = 'disk_checker_config.json';
+            document.getElementById('dyn-dl-name').textContent = 'disk_checker_config.json';
+            dcRenderPreview();
+        } else {
+            document.getElementById('dyn-title').textContent = 'Dashboard Configuration';
+            document.getElementById('dyn-file').textContent = 'disks.json';
+            document.getElementById('dyn-preview-file').textContent = 'disks.json';
+            document.getElementById('dyn-dl-name').textContent = 'disks.json';
+            djRenderPreview();
+        }
+    });
 });
+
+// ─── DASHBOARD CONFIG (disks.json) ────────────────────────────────────────────
+let djProjects = [
+    {
+        project: 'StorageOS Core',
+        teams: [
+            {
+                name: 'Backend Team',
+                disks: [
+                    { id: 'disk_test', name: 'Primary Storage', path: 'reports_test' }
+                ]
+            }
+        ]
+    }
+];
+
+function colorizeJSON(jsonString) {
+    return jsonString.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+        let cls = 'num';
+        if (/^"/.test(match)) {
+            if (/:$/.test(match)) {
+                cls = 'key';
+                // remove quotes from key for prettier look if wanted, but json requires quotes
+            } else {
+                cls = 'str';
+            }
+        }
+        return '<span class="' + cls + '">' + match + '</span>';
+    });
+}
+
+
+function compressDisksJSON(jsonStr) {
+    return jsonStr.replace(/\{\n\s*"id":\s*("[^"]*"),\n\s*"name":\s*("[^"]*"),\n\s*"path":\s*("[^"]*")\n\s*\}/g, '{ "id": $1, "name": $2, "path": $3 }');
+}
+
+function djRenderPreview() {
+    // Basic validation
+    let hasError = false;
+    document.querySelectorAll('.dj-input-required').forEach(el => {
+        el.classList.remove('has-error');
+        if (!el.value.trim()) {
+            el.classList.add('has-error');
+            hasError = true;
+        }
+    });
+    document.getElementById('dc-download').disabled = hasError;
+    
+    // Live preview
+
+    let rawJSON = JSON.stringify(djProjects, null, 2);
+    rawJSON = compressDisksJSON(rawJSON);
+    rawJSON = rawJSON.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    document.getElementById('dc-preview').innerHTML = colorizeJSON(rawJSON);
+}
+
+function djRender() {
+    const list = document.getElementById('dj-projects-list');
+    list.innerHTML = djProjects.map((p, pIdx) => {
+        if (p.project !== undefined) {
+            // It's a Project
+            return `
+            <div class="cfg-card" style="margin-bottom: 12px; border-color: rgba(14,165,233,0.3);">
+                <div class="cfg-card-row">
+                    <div class="field">
+                        <label>Project Name</label>
+                        <input class="dj-input-required" type="text" value="${escAttr(p.project)}" placeholder="e.g. StorageOS Core" oninput="djUpdate('p', ${pIdx}, null, null, 'project', this.value)">
+                    </div>
+                    <button class="btn btn-danger" onclick="djRemove('p', ${pIdx})" title="Remove Project">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <div class="cfg-nest-team">
+                    ${p.teams.map((t, tIdx) => `
+                        <div class="cfg-card" style="margin-bottom: 8px">
+                            <div class="cfg-card-row">
+                                <div class="field">
+                                    <label>Team Name</label>
+                                    <input class="dj-input-required" type="text" value="${escAttr(t.name)}" placeholder="e.g. Backend Team" oninput="djUpdate('t', ${pIdx}, ${tIdx}, null, 'name', this.value)">
+                                </div>
+                                <button class="btn btn-danger" onclick="djRemove('t', ${pIdx}, ${tIdx})" title="Remove Team">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                </button>
+                            </div>
+                            <div class="cfg-nest-disk">
+                                ${t.disks.map((d, dIdx) => `
+                                    <div class="cfg-card-row" style="margin-bottom: 6px">
+                                        <div class="field"><label>Disk ID</label><input class="dj-input-required" type="text" value="${escAttr(d.id)}" placeholder="disk_1" oninput="djUpdate('d', ${pIdx}, ${tIdx}, ${dIdx}, 'id', this.value)"></div>
+                                        <div class="field"><label>Disk Name</label><input class="dj-input-required" type="text" value="${escAttr(d.name)}" placeholder="Primary Storage" oninput="djUpdate('d', ${pIdx}, ${tIdx}, ${dIdx}, 'name', this.value)"></div>
+                                        <div class="field"><label>Server Path</label><input class="dj-input-required" type="text" value="${escAttr(d.path)}" placeholder="/www/wwwroot" oninput="djUpdate('d', ${pIdx}, ${tIdx}, ${dIdx}, 'path', this.value)"></div>
+                                        <button class="btn btn-danger" onclick="djRemove('d', ${pIdx}, ${tIdx}, ${dIdx})" title="Remove Disk" style="margin-bottoM:14px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                                    </div>
+                                `).join('')}
+                                <button class="btn btn-add-row" onclick="djAdd('d', ${pIdx}, ${tIdx})" style="padding: 4px; font-size: 0.7rem">+ Add Disk</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                    <button class="btn btn-add-row" onclick="djAdd('t', ${pIdx})" style="padding: 6px; font-size: 0.73rem; margin-top:8px">+ Add Team</button>
+                </div>
+            </div>`;
+        } else {
+            // It's a Standalone Team
+            return `
+            <div class="cfg-card" style="margin-bottom: 12px; border-color: rgba(52,211,153,0.3);">
+                <div class="cfg-card-row">
+                    <div class="field">
+                        <label>Standalone Team Name</label>
+                        <input class="dj-input-required" type="text" value="${escAttr(p.name)}" placeholder="e.g. Security Team" oninput="djUpdate('st', ${pIdx}, null, null, 'name', this.value)">
+                    </div>
+                    <button class="btn btn-danger" onclick="djRemove('p', ${pIdx})" title="Remove Team">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <div class="cfg-nest-disk">
+                    ${p.disks.map((d, dIdx) => `
+                        <div class="cfg-card-row" style="margin-bottom: 6px">
+                            <div class="field"><label>Disk ID</label><input class="dj-input-required" type="text" value="${escAttr(d.id)}" placeholder="disk_1" oninput="djUpdate('sd', ${pIdx}, null, ${dIdx}, 'id', this.value)"></div>
+                            <div class="field"><label>Disk Name</label><input class="dj-input-required" type="text" value="${escAttr(d.name)}" placeholder="Storage" oninput="djUpdate('sd', ${pIdx}, null, ${dIdx}, 'name', this.value)"></div>
+                            <div class="field"><label>Server Path</label><input class="dj-input-required" type="text" value="${escAttr(d.path)}" placeholder="/www/wwwroot" oninput="djUpdate('sd', ${pIdx}, null, ${dIdx}, 'path', this.value)"></div>
+                            <button class="btn btn-danger" onclick="djRemove('sd', ${pIdx}, null, ${dIdx})" title="Remove Disk" style="margin-bottoM:14px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                        </div>
+                    `).join('')}
+                    <button class="btn btn-add-row" onclick="djAdd('sd', ${pIdx}, null)" style="padding: 4px; font-size: 0.7rem">+ Add Disk</button>
+                </div>
+            </div>`;
+        }
+    }).join('');
+    
+    djRenderPreview();
+}
+
+window.djUpdate = function(type, pIdx, tIdx, dIdx, key, val) {
+    if (type === 'p') djProjects[pIdx][key] = val;
+    else if (type === 't') djProjects[pIdx].teams[tIdx][key] = val;
+    else if (type === 'd') djProjects[pIdx].teams[tIdx].disks[dIdx][key] = val;
+    else if (type === 'st') djProjects[pIdx][key] = val;
+    else if (type === 'sd') djProjects[pIdx].disks[dIdx][key] = val;
+    djRenderPreview();
+};
+
+window.djRemove = function(type, pIdx, tIdx, dIdx) {
+    if (type === 'p') djProjects.splice(pIdx, 1);
+    else if (type === 't') djProjects[pIdx].teams.splice(tIdx, 1);
+    else if (type === 'd') djProjects[pIdx].teams[tIdx].disks.splice(dIdx, 1);
+    else if (type === 'sd') djProjects[pIdx].disks.splice(dIdx, 1);
+    djRender();
+};
+
+window.djAdd = function(type, pIdx, tIdx) {
+    if (type === 'p') {
+        djProjects.push({ project: 'New Project', teams: [] });
+    } else if (type === 'st') {
+        djProjects.push({ name: 'Standalone Team', disks: [] });
+    } else if (type === 't') {
+        djProjects[pIdx].teams.push({ name: 'New Team', disks: [] });
+    } else if (type === 'd') {
+        djProjects[pIdx].teams[tIdx].disks.push({ id: 'disk_' + Math.floor(Math.random()*1000), name: 'Disk Storage', path: '/reports' });
+    } else if (type === 'sd') {
+        djProjects[pIdx].disks.push({ id: 'disk_' + Math.floor(Math.random()*1000), name: 'Disk Storage', path: '/reports' });
+    }
+    djRender();
+};
+
+document.getElementById('dj-add-project').addEventListener('click', () => djAdd('p'));
+document.getElementById('dj-add-team').addEventListener('click', () => djAdd('st'));
+
+// Update download button
+document.getElementById('dc-download').addEventListener('click', () => {
+    if (activeTab === 'dc') {
+        download('disk_checker_config.json', JSON.stringify(dcBuild(), null, 2));
+        toast('Downloaded disk_checker_config.json');
+    } else {
+        const outJSON = compressDisksJSON(JSON.stringify(djProjects, null, 2));
+        download('disks.json', outJSON);
+        toast('Downloaded disks.json');
+    }
+});
+
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 dcRenderTeams();
 dcRefreshUserTeamSelect();
 dcRenderUserGroups();
 dcRenderPreview();
+    djRender();
 </script>
 </body>
 </html>

@@ -86,10 +86,10 @@
 .main-content {
     flex: 1;
     margin-left: var(--sidebar-width);
-    padding: 32px 40px;
+    padding: 24px 24px 24px 24px;
     display: flex;
     flex-direction: column;
-    gap: 32px;
+    gap: 20px;
     /* CRITICAL: allow flex child to shrink below its content width */
     min-width: 0;
     /* All scrolling happens here, not on the page */
@@ -175,7 +175,7 @@
 .charts-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 24px;
+    gap: 16px;
     /* Prevent grid from overflowing its container */
     min-width: 0;
     width: 100%;
@@ -186,10 +186,10 @@
 }
 
 .chart-container {
-    padding: 24px;
+    padding: 16px 20px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
     min-height: 350px;
     /* CRITICAL: prevents grid/flex children from overflowing their container */
     min-width: 0;
@@ -932,4 +932,36 @@
         animation: none;
         width: 60% !important;
     }
+}
+
+/* ==========================================================================
+   Light Mode Contrast Adjustments
+   ========================================================================== */
+:root[data-theme='light'] .header-disk-path {
+    color: #d97706 !important; /* amber-600 */
+}
+
+:root[data-theme='light'] #last-sync-time {
+    color: #059669 !important; /* emerald-600 */
+}
+
+:root[data-theme='light'] .btn-sync {
+    color: #059669 !important;
+    background: rgba(5, 150, 105, 0.1) !important;
+    border-color: rgba(5, 150, 105, 0.3) !important;
+}
+
+:root[data-theme='light'] .btn-sync:hover {
+    color: #047857 !important; /* emerald-700 */
+    background: rgba(5, 150, 105, 0.15) !important;
+    border-color: rgba(5, 150, 105, 0.4) !important;
+}
+
+:root[data-theme='light'] .disk-team-group.active-team .disk-team-header {
+    color: #059669 !important; /* emerald-600 */
+}
+
+:root[data-theme='light'] .disk-team-group.active-team {
+    background: rgba(5, 150, 105, 0.08) !important;
+    border-color: rgba(5, 150, 105, 0.25) !important;
 }
