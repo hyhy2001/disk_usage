@@ -5150,33 +5150,127 @@
     background: rgba(255, 255, 255, 0.05);
 }
 
+/* ── View Toggle (Grid/List) ──────────────────────────── */
+.view-toggle {
+    display: flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--border-radius-md);
+    overflow: hidden; /* Segmented control style */
+}
+
+:root[data-theme='light'] .view-toggle {
+    background: rgba(15, 23, 42, 0.05);
+    border-color: rgba(15, 23, 42, 0.15);
+}
+
+.view-toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 6px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-smooth);
+}
+
+.view-toggle-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme='light'] .view-toggle-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.view-toggle-btn.active {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--text-primary);
+}
+
+:root[data-theme='light'] .view-toggle-btn.active {
+    background: rgba(0, 0, 0, 0.1);
+}
+
 /* ── Team Overview Disk Cards ─────────────────────────── */
 .disk-card-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 20px;
+    gap: 16px;
     margin-bottom: 24px;
 }
 
+/* List View Modifier */
+.disk-card-grid.list-view {
+    display: flex;
+    flex-direction: column;
+    gap: 8px; /* High density row layout */
+}
+
 .team-disk-card {
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
+    background: var(--bg-surface);
+    border: var(--glass-border);
+    border-radius: var(--border-radius-lg);
     padding: 20px;
     display: flex;
     flex-direction: column;
     gap: 16px;
     cursor: pointer;
-    transition: all 0.3s ease;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Brutal/Spring interaction */
 }
 
 .team-disk-card:hover {
-    transform: translateY(-4px);
-    background: rgba(255, 255, 255, 0.08); /* slight brightening */
+    transform: translateY(-2px);
+    background: var(--bg-surface-elevated);
     border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--glass-shadow);
+}
+
+:root[data-theme='light'] .team-disk-card:hover {
+    border-color: rgba(15, 23, 42, 0.3);
+}
+
+/* Adjust layout when inside .list-view */
+.disk-card-grid.list-view .team-disk-card {
+    flex-direction: row;
+    align-items: center;
+    padding: 12px 20px;
+    gap: 20px;
+}
+
+.disk-card-grid.list-view .team-disk-card .card-header {
+    flex: 1;
+    min-width: 150px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+}
+
+.disk-card-grid.list-view .team-disk-card .card-stats {
+    flex: 2;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    min-width: 300px;
+}
+
+.disk-card-grid.list-view .team-disk-card .card-stat-block {
+    text-align: left !important;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.disk-card-grid.list-view .team-disk-card .progress-container {
+    flex: 1;
+    max-width: 150px;
+    margin-top: 0;
 }
 
 .team-disk-card .card-header {
@@ -5193,11 +5287,11 @@
 
 .team-disk-card .disk-path {
     font-size: 0.75rem;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Fira Code', monospace;
     color: var(--text-secondary);
     background: rgba(0,0,0,0.2);
     padding: 2px 6px;
-    border-radius: 4px;
+    border-radius: var(--border-radius-md);
 }
 
 .team-disk-card .card-stats {

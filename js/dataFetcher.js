@@ -1,7 +1,7 @@
 import { UINodes, AppState, animateValue, bytesToTB, showToast } from './main.js';
 import { DataStore } from './dataStore.js';
 import { ChartManager } from './chartManager.js';
-import { initRouter } from './router.js';
+import { initRouter, navigateTo } from './router.js';
 import { renderDetailTables, initScaleToggle, resetDashboardToEmpty } from './detailRenderer.js';
 import { initUserDetailTab, resetUserDetailTab } from './userDetailRenderer.js';
 import { fmt } from './formatters.js';
@@ -64,13 +64,84 @@ class DataFetcher {
             });
         }
 
+        // Workspace header tab buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (!this._activeDisk) return;
+                if (btn.id === 'nav-detail') {
+                    navigateTo('detail');
+                } else {
+                    navigateTo('overview');
+                }
+            });
+        });
+
+        // Team Overview Grid/List View Toggle
+        const viewToggleBtns = document.querySelectorAll('#team-view-toggle .view-toggle-btn');
+        if (viewToggleBtns.length > 0) {
+            const savedView = localStorage.getItem('teamViewMode') || 'grid';
+            
+            // Initial state application
+            const teamDiskGrid = document.getElementById('team-disk-grid');
+            if (savedView === 'list' && teamDiskGrid) {
+                teamDiskGrid.classList.add('list-view');
+            }
+            
+            viewToggleBtns.forEach(btn => {
+                if (btn.dataset.view === savedView) {
+                    viewToggleBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                }
+                
+                btn.addEventListener('click', () => {
+                    const viewType = btn.dataset.view;
+                    viewToggleBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    if (teamDiskGrid) {
+                        if (viewType === 'list') {
+                            teamDiskGrid.classList.add('list-view');
+                        } else {
+                            teamDiskGrid.classList.remove('list-view');
+                        }
+                    }
+                    localStorage.setItem('teamViewMode', viewType);
+                });
+            });
+        }
+
+        // Overhead Disk Dropdown Logic
+        const dropdownTrigger = document.getElementById('disk-dropdown-trigger');
+        const dropdownMenu = document.getElementById('disk-dropdown-menu');
+        if (dropdownTrigger && dropdownMenu) {
+            dropdownTrigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isExpanded = dropdownTrigger.getAttribute('aria-expanded') === 'true';
+                dropdownTrigger.setAttribute('aria-expanded', !isExpanded);
+                dropdownMenu.style.display = isExpanded ? 'none' : 'flex';
+                if (!isExpanded) {
+                    const searchInput = document.getElementById('disk-search');
+                    if (searchInput) searchInput.focus();
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!dropdownTrigger.contains(e.target) && !dropdownMenu.contains(e.target)) {
+                    dropdownTrigger.setAttribute('aria-expanded', 'false');
+                    dropdownMenu.style.display = 'none';
+                }
+            });
+
+            dropdownMenu.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
+
         // Start live clock
         startClock();
 
-        // Load disk list then auto-fetch
-        this._initDiskSelector().then(() => {
-            setTimeout(() => this.startServerSync(), 300);
-        });
+        // Load disk list (auto-fetch is triggered inherently by disk click simulation inside)
+        this._initDiskSelector();
     }
 
     async _initDiskSelector() {
@@ -82,128 +153,365 @@ class DataFetcher {
                     .map(() => '<div class="skeleton skeleton-disk-item"></div>').join('');
                 list.innerHTML = skeletonHTML;
             }
-            // Fetch disks.json directly as static file — no PHP needed
-            const res = await fetch('disks.json');
-            const disks = await res.json();
-            this.disksConfig = disks;
-
-            if (!list) return;
-
-            // Helper: build disk items HTML
-            const buildItems = (container, disks, activate) => {
-                // TASK-04: Show skeleton while building for a brief moment
-                container.innerHTML = disks.map(d =>
-                    `<div class="disk-list-item" data-id="${d.id}" tabindex="0" role="option" aria-selected="false" aria-label="${d.name}${d.path ? ' — ' + d.path : ''}">${d.name}</div>`
-                ).join('');
-                container.querySelectorAll('.disk-list-item').forEach(el => {
-                    el.addEventListener('click', () => {
-                        if (el.dataset.id === this._activeDisk) return;
-                        activate(el.dataset.id);
-                        this.startServerSync();
-                        // Close mobile sidebar when disk is selected (PF-03)
-                        document.dispatchEvent(new CustomEvent('diskSelected'));
+            // Fetch configuration securely via api.php (path hidden)
+            const res = await fetch('api.php?type=disks');
+            const rawDisks = await res.json();
+            
+            // Flatten the disks for internal application logic
+            const flatDisks = [];
+            rawDisks.forEach(p_or_d => {
+                if (p_or_d.project && p_or_d.teams) {
+                    p_or_d.teams.forEach(t => {
+                        t.disks?.forEach(d => {
+                            flatDisks.push({ ...d, project: p_or_d.project, team: t.name });
+                        });
                     });
-                    // Keyboard navigation: Enter/Space to select
-                    el.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            if (el.dataset.id !== this._activeDisk) {
-                                activate(el.dataset.id);
-                                this.startServerSync();
-                                document.dispatchEvent(new CustomEvent('diskSelected'));
-                            }
-                        }
+                } else if (p_or_d.name && p_or_d.disks) {
+                    p_or_d.disks.forEach(d => {
+                        flatDisks.push({ ...d, project: "Workspace", team: p_or_d.name });
                     });
-                });
-            };
+                } else if (p_or_d.id) {
+                    flatDisks.push(p_or_d);
+                }
+            });
+            this.disksConfig = flatDisks;
 
-            // Activate function — updates both lists
-            const activate = (id) => {
-                // Main list
-                list.querySelectorAll('.disk-list-item')
-                    .forEach(el => el.classList.toggle('active', el.dataset.id === id));
-                // Flyout list
-                const flyoutList = document.getElementById('disk-list-flyout');
-                if (flyoutList) {
-                    flyoutList.querySelectorAll('.disk-list-item')
-                        .forEach(el => el.classList.toggle('active', el.dataset.id === id));
+            if (!document.getElementById('project-team-list')) return;
+
+            // Define method to activate a disk
+            this.activateDisk = (id) => {
+                const list = document.getElementById('disk-list');
+                if (list) {
+                    list.querySelectorAll('.disk-list-item').forEach(el => el.classList.remove('active'));
+                    const target = list.querySelector(`.disk-list-item[data-id="${id}"]`);
+                    if (target) target.classList.add('active');
                 }
                 this._activeDisk = id;
-                const disk = disks.find(d => d.id === id);
-                this._updateDiskPath(disk);
                 saveFilters({ activeDisk: id });
 
-                // Reset permission state on disk change
+                const activeCfg = this.disksConfig?.find(d => d.id === id);
+                const titleEl = document.getElementById('shared-page-title');
+                if (titleEl && activeCfg) {
+                    titleEl.textContent = activeCfg.name;
+                }
+                const pathEl = document.getElementById('header-disk-path');
+                if (pathEl && activeCfg) {
+                    pathEl.textContent = '...'; // Will be replaced by actual directory path after sync
+                }
+
                 this._permissionsLoaded = false;
                 const permBody = document.getElementById('permissions-body');
                 if (permBody) {
                     permBody.innerHTML = `
                         <div class="empty-state">
                             <div class="empty-state-icon">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                                </svg>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke-width="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke-width="2"/></svg>
                             </div>
                             <h3>Permission Analysis</h3>
-                            <p>Click the <strong>Permission Issues</strong> tab to scan this disk for access problems.</p>
+                            <p>Click the <strong>Permission Issues</strong> tab to scan this disk.</p>
                         </div>`;
                 }
 
-                // Reset Detail User tab on disk change
-                resetUserDetailTab();
+                if (typeof resetUserDetailTab === 'function') resetUserDetailTab();
+                
+                // Restore nav tabs and sync button if we came from team view
+                const navTabs = document.querySelector('.workspace-nav-tabs');
+                if (navTabs) navTabs.style.display = '';
+                const syncBtn = document.getElementById('btn-fetch');
+                if (syncBtn) syncBtn.style.display = '';
+
+                // Show shared-header and switch to correct page
+                const sharedHeader = document.getElementById('shared-header');
+                if (sharedHeader) sharedHeader.style.display = '';
+
+                
+                const activeTabBtn = document.querySelector('.tab-btn.active');
+                if (activeTabBtn && activeTabBtn.id === 'nav-detail') {
+                    navigateTo('detail');
+                } else {
+                    navigateTo('overview');
+                }
             };
 
-            // Populate main list
-            buildItems(list, disks, activate);
+            // Setup render context function
+            this.renderTeamContext = (teamNode, projectName) => {
+                const list = document.getElementById('disk-list');
+                if (!list) return;
 
-            // Populate flyout list (same data)
-            const flyoutList = document.getElementById('disk-list-flyout');
-            if (flyoutList) buildItems(flyoutList, disks, activate);
+                const disks = teamNode.disks || [];
+                let html = '';
+                disks.forEach(d => {
+                    html += `<div class="disk-list-item" data-id="${d.id}" tabindex="0" data-search-terms="${d.name.toLowerCase()}">${d.name}</div>`;
+                });
+                if (disks.length === 0) {
+                    html = '<div class="disk-list-item" style="opacity:0.5; cursor:default;">No disks directly in this team</div>';
+                }
+                list.innerHTML = html;
 
-            // Restore previously selected disk, fallback to first
+                list.querySelectorAll('.disk-list-item[data-id]').forEach(el => {
+                    el.addEventListener('click', () => {
+                        if (el.dataset.id === this._activeDisk) return;
+                        this.activateDisk(el.dataset.id);
+                        this.startServerSync();
+                        document.dispatchEvent(new CustomEvent('diskSelected'));
+                        
+                        // Close dropdown automatically upon selection
+                        const menu = document.getElementById('disk-dropdown-menu');
+                        const trigger = document.getElementById('disk-dropdown-trigger');
+                        if (menu) menu.style.display = 'none';
+                        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+                    });
+                });
+
+                const searchInput = document.getElementById('disk-search');
+                if (searchInput) {
+                    const newSearch = searchInput.cloneNode(true);
+                    searchInput.parentNode.replaceChild(newSearch, searchInput);
+                    newSearch.addEventListener('input', () => {
+                        const q = newSearch.value.toLowerCase().trim();
+                        list.querySelectorAll('.disk-list-item[data-id]').forEach(item => {
+                            const match = item.dataset.searchTerms.includes(q);
+                            item.style.display = match ? '' : 'none';
+                        });
+                    });
+                }
+                
+                // Show/hide chevron based on whether it is a standalone team
+                const isStandalone = (projectName === "Workspace");
+                const trigger = document.getElementById('disk-dropdown-trigger');
+                if (trigger) {
+                    const chevron = trigger.querySelector('.dropdown-chevron');
+                    if (chevron) {
+                        chevron.style.display = isStandalone ? 'none' : 'block';
+                        trigger.style.cursor = isStandalone ? 'default' : 'pointer';
+                        trigger.style.pointerEvents = isStandalone ? 'none' : 'auto';
+                    }
+                }
+            };
+
+            const projectContainer = document.getElementById('project-team-list');
+
+            const chevronSVG = `<svg class="toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="vertical-align: middle; margin-right: 6px; transition: transform 0.2s;"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+            let phtml = '';
+            
+            const rawD = rawDisks;
+            
+            rawD.forEach((p_or_d, pIdx) => {
+                if (p_or_d.project) {
+                    phtml += `<div class="disk-project-group">
+                                <div class="disk-project-header">${chevronSVG} <span>${p_or_d.project}</span></div>`;
+                    p_or_d.teams?.forEach((t, tIdx) => {
+                        phtml += `<div class="disk-team-group" data-pidx="${pIdx}" data-tidx="${tIdx}">
+                                    <div class="disk-team-header">${t.name}</div>
+                                  </div>`;
+                    });
+                    phtml += `</div>`;
+                } else if (p_or_d.name && p_or_d.disks) {
+                    phtml += `<div class="disk-project-group">
+                                <div class="disk-team-group standalone" data-pidx="${pIdx}" data-tidx="-1">
+                                    <div class="disk-team-header">${p_or_d.name}</div>
+                                </div>
+                              </div>`;
+                }
+            });
+            projectContainer.innerHTML = phtml;
+
+            projectContainer.querySelectorAll('.disk-project-header').forEach(header => {
+                header.style.cursor = 'pointer';
+                header.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    header.parentElement.classList.toggle('collapsed');
+                });
+            });
+
+            projectContainer.querySelectorAll('.disk-team-group').forEach(teamGroup => {
+                teamGroup.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    projectContainer.querySelectorAll('.disk-team-group').forEach(g => {
+                        g.classList.remove('active-team');
+                    });
+                    teamGroup.classList.add('active-team');
+                    
+                    const pIdx = parseInt(teamGroup.dataset.pidx);
+                    const tIdx = parseInt(teamGroup.dataset.tidx);
+                    const node = rawD[pIdx];
+                    let teamNode = null, pName = "Workspace";
+                    
+                    if (tIdx === -1) { teamNode = node; } 
+                    else { teamNode = node.teams[tIdx]; pName = node.project; }
+                    
+                    this._activeDisk = null;
+                    const list = document.getElementById('disk-list');
+                    if (list) list.querySelectorAll('.disk-list-item').forEach(el => el.classList.remove('active'));
+
+                    // Always render the context (which populates the dropdown menu disk-list)
+                    this.renderTeamContext(teamNode, pName);
+
+                    if (!window._isRestoringDisk) {
+                        // Logic defined by user: 
+                        // - Standalone Team (tIdx === -1) -> Jump directly to its first disk
+                        // - Project Team (tIdx >= 0) -> ALWAYS show Team Overview grid
+                        if (tIdx === -1 && teamNode.disks && teamNode.disks.length > 0) {
+                            setTimeout(() => {
+                                const diskEl = document.querySelector(`.disk-list-item[data-id="${teamNode.disks[0].id}"]`);
+                                if (diskEl) diskEl.click();
+                            }, 50);
+                        } else {
+                            this.loadTeamOverview(teamNode.name || pName);
+                        }
+                    }
+                });
+            });
+
             const savedDisk = loadFilters().activeDisk;
-            const diskToActivate = savedDisk && disks.find(d => d.id === savedDisk)
-                ? savedDisk
-                : disks[0]?.id;
-            if (diskToActivate) activate(diskToActivate);
-
-            // Main list search
-            const searchInput = document.getElementById('disk-search');
-            if (searchInput) {
-                searchInput.addEventListener('input', () => {
-                    const q = searchInput.value.toLowerCase().trim();
-                    list.querySelectorAll('.disk-list-item').forEach(el => {
-                        el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
-                    });
+            if (savedDisk) {
+                let foundTeamEl = null;
+                rawD.forEach((p, pIdx) => {
+                    if (p.project) {
+                        p.teams?.forEach((t, tIdx) => {
+                            if (t.disks?.find(d => d.id === savedDisk)) {
+                                foundTeamEl = projectContainer.querySelector(`.disk-team-group[data-pidx="${pIdx}"][data-tidx="${tIdx}"]`);
+                            }
+                        });
+                    } else if (p.name && p.disks?.find(d => d.id === savedDisk)) {
+                         foundTeamEl = projectContainer.querySelector(`.disk-team-group[data-pidx="${pIdx}"][data-tidx="-1"]`);
+                    }
                 });
+                if (foundTeamEl) {
+                    window._isRestoringDisk = true;
+                    foundTeamEl.click();
+                    setTimeout(() => {
+                        const dl = document.querySelector(`.disk-list-item[data-id="${savedDisk}"]`);
+                        if (dl) dl.click();
+                        window._isRestoringDisk = false;
+                    }, 100);
+                } else {
+                   const firstTeam = projectContainer.querySelector('.disk-team-group');
+                   if (firstTeam) firstTeam.click();
+                }
+            } else {
+                const firstTeam = projectContainer.querySelector('.disk-team-group');
+                if (firstTeam) firstTeam.click();
             }
-
-            // Flyout search
-            const flyoutSearch = document.getElementById('disk-search-flyout');
-            if (flyoutSearch && flyoutList) {
-                flyoutSearch.addEventListener('input', () => {
-                    const q = flyoutSearch.value.toLowerCase().trim();
-                    flyoutList.querySelectorAll('.disk-list-item').forEach(el => {
-                        el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
-                    });
-                });
-            }
-
-
         } catch (e) {
-            console.warn('Could not load disk list:', e);
+            console.error('Error in fetchDisksList:', e);
         }
     }
 
-    _updateDiskPath(disk) {
+    async loadTeamOverview(teamName) {
+        this._activeDisk = null;
+
+        // Reset Header
+        const titleEl = document.getElementById('shared-page-title');
+        if (titleEl) titleEl.textContent = teamName + ' Overview';
         const pathEl = document.getElementById('header-disk-path');
-        if (pathEl && disk) {
-            pathEl.textContent = disk.dir || disk.name || '';
-            pathEl.title = disk.name || disk.dir || '';
+        if (pathEl) pathEl.textContent = 'Aggregated usage';
+        
+        // Reset dropdown label
+        const titleText = document.getElementById('disk-title-text');
+        if (titleText) titleText.textContent = "Select a disk...";
+        
+        // Switch to Team Overview Page
+        // Hide irrelevant tabs/buttons for the team aggregated view
+        const navTabs = document.querySelector('.workspace-nav-tabs');
+        if (navTabs) navTabs.style.display = 'none';
+        
+        const syncBtn = document.getElementById('btn-fetch');
+        if (syncBtn) syncBtn.style.display = 'none';
+
+        const sharedHeader = document.getElementById('shared-header');
+        if (sharedHeader) sharedHeader.style.display = '';
+
+        // Switch to Team Overview Page via Router
+        navigateTo('team');
+
+        const grid = document.getElementById('team-disk-grid');
+        if (!grid) return;
+        
+        grid.innerHTML = '<div class="glass-panel" style="padding:20px;"><div class="spinner"></div> Loading team data...</div>';
+
+        try {
+            const res = await fetch(`api.php?type=team&name=${encodeURIComponent(teamName)}`);
+            if (!res.ok) throw new Error('API fetching failed');
+            const result = await res.json();
+            
+            if (result.status !== 'success' || !result.data || result.data.length === 0) {
+                grid.innerHTML = '<div class="glass-panel" style="padding:20px; color:var(--text-secondary);">No disk usage reports available for this team.</div>';
+                return;
+            }
+
+            let totalBytes = 0;
+            let usedBytes = 0;
+            let cardsHTML = '';
+
+            result.data.forEach(d => {
+                const total = (d.overview && d.overview.total) ? d.overview.total : 0;
+                const used = (d.overview && d.overview.used) ? d.overview.used : 0;
+                totalBytes += total;
+                usedBytes += used;
+                
+                const percent = total > 0 ? (used/total * 100).toFixed(1) : 0;
+                const diskName = d._disk_name || 'Disk';
+                const diskId = d._disk_id || '';
+                
+                cardsHTML += `<div class="team-disk-card" onclick="document.querySelector('.disk-list-item[data-id=\\'${diskId}\\']')?.click()">
+                    <div class="card-header">
+                        <span class="disk-name">${diskName}</span>
+                        <span class="disk-path">${percent}% full</span>
+                    </div>
+                    <div class="card-stats">
+                        <div class="card-stat-block">
+                            <span class="stat-label">Used Space</span>
+                            <span class="card-stat-val text-rose">${fmt(used)}</span>
+                        </div>
+                        <div class="card-stat-block" style="text-align:right;">
+                            <span class="stat-label">Total Allocated</span>
+                            <span class="card-stat-val">${fmt(total)}</span>
+                        </div>
+                    </div>
+                    <div class="progress-container"><div class="progress-track"><div class="progress-fill" style="width: ${percent}%;"></div></div></div>
+                </div>`;
+            });
+
+            grid.innerHTML = cardsHTML;
+            
+            const txtTotal = document.getElementById('team-stat-total');
+            const txtUsed = document.getElementById('team-stat-used');
+            
+            if (txtTotal) txtTotal.textContent = bytesToTB(totalBytes);
+            if (txtUsed) txtUsed.textContent = bytesToTB(usedBytes);
+
+            // Re-render team doughnut chart
+            if (window._teamChart) window._teamChart.destroy();
+            const ctx = document.getElementById('teamUsageChart');
+            if (ctx) {
+                const rmd = totalBytes - usedBytes;
+                window._teamChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Used', 'Free'],
+                        datasets: [{
+                            data: [usedBytes, rmd > 0 ? rmd : 0],
+                            backgroundColor: ['#f43f5e', '#10b981'],
+                            borderWidth: 0,
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false }, tooltip: {
+                            callbacks: { label: (ctx) => ' ' + fmt(ctx.raw) }
+                        }},
+                        cutout: '75%'
+                    }
+                });
+            }
+        } catch (e) {
+            console.error("Team load error:", e);
+            grid.innerHTML = '<div class="glass-panel" style="padding:20px; color:#f43f5e;">Failed to load team aggregated data. Please check connection.</div>';
         }
     }
-
 
     async startServerSync() {
         if (AppState.isProcessing) return;
@@ -289,7 +597,18 @@ class DataFetcher {
         }
         try {
             const res = await fetch(`api.php?id=${encodeURIComponent(this._activeDisk)}&type=permissions`);
-            const json = JSON.parse(atob(await res.text()));
+            const text = await res.text();
+            let json;
+            try { 
+                json = JSON.parse(text); 
+            } catch (err1) { 
+                try {
+                    json = JSON.parse(atob(text)); 
+                } catch (err2) {
+                    console.error("API response was neither valid JSON nor Base64.", { text_preview: text.substring(0, 100) });
+                    throw new Error(`Invalid API Response: ${text.substring(0, 100)}`);
+                }
+            }
 
             if (json?.status === 'success') {
                 this._permissionsLoaded = true;
@@ -372,7 +691,9 @@ class DataFetcher {
 
         // Update page title based on active page
         const titleEl = document.getElementById('shared-page-title');
-        if (titleEl && activeDisk) titleEl.textContent = activeDisk.name || 'Disk Usage';
+        if (titleEl && activeDisk) {
+            titleEl.textContent = activeDisk.name;
+        }
 
         // ── Scan Summary Bar ──────────────────────────────────────────
         const gapBytes = Math.max(0, stats.used - scannedBytes);
