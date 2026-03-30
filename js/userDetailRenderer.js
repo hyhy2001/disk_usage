@@ -12,6 +12,8 @@ let _abortCtrl      = null;
 let _otherUsers     = [];   // [{ name, used }] from snapshot
 let _filePage       = 1;    // current page (1-indexed)
 let _fileTotalPages = 1;    // total pages for file report
+let _dirPage        = 1;
+let _dirTotalPages  = 1;
 const FILE_PAGE     = 500;  // rows per page
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -54,26 +56,32 @@ function _renderDirCard(dirData) {
         </div>`;
     }).join('');
 
+    const totalDirs   = dirData.total_dirs ?? dirData.dirs.length;
+    const totalPages  = Math.max(1, Math.ceil(totalDirs / FILE_PAGE));
+    const currentPage = _dirPage;
+    const badge       = `Page ${currentPage} of ${totalPages} · ${totalDirs.toLocaleString()} dirs`;
+
     return `
-    <div class="ud-card glass-panel">
+    <div class="ud-card glass-panel" id="ud-dir-card">
         <div class="ud-card-header">
             <span class="ud-card-title">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 Top Directories
             </span>
             <div class="ud-card-actions">
-                <span class="ud-card-badge">${dirData.dirs.length} dirs &middot; ${fmt(total)} total</span>
+                <span class="ud-card-badge" id="ud-dir-badge">${badge}</span>
                 <button class="ud-export-btn" id="ud-export-dirs-user" data-tooltip="Download this user's top directories as CSV">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     CSV
                 </button>
             </div>
         </div>
-        <div class="ud-path-list">${rows}</div>
+        <div class="ud-path-list" id="ud-dir-list">${rows}</div>
+        ${_renderPagination(currentPage, totalPages, 'dir')}
     </div>`;
 }
 
-function _renderPagination(current, total) {
+function _renderPagination(current, total, type) {
     if (total <= 1) return '';
 
     const pages = [];
@@ -112,7 +120,7 @@ function _renderPagination(current, total) {
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
     </button>`);
 
-    return `<div class="ud-pagination" id="ud-pagination">${buttons.join('')}</div>`;
+    return `<div class="ud-pagination" id="ud-pagination-${type}">${buttons.join('')}</div>`;
 }
 
 function _renderFileCard(fileData) {
@@ -155,7 +163,7 @@ function _renderFileCard(fileData) {
             </div>
         </div>
         <div class="ud-path-list" id="ud-file-list">${rows}</div>
-        ${_renderPagination(currentPage, totalPages)}
+        ${_renderPagination(currentPage, totalPages, 'file')}
     </div>`;
 }
 
@@ -232,10 +240,10 @@ function _renderError(msg) {
 
 // ── API fetch ─────────────────────────────────────────────────────────────────
 
-async function _fetchDir(diskId, user) {
+async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE) {
     if (_abortCtrl) _abortCtrl.abort();
     _abortCtrl = new AbortController();
-    const url = `api.php?id=${encodeURIComponent(diskId)}&type=dirs&user=${encodeURIComponent(user)}`;
+    const url = `api.php?id=${encodeURIComponent(diskId)}&type=dirs&user=${encodeURIComponent(user)}&offset=${offset}&limit=${limit}`;
     const res = await fetch(url, { signal: _abortCtrl.signal });
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     const text = await res.text();
@@ -277,23 +285,26 @@ async function _loadAndRender(user) {
     _selectedUser   = user;
     _filePage       = 1;
     _fileTotalPages = 1;
+    _dirPage        = 1;
+    _dirTotalPages  = 1;
 
     const contentEl = root.querySelector('#ud-content');
     if (contentEl) contentEl.innerHTML = _renderSkeleton();
 
     try {
         const [dirData, fileData] = await Promise.all([
-            _fetchDir(_currentDisk, user),
+            _fetchDir(_currentDisk, user, 0, FILE_PAGE),
             _fetchFilePage(_currentDisk, user, 0, FILE_PAGE),
         ]);
         _fileTotalPages = Math.max(1, Math.ceil((fileData.total_files ?? fileData.files.length) / FILE_PAGE));
+        _dirTotalPages  = Math.max(1, Math.ceil((dirData.total_dirs ?? dirData.dirs.length) / FILE_PAGE));
 
         if (contentEl) {
             contentEl.innerHTML = `<div class="ud-grid">
                 ${_renderDirCard(dirData)}
                 ${_renderFileCard(fileData)}
             </div>`;
-            _attachPaginationEvents(contentEl);
+            _attachContentEvents(contentEl, root);
         }
     } catch (err) {
         if (err.name === 'AbortError') return;
@@ -314,33 +325,38 @@ async function _loadAndRender(user) {
     }
 }
 
-function _attachPaginationEvents(root) {
-    const pg = root.querySelector('#ud-pagination');
-    if (pg) {
-        pg.addEventListener('click', e => {
+function _attachContentEvents(contentEl, root) {
+    if (!contentEl) return;
+
+    // Use event delegation on contentEl so we only bind once
+    if (!contentEl._hasPaginationEvents) {
+        contentEl.addEventListener('click', e => {
             const btn = e.target.closest('.ud-page-btn');
             if (!btn || btn.classList.contains('disabled') || btn.classList.contains('active')) return;
             const page = parseInt(btn.dataset.page, 10);
-            if (!isNaN(page) && page >= 1 && page <= _fileTotalPages) _goToPage(root, page);
+            if (isNaN(page)) return;
+
+            if (e.target.closest('#ud-pagination-dir')) {
+                _goToPageDir(root, page);
+            } else if (e.target.closest('#ud-pagination-file')) {
+                _goToPageFile(root, page);
+            }
         });
+        contentEl._hasPaginationEvents = true;
     }
 
-    // Dir export buttons
-    root.querySelector('#ud-export-dirs-user')?.addEventListener('click', () => _udExportDirs(false));
-    root.querySelector('#ud-export-dirs-all')?.addEventListener('click',  () => _udExportDirs(true));
-
-    // File export buttons
-    root.querySelector('#ud-export-files-user')?.addEventListener('click', () => _udExportFiles(false));
-    root.querySelector('#ud-export-files-all')?.addEventListener('click',  () => _udExportFiles(true));
+    // Since content inside contentEl is replaced, these buttons are brand new on every render.
+    contentEl.querySelector('#ud-export-dirs-user')?.addEventListener('click', () => _udExportDirs(false));
+    contentEl.querySelector('#ud-export-files-user')?.addEventListener('click', () => _udExportFiles(false));
 }
 
-async function _goToPage(root, page) {
+async function _goToPageFile(root, page) {
     if (!_currentDisk || !_selectedUser) return;
     if (page < 1 || page > _fileTotalPages) return;
 
     // Dim the list while loading
     const list  = root.querySelector('#ud-file-list');
-    const pager = root.querySelector('#ud-pagination');
+    const pager = root.querySelector('#ud-pagination-file');
     const badge = root.querySelector('#ud-file-badge');
     if (list) list.style.opacity = '0.4';
     if (pager) pager.style.pointerEvents = 'none';
@@ -376,11 +392,57 @@ async function _goToPage(root, page) {
         if (badge) badge.textContent = `Page ${page} of ${_fileTotalPages} · ${totalFiles.toLocaleString()} files`;
 
         // Re-render pagination
-        const pgWrap = root.querySelector('#ud-pagination');
+        const pgWrap = root.querySelector('#ud-pagination-file');
         if (pgWrap) {
-            pgWrap.outerHTML = _renderPagination(page, _fileTotalPages);
-            // Re-attach events on the new element
-            _attachPaginationEvents(root);
+            pgWrap.outerHTML = _renderPagination(page, _fileTotalPages, 'file');
+        }
+
+    } catch (err) {
+        if (list) list.style.opacity = '';
+        if (pager) pager.style.pointerEvents = '';
+    }
+}
+
+async function _goToPageDir(root, page) {
+    if (!_currentDisk || !_selectedUser) return;
+    if (page < 1 || page > _dirTotalPages) return;
+
+    // Dim the list while loading
+    const list  = root.querySelector('#ud-dir-list');
+    const pager = root.querySelector('#ud-pagination-dir');
+    const badge = root.querySelector('#ud-dir-badge');
+    if (list) list.style.opacity = '0.4';
+    if (pager) pager.style.pointerEvents = 'none';
+
+    try {
+        const offset  = (page - 1) * FILE_PAGE;
+        const dirData = await _fetchDir(_currentDisk, _selectedUser, offset, FILE_PAGE);
+        _dirPage      = page;
+        _dirTotalPages = Math.max(1, Math.ceil((dirData.total_dirs ?? dirData.dirs.length) / FILE_PAGE));
+
+        if (list) {
+            const grandTotal = dirData.total_used || 1;
+            list.innerHTML = dirData.dirs.map(d => {
+                const pct = Math.min((d.used / grandTotal) * 100, 100).toFixed(1);
+                const cls = parseFloat(pct) > 70 ? 'ud-fill-rose' : parseFloat(pct) > 40 ? 'ud-fill-amber' : 'ud-fill-sky';
+                return `
+                <div class="ud-path-row">
+                    <div class="ud-path-name" title="${d.path}">${_shortPath(d.path)}</div>
+                    <div class="ud-path-bar-wrap" data-tooltip="${fmt(d.used)} · ${pct}% of page total">
+                        <div class="ud-path-bar-fill ${cls}" style="width:${pct}%"></div>
+                    </div>
+                    <span class="ud-path-val">${fmt(d.used)}</span>
+                </div>`;
+            }).join('');
+            list.style.opacity = '';
+        }
+
+        const totalDirs = dirData.total_dirs ?? dirData.dirs.length;
+        if (badge) badge.textContent = `Page ${page} of ${_dirTotalPages} · ${totalDirs.toLocaleString()} dirs`;
+
+        const pgWrap = root.querySelector('#ud-pagination-dir');
+        if (pgWrap) {
+            pgWrap.outerHTML = _renderPagination(page, _dirTotalPages, 'dir');
         }
 
     } catch (err) {
@@ -528,14 +590,14 @@ async function _udExportDirs(allUsers) {
             const users = await _fetchUserList(_currentDisk);
             const named = users.filter(u => u.name && u.name !== '');
             const results = await Promise.all(
-                named.map(u => _fetchDir(_currentDisk, u.name).catch(() => null))
+                named.map(u => _fetchDir(_currentDisk, u.name, 0, 999999).catch(() => null))
             );
             named.forEach((u, i) => {
                 if (!results[i]?.dirs) return;
                 results[i].dirs.forEach(d => rows.push({ user: u.name, path: d.path, used: d.used }));
             });
         } else if (user) {
-            const dirData = await _fetchDir(_currentDisk, user);
+            const dirData = await _fetchDir(_currentDisk, user, 0, 999999);
             (dirData?.dirs || []).forEach(d => rows.push({ user, path: d.path, used: d.used }));
         }
 

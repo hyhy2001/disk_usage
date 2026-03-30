@@ -442,7 +442,9 @@ function find_file_by_pattern($dir, $pattern) {
 // type=dirs  — full directory report for a user
 // =============================================================================
 if ($type === 'dirs') {
-    $who       = sanitize_name(param('user', ''));
+    $who        = sanitize_name(param('user', ''));
+    $offset     = get_int('offset', 0,   0,    PHP_INT_MAX);
+    $limit      = get_int('limit',  500, 1,    2000000);
     $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
     
     // Look for file ending in detail_report_dir_{user}.json, prefixed optionally
@@ -453,11 +455,56 @@ if ($type === 'dirs') {
         b64_error('No directory report for user: ' . $who, 404);
     }
 
-    header('Content-Type: application/json; charset=utf-8');
-    echo '{"status":"success","data":{"dir":';
-    if (!readfile($file_path)) echo "null";
-    echo '}}';
-    exit;
+    $fh = @fopen($file_path, 'r');
+
+    // Read header fields before the "dirs" array
+    $date = 0; $user_name = $who; $total_dirs = 0; $total_used = 0;
+    while ($fh && ($ln = fgets($fh)) !== false) {
+        if      (preg_match('/"date"\s*:\s*(\d+)/',        $ln, $m)) $date        = (int)$m[1];
+        elseif  (preg_match('/"user"\s*:\s*"([^"]+)"/',    $ln, $m)) $user_name   = $m[1];
+        elseif  (preg_match('/"total_dirs"\s*:\s*(\d+)/',  $ln, $m)) $total_dirs  = (int)$m[1];
+        elseif  (preg_match('/"total_used"\s*:\s*(\d+)/',  $ln, $m)) $total_used  = (int)$m[1];
+        if (strpos($ln, '"dirs"') !== false && strpos($ln, '[') !== false) break;
+    }
+
+    // Stream items with brace-depth parser
+    $idx = 0; $collected = array(); $buf = ''; $depth = 0;
+    while ($fh && ($ln = fgets($fh)) !== false) {
+        $trimmed = trim($ln);
+        if ($trimmed === ']' || $trimmed === '];') break;
+        if ($trimmed === '' || $trimmed === '[')   continue;
+
+        $buf   .= $ln;
+        $depth += substr_count($ln, '{') - substr_count($ln, '}');
+
+        if ($depth <= 0 && ltrim($buf) !== '') {
+            $obj = @json_decode(rtrim(trim($buf), ','), true);
+            if ($obj !== null && is_array($obj)) {
+                if ($offset === 0 && $limit >= 900000) {
+                    $collected[] = $obj;
+                } else {
+                    if ($idx >= $offset && count($collected) < $limit) {
+                        $collected[] = $obj;
+                    }
+                    $idx++;
+                    if (count($collected) >= $limit && $idx >= $offset + $limit) break;
+                }
+            }
+            $buf = ''; $depth = 0;
+        }
+    }
+    if ($fh) fclose($fh);
+
+    b64_success(array('dir' => array(
+        'date'        => $date,
+        'user'        => $user_name,
+        'total_dirs'  => $total_dirs,
+        'total_used'  => $total_used,
+        'offset'      => $offset,
+        'limit'       => $limit,
+        'has_more'    => count($collected) >= $limit && $limit < 900000,
+        'dirs'        => $collected,
+    )));
 }
 
 // =============================================================================
@@ -466,7 +513,7 @@ if ($type === 'dirs') {
 if ($type === 'files') {
     $who        = sanitize_name(param('user', ''));
     $offset     = get_int('offset', 0,   0,    PHP_INT_MAX);
-    $limit      = get_int('limit',  500, 1,    2000);
+    $limit      = get_int('limit',  500, 1,    2000000);
     $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
     
     // Look for file ending in detail_report_file_{user}.json, prefixed optionally
