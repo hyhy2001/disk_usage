@@ -380,7 +380,8 @@ body[data-design='pro-max'] .chart-container {
 }
 
 /* flat icon button for settings */
-.settings-btn {
+.settings-btn,
+.sidebar-collapse-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -394,16 +395,26 @@ body[data-design='pro-max'] .chart-container {
     cursor: pointer;
     transition: background 0.2s, color 0.2s;
 }
-.settings-btn:hover {
+.settings-btn:hover,
+.sidebar-collapse-btn:hover {
     background: rgba(255,255,255,0.08);
     color: var(--text-primary);
 }
-:root[data-theme='light'] .settings-btn {
+:root[data-theme='light'] .settings-btn,
+:root[data-theme='light'] .sidebar-collapse-btn {
     color: #475569;
 }
-:root[data-theme='light'] .settings-btn:hover {
+:root[data-theme='light'] .settings-btn:hover,
+:root[data-theme='light'] .sidebar-collapse-btn:hover {
     background: rgba(0,0,0,0.06);
     color: #0f172a;
+}
+
+.sidebar-collapse-btn svg {
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+body.sidebar-collapsed .sidebar-collapse-btn svg {
+    transform: rotate(180deg);
 }
 
 .sidebar-close-btn {
@@ -1031,4 +1042,175 @@ body[data-design='pro-max'] .chart-container {
 :root[data-theme='light'] .disk-team-group.active-team {
     background: rgba(5, 150, 105, 0.08) !important;
     border-color: rgba(5, 150, 105, 0.25) !important;
+}
+
+/* -- Desktop Manual Collapse (Applies >= 641px) -- */
+@media (min-width: 641px) {
+
+body.sidebar-collapsed {  --sidebar-width: 64px; }
+
+body.sidebar-collapsed .sidebar { 
+        padding: 16px 12px;
+        width: 64px;
+        overflow: visible;
+    }
+
+    /* Hide all text-only elements inside sidebar */
+    .sidebar .brand span,
+    .sidebar .nav-item span,
+    .sidebar .disk-selector-label,
+    .sidebar .disk-search-wrap,
+    .sidebar .disk-list,
+    .sidebar .status-monitor,
+    .sidebar .sidebar-clock,
+body.sidebar-collapsed .sidebar-clock { 
+        display: none;
+    }
+
+    /* Center nav icons */
+body.sidebar-collapsed .sidebar .nav-links { 
+        align-items: center;
+    }
+
+body.sidebar-collapsed .sidebar .nav-item { 
+        justify-content: center;
+        padding: 10px;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+    }
+
+    /* Brand area compact */
+body.sidebar-collapsed .brand { 
+        margin-bottom: 24px;
+        display: flex;
+        justify-content: center;
+    }
+
+    /* brand-row stacks to center everything */
+body.sidebar-collapsed .brand-row { 
+        flex-direction: column;
+        gap: 6px;
+        align-items: center;
+    }
+
+body.sidebar-collapsed .logo { 
+        gap: 0;
+    }
+
+    /* theme toggle: icon-only, square pill */
+body.sidebar-collapsed .theme-toggle-btn { 
+        padding: 6px;
+        border-radius: 8px;
+        font-size: 0;        /* hide text label */
+        gap: 0;
+        width: 32px;
+        height: 32px;
+    }
+
+    /* -- Disk selector: compact icon button with flyout popup -- */
+body.sidebar-collapsed .sidebar .disk-selector-wrap { 
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 6px 0;
+        position: relative;
+        border: none;
+        margin: 0;
+        flex: 0 0 auto; /* don't grow in icon-only mode */
+    }
+
+
+    /* Show the disk-selector-wrap itself (was hidden) */
+body.sidebar-collapsed .sidebar .disk-selector-label { 
+        display: none !important;
+    }
+body.sidebar-collapsed .sidebar .disk-search-wrap { 
+        display: none !important;
+    }
+
+    /* Disk icon trigger button */
+body.sidebar-collapsed .sidebar .disk-icon-trigger { 
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 1rem;
+        transition: all 0.2s;
+        position: relative;
+    }
+body.sidebar-collapsed .sidebar .disk-icon-trigger:hover { 
+        background: rgba(255,255,255,0.08);
+        color: var(--text-primary);
+        border-color: rgba(255,255,255,0.1);
+    }
+body.sidebar-collapsed .sidebar .disk-icon-trigger.has-active { 
+        color: var(--emerald-400);
+    }
+
+    /* Flyout panel -- appears on hover to the right of icon */
+body.sidebar-collapsed .sidebar .disk-flyout { 
+        position: absolute;
+        left: calc(100% + 6px);
+        top: 0;
+        width: 220px;
+        background: #171b22;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        padding: 10px;
+        z-index: 500;
+        /* Use opacity+pointer-events instead of display:none
+           so we can (a) animate and (b) add a ::before bridge */
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
+    }
+
+    /* Invisible bridge: fills the gap between icon and flyout panel.
+       Keeps :hover alive while mouse travels across the gap. */
+body.sidebar-collapsed .sidebar .disk-flyout::before { 
+        content: '';
+        position: absolute;
+        right: 100%;       /* extends leftward from flyout edge */
+        top: 0;
+        width: 10px;       /* covers the 6px gap + margin */
+        height: 100%;
+    }
+
+    .sidebar .disk-selector-wrap:hover .disk-flyout,
+body.sidebar-collapsed .sidebar .disk-flyout:hover { 
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+body.sidebar-collapsed .sidebar .disk-flyout-title { 
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-secondary);
+        padding: 0 4px 6px;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+body.sidebar-collapsed .sidebar .disk-flyout .disk-list { 
+        display: flex !important;
+        max-height: 260px;
+        overflow-y: auto;
+    }
+
+body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap { 
+        display: flex !important;
+        margin-bottom: 2px;
+    }
 }
