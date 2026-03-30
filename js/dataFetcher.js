@@ -190,6 +190,8 @@ class DataFetcher {
                 if (typeof resetUserDetailTab === 'function') resetUserDetailTab();
                 
                 // Restore nav tabs and sync button if we came from team view
+                const workspaceHeader = document.querySelector('.workspace-header');
+                if (workspaceHeader) workspaceHeader.style.display = '';
                 const navTabs = document.querySelector('.workspace-nav-tabs');
                 if (navTabs) navTabs.style.display = '';
                 const syncBtn = document.getElementById('btn-fetch');
@@ -378,6 +380,9 @@ class DataFetcher {
         
         // Switch to Team Overview Page
         // Hide irrelevant tabs/buttons for the team aggregated view
+        const workspaceHeader = document.querySelector('.workspace-header');
+        if (workspaceHeader) workspaceHeader.style.display = 'none';
+        
         const navTabs = document.querySelector('.workspace-nav-tabs');
         if (navTabs) navTabs.style.display = 'none';
         
