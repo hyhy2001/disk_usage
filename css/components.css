@@ -5221,9 +5221,9 @@ body[data-design='pro-max'] .team-disk-card:hover {
 }
 
 .disk-card-grid.list-view .team-disk-card .card-header {
-    flex: 0 0 200px;
+    flex: 0 0 250px;
     margin-bottom: 0 !important;
-    white-space: nowrap;
+    gap: 12px;
 }
 
 .disk-card-grid.list-view .team-disk-card .team-card-bar-wrapper {
@@ -5247,6 +5247,7 @@ body[data-design='pro-max'] .team-disk-card:hover {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 10px;
 }
 
 .team-disk-card .disk-name {
