@@ -30,13 +30,15 @@ function sanitize_name($raw) {
 }
 
 function b64_success($data) {
-    echo base64_encode(json_encode(array('status' => 'success', 'data' => $data)));
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(array('status' => 'success', 'data' => $data));
     exit;
 }
 
 function b64_error($message, $code) {
     http_response_code($code);
-    echo base64_encode(json_encode(array('status' => 'error', 'message' => $message)));
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(array('status' => 'error', 'message' => $message));
     exit;
 }
 
@@ -50,6 +52,147 @@ function json_success($data) {
 // =============================================================================
 
 $req_id = sanitize_name(param('id', ''));
+$type   = param('type', '');
+
+// Handle type=disks (No disk id required)
+// Returns nested structure without system path
+if ($type === 'disks') {
+    $disks_file = __DIR__ . DIRECTORY_SEPARATOR . 'disks.json';
+    $disks_raw  = @file_get_contents($disks_file);
+    $disks      = ($disks_raw !== false) ? json_decode($disks_raw, true) : array();
+    
+    $safe_disks = array();
+    if (is_array($disks)) {
+        foreach ($disks as $p_or_d) {
+            if (isset($p_or_d['id'])) {
+                // Legacy Flat Format fallback
+                $safe_disks[] = array(
+                    'id'   => $p_or_d['id'],
+                    'name' => isset($p_or_d['name']) ? $p_or_d['name'] : ''
+                );
+                } elseif (isset($p_or_d['project'])) {
+                    // Nested Format (Project Wrapped)
+                    $proj = array('project' => $p_or_d['project']);
+                    $safe_teams = array();
+                    if (isset($p_or_d['teams']) && is_array($p_or_d['teams'])) {
+                        foreach ($p_or_d['teams'] as $t) {
+                            $team = array('name' => isset($t['name']) ? $t['name'] : 'Unknown');
+                            $safe_disk_list = array();
+                            if (isset($t['disks']) && is_array($t['disks'])) {
+                                foreach ($t['disks'] as $d) {
+                                    $safe_disk_list[] = array(
+                                        'id'   => isset($d['id']) ? $d['id'] : '',
+                                        'name' => isset($d['name']) ? $d['name'] : ''
+                                    );
+                                }
+                            }
+                            $team['disks'] = $safe_disk_list;
+                            $safe_teams[] = $team;
+                        }
+                    }
+                    $proj['teams'] = $safe_teams;
+                    $safe_disks[] = $proj;
+                } elseif (isset($p_or_d['name']) && isset($p_or_d['disks'])) {
+                    // Standalone Team Format
+                    $team = array('name' => $p_or_d['name']);
+                    $safe_disk_list = array();
+                    if (is_array($p_or_d['disks'])) {
+                        foreach ($p_or_d['disks'] as $d) {
+                            $safe_disk_list[] = array(
+                                'id'   => isset($d['id']) ? $d['id'] : '',
+                                'name' => isset($d['name']) ? $d['name'] : ''
+                            );
+                        }
+                    }
+                    $team['disks'] = $safe_disk_list;
+                    $safe_disks[] = $team;
+                }
+        }
+    }
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($safe_disks);
+    exit;
+}
+
+// =============================================================================
+// type=team - Aggregate the latest report for all disks in a team
+// =============================================================================
+if ($type === 'team') {
+    $team_name = trim(param('name', ''));
+    if ($team_name === '') b64_error('Missing team name', 400);
+
+    $disks_file = __DIR__ . DIRECTORY_SEPARATOR . 'disks.json';
+    $disks_raw  = @file_get_contents($disks_file);
+    $disks      = ($disks_raw !== false) ? json_decode($disks_raw, true) : array();
+    
+    $team_disks = array();
+    if (is_array($disks)) {
+        foreach ($disks as $p_or_d) {
+            if (isset($p_or_d['teams']) && is_array($p_or_d['teams'])) {
+                foreach ($p_or_d['teams'] as $t) {
+                    if (isset($t['name']) && $t['name'] === $team_name) {
+                        if (isset($t['disks']) && is_array($t['disks'])) {
+                            foreach ($t['disks'] as $d) {
+                                $team_disks[] = $d;
+                            }
+                        }
+                    }
+                }
+            }
+            if (isset($p_or_d['name']) && $p_or_d['name'] === $team_name) {
+                if (isset($p_or_d['disks']) && is_array($p_or_d['disks'])) {
+                    foreach ($p_or_d['disks'] as $d) {
+                        $team_disks[] = $d;
+                    }
+                }
+            }
+        }
+    }
+    
+    if (empty($team_disks)) b64_error('Team not found or has no disks', 404);
+    
+    $result_data = array();
+    
+    foreach ($team_disks as $d) {
+        if (empty($d['path'])) continue;
+        $disk_path = __DIR__ . DIRECTORY_SEPARATOR . trim($d['path'], '/\\');
+        if (!is_dir($disk_path)) continue;
+        
+        $dh    = @opendir($disk_path);
+        $files = array();
+        while ($dh && ($f = readdir($dh)) !== false) {
+            if (substr($f, -5) !== '.json') continue;
+            $fl = strtolower($f);
+            if (strpos($fl, 'permission_issue') !== false) continue;
+            if (strpos($fl, 'detail_report')    !== false) continue;
+            
+            $is_report = strpos($fl, 'disk_usage_report') !== false
+                      || strpos($fl, 'usage_report')       !== false
+                      || strpos($f,  'report_') === 0 
+                      || preg_match('/^report[_-]/i', $f);
+            if ($is_report) $files[] = $disk_path . DIRECTORY_SEPARATOR . $f;
+        }
+        if ($dh) closedir($dh);
+        sort($files);
+        
+        $latest = end($files);
+        if ($latest) {
+            $json = @file_get_contents($latest);
+            $parsed = @json_decode($json, true);
+            if ($parsed && is_array($parsed)) {
+                $parsed['_disk_id'] = isset($d['id']) ? $d['id'] : '';
+                $parsed['_disk_name'] = isset($d['name']) ? $d['name'] : 'Unknown Disk';
+                $parsed['_disk_path'] = isset($d['path']) ? $d['path'] : 'Unknown Path';
+                $result_data[] = $parsed;
+            }
+        }
+    }
+    
+    header('Cache-Control: public, max-age=15'); // Short cache for team overview
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(array('status' => 'success', 'team' => $team_name, 'data' => $result_data));
+    exit;
+}
 
 if ($req_id === '') {
     http_response_code(400);
@@ -63,10 +206,34 @@ $disks      = ($disks_raw !== false) ? json_decode($disks_raw, true) : array();
 
 $disk_entry = null;
 if (is_array($disks)) {
-    foreach ($disks as $d) {
-        if (isset($d['id']) && $d['id'] === $req_id) {
-            $disk_entry = $d;
+    foreach ($disks as $p_or_d) {
+        if (isset($p_or_d['id']) && $p_or_d['id'] === $req_id) {
+            $disk_entry = $p_or_d; // Flat fallback
             break;
+        }
+        if (isset($p_or_d['teams']) && is_array($p_or_d['teams'])) {
+            foreach ($p_or_d['teams'] as $t) {
+                if (isset($t['disks']) && is_array($t['disks'])) {
+                    foreach ($t['disks'] as $d) {
+                        if (isset($d['id']) && $d['id'] === $req_id) {
+                            $d['project'] = isset($p_or_d['project']) ? $p_or_d['project'] : '';
+                            $d['team']    = isset($t['name']) ? $t['name'] : '';
+                            $disk_entry = $d;
+                            break 3; // Break out of all 3 loops
+                        }
+                    }
+                }
+            }
+        }
+        if (isset($p_or_d['disks']) && is_array($p_or_d['disks'])) {
+            foreach ($p_or_d['disks'] as $d) {
+                if (isset($d['id']) && $d['id'] === $req_id) {
+                    $d['project'] = ''; // Standalone team has no project
+                    $d['team']    = isset($p_or_d['name']) ? $p_or_d['name'] : '';
+                    $disk_entry = $d;
+                    break 2; // Break out of all 2 loops
+                }
+            }
         }
     }
 }
@@ -286,8 +453,11 @@ if ($type === 'dirs') {
         b64_error('No directory report for user: ' . $who, 404);
     }
 
-    $c = file_get_contents($file_path);
-    b64_success(array('dir' => ($c !== false) ? json_decode($c, true) : null));
+    header('Content-Type: application/json; charset=utf-8');
+    echo '{"status":"success","data":{"dir":';
+    if (!readfile($file_path)) echo "null";
+    echo '}}';
+    exit;
 }
 
 // =============================================================================
@@ -378,17 +548,16 @@ while ($dh && ($f = readdir($dh)) !== false) {
 if ($dh) closedir($dh);
 sort($files);
 
-$agg = array();
-foreach ($files as $file) {
-    $c = file_get_contents($file);
-    if ($c === false) continue;
-    $j = json_decode($c, true);
-    if ($j !== null) $agg[] = $j;
-}
-
 header('Cache-Control: public, max-age=60');
-json_success(array(
-    'status'      => 'success',
-    'total_files' => count($agg),
-    'data'        => $agg,
-));
+header('Content-Type: application/json; charset=utf-8');
+
+echo '{"status":"success","total_files":' . count($files) . ',"data":[';
+$first = true;
+foreach ($files as $file) {
+    if (!$first) echo ',';
+    // Just dump the raw JSON file text directly into the array structure
+    readfile($file);
+    $first = false;
+}
+echo ']}';
+exit;
