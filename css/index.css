@@ -91,13 +91,18 @@
     box-sizing: border-box;
 }
 
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden; /* Prevent 2nd outer scrollbar */
+}
+
 body {
     background-color: var(--bg-base);
     color: var(--text-primary);
     font-family: 'Inter', -apple-system, sans-serif;
     line-height: 1.5;
-    min-height: 100vh;
-    overflow-x: hidden;
     position: relative;
     /* Legacy has no default grid background here */
 }
