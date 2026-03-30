@@ -5111,51 +5111,6 @@ body[data-design='pro-max'] .glass-panel {
     padding-left: 6px;
 }
 
-/* ── Overhead Disk Dropdown ─────────────────────────── */
-.disk-dropdown-trigger {
-    background: transparent;
-    border: none;
-    padding: 6px 10px;
-    margin: -6px -10px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--text-primary);
-    cursor: pointer;
-    transition: background 0.2s, color 0.2s;
-}
-
-.disk-dropdown-trigger:hover {
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.disk-dropdown-trigger .dropdown-chevron {
-    color: var(--text-muted);
-    transition: transform 0.2s;
-}
-
-.disk-dropdown-trigger[aria-expanded="true"] .dropdown-chevron {
-    transform: rotate(180deg);
-}
-
-.disk-dropdown-menu {
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-}
-
-.disk-dropdown-menu .disk-list-item {
-    transition: background 0.2s;
-    border-radius: 6px;
-    margin: 2px 5px;
-}
-
-.disk-dropdown-menu .disk-list-item:hover {
-    background: rgba(255, 255, 255, 0.05);
-}
 
 /* ── View Toggle (Grid/List) ──────────────────────────── */
 .view-toggle {

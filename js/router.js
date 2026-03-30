@@ -4,6 +4,7 @@ import { saveFilters, loadFilters } from './filterStorage.js';
 const PAGES = {
     overview: document.getElementById('page-overview'),
     detail: document.getElementById('page-detail'),
+    team: document.getElementById('page-team-overview'),
 };
 
 const NAV_ITEMS = {
@@ -18,21 +19,34 @@ function showPage(pageId) {
 
     // Hide all pages
     Object.values(PAGES).forEach(el => {
-        el.classList.remove('page-active');
-        el.classList.add('page-hidden');
+        if (el) {
+            el.classList.remove('page-active');
+            el.classList.add('page-hidden');
+        }
     });
 
     // Remove active from all nav items
     Object.values(NAV_ITEMS).forEach(el => {
-        el?.classList.remove('nav-active');
-        el?.removeAttribute('aria-current');
+        if (el) {
+            el.classList.remove('active');
+            el.removeAttribute('aria-current');
+        }
     });
 
     // Show target page
-    PAGES[pageId].classList.remove('page-hidden');
-    PAGES[pageId].classList.add('page-active');
-    NAV_ITEMS[pageId]?.classList.add('nav-active');
-    NAV_ITEMS[pageId]?.setAttribute('aria-current', 'page');
+    if (PAGES[pageId]) {
+        PAGES[pageId].classList.remove('page-hidden');
+        PAGES[pageId].classList.add('page-active');
+    }
+    if (NAV_ITEMS[pageId]) {
+        NAV_ITEMS[pageId].classList.add('active');
+        NAV_ITEMS[pageId].setAttribute('aria-current', 'page');
+    }
+
+    const statBar = document.getElementById('shared-stat-bar');
+    if (statBar) {
+        statBar.style.display = (pageId === 'team') ? 'none' : '';
+    }
 
     currentPage = pageId;
     saveFilters({ activePage: pageId });

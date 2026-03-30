@@ -103,28 +103,11 @@
                             <line x1="3" y1="18" x2="21" y2="18"/>
                         </svg>
                     </button>
-                    <div class="dropdown-wrapper" id="disk-dropdown-wrapper" style="position:relative;">
-                        <button id="disk-dropdown-trigger" class="disk-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false">
-                            <h1 id="shared-page-title" style="margin:0; font-size:inherit;">Disk Usage Overview</h1>
-                            <svg class="dropdown-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                        </button>
-                        <!-- Overflow Disk Dropdown Menu -->
-                        <div id="disk-dropdown-menu" class="disk-dropdown-menu glass-panel" style="display:none; position:absolute; top:calc(100% + 8px); left:0; width:280px; z-index:1000; flex-direction:column; padding:0; overflow:hidden;">
-                            <div class="disk-search-wrap" style="margin: 10px 10px 5px 10px;">
-                                <svg class="disk-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                                <input type="text" id="disk-search" class="disk-search-input" placeholder="Search disk..." autocomplete="off" style="width:100%; min-width:0;">
-                            </div>
-                            <div id="disk-list" class="disk-list" style="flex:1; padding: 10px; max-height: 350px; overflow-y:auto;">
-                                <div class="disk-list-item" style="opacity:0.5; padding:8px 12px; font-size:13px;">No disks available.</div>
-                            </div>
-                        </div>
-                    </div>
+                    <h1 id="shared-page-title" style="margin:0; font-size:1.25rem; font-weight:700; color:var(--text-primary);">Disk Usage Overview</h1>
                     <span class="header-sep">·</span>
                     <p id="header-disk-path" class="header-disk-path">—</p>
                 </div>
-                <div class="page-stat-bar glass-panel">
+                <div class="page-stat-bar glass-panel" id="shared-stat-bar">
                     <div class="stat-block" id="shared-stat-total">
                         <div class="stat-num-row">
                             <span class="stat-number" id="val-total">—</span>

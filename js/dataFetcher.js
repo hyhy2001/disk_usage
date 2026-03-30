@@ -110,32 +110,7 @@ class DataFetcher {
             });
         }
 
-        // Overhead Disk Dropdown Logic
-        const dropdownTrigger = document.getElementById('disk-dropdown-trigger');
-        const dropdownMenu = document.getElementById('disk-dropdown-menu');
-        if (dropdownTrigger && dropdownMenu) {
-            dropdownTrigger.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const isExpanded = dropdownTrigger.getAttribute('aria-expanded') === 'true';
-                dropdownTrigger.setAttribute('aria-expanded', !isExpanded);
-                dropdownMenu.style.display = isExpanded ? 'none' : 'flex';
-                if (!isExpanded) {
-                    const searchInput = document.getElementById('disk-search');
-                    if (searchInput) searchInput.focus();
-                }
-            });
-
-            document.addEventListener('click', (e) => {
-                if (!dropdownTrigger.contains(e.target) && !dropdownMenu.contains(e.target)) {
-                    dropdownTrigger.setAttribute('aria-expanded', 'false');
-                    dropdownMenu.style.display = 'none';
-                }
-            });
-
-            dropdownMenu.addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
-        }
+        // Dropped disk-dropdown logic completely per user request.
 
         // Start live clock
         startClock();
@@ -254,12 +229,6 @@ class DataFetcher {
                         this.activateDisk(el.dataset.id);
                         this.startServerSync();
                         document.dispatchEvent(new CustomEvent('diskSelected'));
-                        
-                        // Close dropdown automatically upon selection
-                        const menu = document.getElementById('disk-dropdown-menu');
-                        const trigger = document.getElementById('disk-dropdown-trigger');
-                        if (menu) menu.style.display = 'none';
-                        if (trigger) trigger.setAttribute('aria-expanded', 'false');
                     });
                 });
 
@@ -276,17 +245,7 @@ class DataFetcher {
                     });
                 }
                 
-                // Show/hide chevron based on whether it is a standalone team
-                const isStandalone = (projectName === "Workspace");
-                const trigger = document.getElementById('disk-dropdown-trigger');
-                if (trigger) {
-                    const chevron = trigger.querySelector('.dropdown-chevron');
-                    if (chevron) {
-                        chevron.style.display = isStandalone ? 'none' : 'block';
-                        trigger.style.cursor = isStandalone ? 'default' : 'pointer';
-                        trigger.style.pointerEvents = isStandalone ? 'none' : 'auto';
-                    }
-                }
+                // Removed standalone specific dropdown chevron logic
             };
 
             const projectContainer = document.getElementById('project-team-list');
