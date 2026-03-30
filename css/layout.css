@@ -353,6 +353,59 @@ body[data-design='pro-max'] .chart-container {
 }
 
 /* -- Sidebar close button (drawer only) -- */
+.sidebar-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 500;
+    transition: background 0.2s, color 0.2s;
+}
+
+.sidebar-nav-item:hover {
+    background: rgba(255,255,255,0.06);
+    color: var(--text-primary);
+}
+
+:root[data-theme='light'] .sidebar-nav-item {
+    color: #475569;
+}
+:root[data-theme='light'] .sidebar-nav-item:hover {
+    background: rgba(0,0,0,0.05);
+    color: #0f172a;
+}
+
+/* flat icon button for settings */
+.settings-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+.settings-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: var(--text-primary);
+}
+:root[data-theme='light'] .settings-btn {
+    color: #475569;
+}
+:root[data-theme='light'] .settings-btn:hover {
+    background: rgba(0,0,0,0.06);
+    color: #0f172a;
+}
+
 .sidebar-close-btn {
     display: none;            /* hidden on desktop */
     align-items: center;
@@ -452,29 +505,6 @@ body[data-design='pro-max'] .chart-container {
         gap: 0;
         width: 32px;
         height: 32px;
-    }
-
-    /* flat icon button for settings */
-    .settings-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 6px;
-        width: 32px;
-        height: 32px;
-        background: transparent;
-        border: none;
-        color: var(--text-secondary);
-        border-radius: 6px;
-        cursor: pointer;
-        transition: background 0.2s, color 0.2s;
-    }
-    .settings-btn:hover {
-        background: rgba(255,255,255,0.08);
-        color: var(--text-primary);
-    }
-    :root[data-theme='light'] .settings-btn:hover {
-        background: rgba(0,0,0,0.06);
     }
 
     /* -- Disk selector: compact icon button with flyout popup -- */
