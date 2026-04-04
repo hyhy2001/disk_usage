@@ -12,11 +12,12 @@ which generates the JSON reports this dashboard consumes.
 ## ✨ Features
 
 ### Overview & Navigation
-- **Multi-disk selector** — switch between any number of configured storage volumes
-- **Auto-load on visit** — data loads immediately without user interaction
-- **Tab-based layout** — Overview, History & Analysis, Detail User, and Permission Issues tabs
-- **Sidebar clock** — live clock display in the navigation sidebar
-- **Smart tooltips** — custom glassmorphic tooltip system (JS singleton, immune to stacking contexts)
+- **Team Spaces View** — "All Teams" dashboard with a searchable grid to manage and choose between multiple storage volumes (disks)
+- **SPA Routing** — App state and active tabs persist seamlessly across reloads via `router.js`
+- **Tab-based layout** — Overview, History & Analysis, Detail User, and Permission Issues tabs for deep diving into individual volumes
+- **Custom UI Settings** — Built-in dropdown to toggle between Light/Dark mode and Legacy/Pro-Max UI
+- **Sidebar logic** — Live clock, collapsable layout, and quick dropdown space picker
+- **Smart tooltips** — Custom glassmorphic tooltip system (JS singleton, immune to stacking contexts)
 
 ### Overview Tab
 - **System summary cards** — total capacity, used, scanned, free space with dynamic units
@@ -50,7 +51,8 @@ which generates the JSON reports this dashboard consumes.
 - **Backward-compatible API** — accepts both new flat format and old nested format
 
 ### UI / UX
-- **Dark glassmorphic theme** — `backdrop-filter: blur`, layered gradients, CSS variable tokens
+- **Theme & Design Settings** — Supports Light and Dark modes, plus Legacy vs Pro-Max glassmorphic UI toggles. Preferences are saved locally
+- **Responsive Layout** — Includes desktop edge collapse button and mobile off-canvas drawer
 - **Custom tooltip system** — `data-tooltip=""` attribute, auto-positions (flips/clamps at edges)
 - **Micro-animations** — hover lifts, skeleton loading, fade-in transitions
 - **SVG icons only** — no emoji, consistent cross-platform rendering
@@ -212,7 +214,9 @@ disk_usage/
 │   └── components.css          # Cards, tables, badges, tooltips, skeletons
 │
 ├── js/
-│   ├── main.js                 # App bootstrap, AppState, tab routing
+│   ├── main.js                 # App bootstrap, AppState initialization
+│   ├── router.js               # SPA Router (manages page visibility and active nav state)
+│   ├── filterStorage.js        # Restores and persists user filters/states across sessions
 │   ├── dataFetcher.js          # Fetch orchestration, disk switching, progress
 │   ├── dataStore.js            # Centralised data cache
 │   ├── chartManager.js         # Chart.js wrapper (line, doughnut, bar)
@@ -224,6 +228,7 @@ disk_usage/
 │   ├── tooltip.js              # Singleton JS tooltip (auto-positions, viewport-aware)
 │   ├── formatters.js           # fmt(), fmtDate(), fmtDateSec() — shared utils
 │   ├── themeToggle.js          # Dark / light mode toggle
+│   ├── designToggle.js         # Legacy / Pro-Max UI configuration toggle
 │   └── scrollToTop.js          # Scroll-to-top FAB
 │
 ├── generate_mock_json.py       # Generates realistic mock report data for testing
