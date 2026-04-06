@@ -798,6 +798,9 @@ body[data-design='pro-max'] .glass-panel {
     color: var(--text-primary);
 }
 
+.stat-number.text-rose { color: var(--rose-500); }
+.stat-number.text-amber { color: #f59e0b; }
+
 .stat-label {
     font-size: 0.68rem;
     font-weight: 600;
