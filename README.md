@@ -12,7 +12,7 @@ which generates the JSON reports this dashboard consumes.
 ## ✨ Features
 
 ### Overview & Navigation
-- **Team Spaces View** — "All Teams" dashboard with a searchable grid to manage and choose between multiple storage volumes (disks)
+- **3-Column Master-Detail Layout** — A streamlined architecture featuring Teams in the sidebar, Disks in a middle column, and a main dashboard canvas for detailed metrics
 - **SPA Routing** — App state and active tabs persist seamlessly across reloads via `router.js`
 - **Tab-based layout** — Overview, History & Analysis, Detail User, and Permission Issues tabs for deep diving into individual volumes
 - **Custom UI Settings** — Built-in dropdown to toggle between Light/Dark mode and Legacy/Pro-Max UI
@@ -156,12 +156,15 @@ git clone https://github.com/hyhy2001/disk_usage.git
 cd disk_usage
 
 # 2. Configure disks
-# Edit disks.json — add an entry for each storage volume:
-# {
-#   "id":   "disk_sda",
-#   "name": "Primary Storage",
-#   "path": "mock_reports/disk_sda"
-# }
+# Edit disks.json — group your storage volumes by team:
+# [
+#   {
+#     "name": "Backend Team",
+#     "disks": [
+#       { "id": "disk_sda", "name": "Primary Storage", "path": "mock_reports/disk_sda" }
+#     ]
+#   }
+# ]
 
 # 3. Generate mock data (optional, for testing)
 python3 generate_mock_json.py
@@ -175,14 +178,11 @@ python3 generate_mock_json.py
 ```json
 [
   {
-    "id":   "disk_nvme0",
-    "name": "Primary NVMe",
-    "path": "mock_reports/disk_nvme0"
-  },
-  {
-    "id":   "disk_sda",
-    "name": "Archive HDD Array",
-    "path": "mock_reports/disk_sda"
+    "name": "Backend Team",
+    "disks": [
+      { "id": "disk_nvme0", "name": "Primary NVMe", "path": "mock_reports/disk_nvme0" },
+      { "id": "disk_sda", "name": "Archive HDD Array", "path": "mock_reports/disk_sda" }
+    ]
   }
 ]
 ```
