@@ -161,15 +161,12 @@ cd disk_usage
 #   {
 #     "name": "Backend Team",
 #     "disks": [
-#       { "id": "disk_sda", "name": "Primary Storage", "path": "mock_reports/disk_sda" }
+#       { "id": "disk_sda", "name": "Primary Storage", "path": "reports_test/disk_sda" }
 #     ]
 #   }
 # ]
 
-# 3. Generate mock data (optional, for testing)
-python3 generate_mock_json.py
-
-# 4. Open in browser
+# 3. Open in browser
 # http://your-server/disk_usage/
 ```
 
@@ -180,8 +177,8 @@ python3 generate_mock_json.py
   {
     "name": "Backend Team",
     "disks": [
-      { "id": "disk_nvme0", "name": "Primary NVMe", "path": "mock_reports/disk_nvme0" },
-      { "id": "disk_sda", "name": "Archive HDD Array", "path": "mock_reports/disk_sda" }
+      { "id": "disk_nvme0", "name": "Primary NVMe", "path": "reports_test/disk_nvme0" },
+      { "id": "disk_sda", "name": "Archive HDD Array", "path": "reports_test/disk_sda" }
     ]
   }
 ]
@@ -231,9 +228,7 @@ disk_usage/
 │   ├── designToggle.js         # Legacy / Pro-Max UI configuration toggle
 │   └── scrollToTop.js          # Scroll-to-top FAB
 │
-├── generate_mock_json.py       # Generates realistic mock report data for testing
-│
-└── mock_reports/               # Auto-generated mock data (gitignored)
+└── reports_test/               # Test data directory
     └── disk_sda/
         ├── disk_usage_report_20260322.json
         ├── permission_issues_20260322.json
@@ -243,16 +238,6 @@ disk_usage/
 ---
 
 ## 🔧 Development
-
-### Generate fresh mock data
-
-```bash
-# Default: multiple disks, ~20 users per disk, 2500 files per user
-python3 generate_mock_json.py
-
-# After changing user counts or format, always regenerate:
-python3 generate_mock_json.py && echo "Done"
-```
 
 ### API testing
 
