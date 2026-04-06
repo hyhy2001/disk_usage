@@ -229,10 +229,9 @@ disk_usage/
 │   └── scrollToTop.js          # Scroll-to-top FAB
 │
 └── reports_test/               # Test data directory
-    └── disk_sda/
-        ├── disk_usage_report_20260322.json
-        ├── permission_issues_20260322.json
-        └── detail_report_dir_user1.json
+    ├── detail_users/           # Per-user directory & file reports
+    ├── test_disk_usage_report_*.json
+    └── test_permission_issues.json
 ```
 
 ---
