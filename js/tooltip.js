@@ -58,7 +58,7 @@
         const text = el.getAttribute('data-tooltip');
         if (!text) return;
         _target         = el;
-        tip.textContent = text;
+        tip.innerHTML = text;
         tip.removeAttribute('data-arrow');
         tip.classList.add('visible');
         // Position after paint so offsetWidth/Height are correct

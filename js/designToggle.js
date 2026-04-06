@@ -46,7 +46,9 @@ function initDesignToggle() {
     const saved = localStorage.getItem(DESIGN_STORAGE_KEY) || 'legacy';
     applyDesign(saved);
 
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const current = document.documentElement.getAttribute('data-design') || 'legacy';
         applyDesign(current === 'legacy' ? 'pro-max' : 'legacy');
     });

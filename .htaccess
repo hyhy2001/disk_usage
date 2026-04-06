@@ -1,0 +1,11 @@
+# Disable directory indexing to prevent users from browsing internal files and directories.
+# If there is no index.html / index.php file, the server will return a 403 Forbidden error.
+Options -Indexes
+
+# Prevent access to non-existent links by redirecting them back to the main app interface.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.html [R=302,L]
+</IfModule>

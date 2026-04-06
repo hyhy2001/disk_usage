@@ -63,6 +63,8 @@
 
 .brand {
     margin-bottom: 32px;
+    position: relative;
+    z-index: 300;
 }
 
 /* Logo + theme toggle on one row */
@@ -104,6 +106,8 @@
     flex: 1;
     display: flex;
     flex-direction: column;
+    position: relative;
+    z-index: 1;
     min-height: 0; /* Important for scrollable children in flex column */
 }
 .team-flyout-trigger {
@@ -515,14 +519,15 @@ body[data-design='pro-max'] .chart-container {
     }
 
     /* Hide all text-only elements inside sidebar */
-    .sidebar .brand span,
+    .sidebar .brand .logo span,
     .sidebar .nav-item span,
     .sidebar .disk-selector-label,
     .sidebar .disk-search-wrap,
     .sidebar .disk-list,
     .sidebar .status-monitor,
     .sidebar .sidebar-clock,
-    .sidebar-clock {
+    .sidebar-clock,
+    .sidebar-edge-collapse-btn {
         display: none;
     }
 
@@ -567,111 +572,49 @@ body[data-design='pro-max'] .chart-container {
         height: 32px;
     }
 
-    /* -- Disk selector: compact icon button with flyout popup -- */
-    .sidebar .disk-selector-wrap {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 6px 0;
+    /* -- Team selector: compact icon button with flyout popup -- */
+    .sidebar .team-selector-wrapper {
         position: relative;
-        border: none;
-        margin: 0;
-        flex: 0 0 auto; /* don't grow in icon-only mode */
+        flex: 0 0 auto;
+        overflow: visible;
     }
 
-
-    /* Show the disk-selector-wrap itself (was hidden) */
-    .sidebar .disk-selector-label {
-        display: none !important;
-    }
-    .sidebar .disk-search-wrap {
-        display: none !important;
-    }
-
-    /* Disk icon trigger button */
-    .sidebar .disk-icon-trigger {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        border: 1px solid transparent;
-        background: transparent;
-        color: var(--text-secondary);
-        cursor: pointer;
-        font-size: 1rem;
-        transition: all 0.2s;
-        position: relative;
-    }
-    .sidebar .disk-icon-trigger:hover {
-        background: rgba(255,255,255,0.08);
-        color: var(--text-primary);
-        border-color: rgba(255,255,255,0.1);
-    }
-    .sidebar .disk-icon-trigger.has-active {
-        color: var(--emerald-400);
-    }
-
-    /* Flyout panel -- appears on hover to the right of icon */
-    .sidebar .disk-flyout {
+    .sidebar #team-flyout-panel {
         position: absolute;
-        left: calc(100% + 6px);
+        left: calc(100% + 4px);
         top: 0;
-        width: 220px;
-        background: #171b22;
-        border: 1px solid rgba(255,255,255,0.12);
+        width: 260px;
+        max-height: 400px;
+        background-color: var(--bg-base);
+        background-image: linear-gradient(var(--bg-surface-elevated), var(--bg-surface-elevated));
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: var(--glass-border);
         border-radius: 12px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-        padding: 10px;
+        box-shadow: var(--glass-shadow);
         z-index: 500;
-        /* Use opacity+pointer-events instead of display:none
-           so we can (a) animate and (b) add a ::before bridge */
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
         opacity: 0;
         visibility: hidden;
-        transition: opacity 0.2s ease, visibility 0s linear 0.25s;
+        transform: translateX(-8px);
+        transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.25s;
+        display: flex !important;
+        flex-direction: column;
     }
 
-    /* Invisible bridge: fills the gap between icon and flyout panel.
-       Keeps :hover alive while mouse travels across the gap. */
-    .sidebar .disk-flyout::before {
-        content: '';
-        position: absolute;
-        right: 100%;       /* extends leftward from flyout edge */
-        top: 0;
-        width: 10px;       /* covers the 6px gap + margin */
-        height: 100%;
-    }
-
-    .sidebar .disk-selector-wrap:hover .disk-flyout,
-    .sidebar .disk-flyout:hover {
+    .sidebar .team-selector-wrapper:hover #team-flyout-panel {
         opacity: 1;
         visibility: visible;
+        transform: translateX(0);
         transition-delay: 0s;
     }
 
-    .sidebar .disk-flyout-title {
-        font-size: 0.68rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--text-secondary);
-        padding: 0 4px 6px;
-        border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-
-    .sidebar .disk-flyout .disk-list {
-        display: flex !important;
-        max-height: 260px;
-        overflow-y: auto;
-    }
-
-    .sidebar .disk-flyout .disk-search-wrap {
-        display: flex !important;
-        margin-bottom: 2px;
+    .sidebar #team-flyout-panel::before {
+        content: '';
+        position: absolute;
+        right: 100%;
+        top: 0;
+        width: 14px;
+        height: 100%;
     }
 }
 
@@ -715,11 +658,19 @@ body[data-design='pro-max'] .chart-container {
     /* Top header row inside drawer */
     .sidebar .brand {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
+        flex-direction: column;
         padding: 20px 20px 16px;
         margin-bottom: 0;
         border-bottom: 1px solid rgba(255,255,255,0.06);
+        position: relative;
+        z-index: 300;
+    }
+    .sidebar .brand-row {
+        width: 100%;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
     }
 
     .sidebar .logo {
@@ -743,6 +694,23 @@ body[data-design='pro-max'] .chart-container {
     .sidebar .sidebar-clock,
     .sidebar .sidebar-search {
         display: flex !important;
+    }
+
+    /* Override tablet collapsed mode for the flyout to ensure it shows inline */
+    body .sidebar #team-flyout-panel {
+        position: static !important;
+        width: 100% !important;
+        max-height: none !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        transform: none !important;
+        transition: none !important;
+        padding-top: 10px !important;
     }
 
     .sidebar .disk-selector-label { display: flex !important; }
@@ -1337,4 +1305,63 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
         display: flex !important;
         margin-bottom: 2px;
     }
+}
+
+/* -- 3-Column Layout Responsive Adjustments -- */
+@media (max-width: 1100px) {
+    .team-disk-sidebar {
+        width: 240px !important;
+    }
+}
+
+@media (max-width: 850px) {
+    .workspace-body {
+        flex-direction: column !important;
+        gap: 16px !important;
+    }
+    
+    .team-disk-sidebar {
+        width: 100% !important;
+        border-right: none;
+        border-bottom: var(--glass-border);
+        flex: none !important;
+        height: auto !important;
+        max-height: none !important;
+        position: relative;
+        z-index: 100;
+        overflow: visible !important;
+        background: var(--bg-base); /* Changed to base for solid opacity */
+    }
+    
+    .team-disk-dropdown-content {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        width: 100%;
+        background: var(--bg-base); /* Changed to base for solid opacity */
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: var(--glass-border);
+        border-top: none;
+        border-radius: 0 0 var(--border-radius-lg) var(--border-radius-lg);
+        box-shadow: var(--glass-shadow);
+        z-index: 110;
+        max-height: 60vh;
+        
+        display: none !important;
+    }
+    
+    .team-disk-sidebar.expanded .team-disk-dropdown-content {
+        display: flex !important;
+    }
+
+    .mobile-dropdown-chevron {
+        display: block !important;
+    }
+    
+    .team-disk-sidebar.expanded .mobile-dropdown-chevron {
+        transform: rotate(180deg);
+    }
+    
+
 }

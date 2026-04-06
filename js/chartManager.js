@@ -4,15 +4,15 @@ import { smartFmt, smartFmtTick, pickUnit } from './formatters.js';
 function ct() {
     const light = document.documentElement.dataset.theme === 'light';
     return {
-        grid:    light ? 'rgba(0,0,0,0.065)' : 'rgba(255,255,255,0.05)',
-        gridSm:  light ? 'rgba(0,0,0,0.05)'  : 'rgba(255,255,255,0.04)',
-        gridXs:  light ? 'rgba(0,0,0,0.04)'  : 'rgba(255,255,255,0.03)',
-        tick:    light ? '#374151'            : '#CBD5E1',
-        tickDim: light ? '#6B7280'            : '#94A3B8',
-        tipBg:   light ? 'rgba(250,249,246,0.97)' : 'rgba(10,14,20,0.94)',
-        tipTitle:light ? '#1F2937'            : '#fbbf24',
-        tipBody: light ? '#374151'            : '#cbd5e1',
-        tipBdr:  light ? 'rgba(0,0,0,0.08)'  : 'rgba(251,191,36,0.3)',
+        grid:    light ? 'rgba(0,0,0,0.18)'   : 'rgba(255,255,255,0.12)',
+        gridSm:  light ? 'rgba(0,0,0,0.11)'   : 'rgba(255,255,255,0.08)',
+        gridXs:  light ? 'rgba(0,0,0,0.07)'   : 'rgba(255,255,255,0.05)',
+        tick:    light ? '#020617'            : '#E2E8F0',
+        tickDim: light ? '#1E293B'            : '#94A3B8',
+        tipBg:   light ? 'rgba(255,255,255,0.98)' : 'rgba(15,23,42,0.94)',
+        tipTitle:light ? '#020617'            : '#fbbf24',
+        tipBody: light ? '#020617'            : '#e2e8f0',
+        tipBdr:  light ? 'rgba(0,0,0,0.12)'   : 'rgba(251,191,36,0.4)',
     };
 }
 
@@ -147,7 +147,7 @@ export class ChartManager {
 
     _updateChartDefaults() {
         const light = document.documentElement.dataset.theme === 'light';
-        Chart.defaults.color = light ? '#4B5563' : '#CBD5E1';
+        Chart.defaults.color = light ? '#1E293B' : '#E2E8F0';
         Chart.defaults.font.weight = '600';
     }
 
@@ -544,16 +544,16 @@ export class ChartManager {
                 scales: {
                     x: {
                         grid: { color: ct().gridXs, drawBorder: false },
-                        ticks: { maxTicksLimit: 10, color: ct().tick, font: { size: 11 } }
+                        ticks: { maxTicksLimit: 10, color: ct().tick, font: { size: 12, weight: 500 } }
                     },
                     y: {
                         position: 'right',
                         beginAtZero: false,
                         grid: { color: ct().gridSm, drawBorder: false },
-                        afterFit(scale) { scale.width = 65; },
+                        afterFit(scale) { scale.width = 90; },
                         ticks: {
                             color: ct().tick,
-                            font: { size: 11 },
+                            font: { size: 12, weight: 500 },
                             callback: v => formatBytesDynamically(v)
                         }
                     }
@@ -805,16 +805,18 @@ export class ChartManager {
         const xScaleCfg = logScale
             ? {
                 type: 'logarithmic',
-                grid: { color: 'rgba(255,255,255,0.05)' },
+                grid: { color: ct().gridXs },
                 ticks: {
                     autoSkip: true,
                     maxTicksLimit: 6,
                     maxRotation: 0,
                     callback: v => {
+                        if (v <= 0) return null;
                         const log = Math.log10(v);
                         if (Math.abs(log - Math.round(log)) < 1e-9) return smartFmtTick(v * divisor);
-                        const nice = [1,2,5,10,15,20,25,30,40,50,60,70,80,90,100];
-                        return nice.includes(Math.round(v)) ? smartFmtTick(Math.round(v) * divisor) : null;
+                        const mantissa = Math.round(v / Math.pow(10, Math.floor(log)));
+                        if (mantissa === 2 || mantissa === 5) return smartFmtTick(v * divisor);
+                        return null;
                     }
                 }
               }
@@ -846,7 +848,6 @@ export class ChartManager {
         // Wire toggle button
         const btn = document.getElementById('users-scale-btn');
         if (btn) {
-            btn.textContent = logScale ? 'Log' : 'Lin';
             btn.classList.toggle('active', logScale);
             btn.onclick = () => {
                 this._usersLogScale = !this._usersLogScale;
@@ -901,8 +902,8 @@ export class ChartManager {
                     }
                 },
                 scales: {
-                    x: { grid: { color: ct().gridXs }, ticks: { maxTicksLimit: 6, color: ct().tick, font: { size: 10 } } },
-                    y: { position: 'right', grid: { color: ct().gridSm }, ticks: { autoSkip: true, maxRotation: 0, color: ct().tick, font: { size: 10 }, callback: v => smartFmtTick(v * 1e12) } }
+                    x: { grid: { color: ct().gridXs }, ticks: { maxTicksLimit: 6, color: ct().tick, font: { size: 12, weight: 500 } } },
+                    y: { position: 'right', grid: { color: ct().gridSm }, ticks: { autoSkip: true, maxRotation: 0, color: ct().tick, font: { size: 12, weight: 500 }, callback: v => smartFmtTick(v * 1e12) } }
                 }
             }
         });
@@ -944,22 +945,24 @@ export class ChartManager {
         const xScaleCfg = useLog
             ? {
                 type: 'logarithmic',
-                grid: { color: 'rgba(255,255,255,0.04)' },
+                grid: { color: ct().gridXs },
                 ticks: {
-                    color: '#475569', font: { size: 10 },
+                    color: ct().tickDim, font: { size: 12, weight: 500 },
                     autoSkip: true,
                     maxTicksLimit: 6,
                     maxRotation: 0,
                     callback: v => {
+                        if (v <= 0) return null;
                         const log = Math.log10(v);
                         const str = smartFmtTick(v * divisor);
                         if (Math.abs(log - Math.round(log)) < 1e-9) return `+${str}`;
-                        const nice = [1,2,5,10,15,20,25,30,40,50,60,70,80,90,100,150,200,300,400,500];
-                        return nice.includes(Math.round(v)) ? `+${str}` : null;
+                        const mantissa = Math.round(v / Math.pow(10, Math.floor(log)));
+                        if (mantissa === 2 || mantissa === 5) return `+${str}`;
+                        return null;
                     }
                 }
               }
-            : { type: 'linear', grid: { color: ct().gridSm }, ticks: { autoSkip: true, maxRotation: 0, maxTicksLimit: 6, color: ct().tick, font: { size: 10 }, callback: v => `${v>0?'+':''}${smartFmtTick(v * divisor)}` } };
+            : { type: 'linear', grid: { color: ct().gridSm }, ticks: { autoSkip: true, maxRotation: 0, maxTicksLimit: 6, color: ct().tick, font: { size: 12, weight: 500 }, callback: v => `${v>0?'+':''}${smartFmtTick(v * divisor)}` } };
 
         if (this._histGrowersChart) this._histGrowersChart.destroy();
         this._histGrowersChart = new Chart(ctx, {
@@ -977,7 +980,7 @@ export class ChartManager {
                 },
                 scales: {
                     x: xScaleCfg,
-                    y: { grid: { display: false }, ticks: { color: ct().tickDim, font: { size: 10 } } }
+                    y: { grid: { display: false }, ticks: { color: ct().tickDim, font: { size: 12, weight: 500 } } }
                 }
             }
         });
@@ -986,7 +989,6 @@ export class ChartManager {
         const btn = document.getElementById('growers-scale-btn');
         if (btn) {
             const effective = useLog;
-            btn.textContent = effective ? 'Log' : 'Lin';
             btn.classList.toggle('active', effective);
             btn.title = hasNegative && logScale ? 'Log unavailable (negative values)' : 'Toggle log/linear scale';
             btn.onclick = () => {
@@ -1040,7 +1042,7 @@ export class ChartManager {
                 plugins: {
                     legend: {
                         position: 'top', align: 'start',
-                        labels: { boxWidth: 10, padding: 10, color: '#94a3b8', font: { size: 10 } }
+                        labels: { boxWidth: 10, padding: 10, color: '#94a3b8', font: { size: 12, weight: 500 } }
                     },
                     tooltip: {
                         backgroundColor: ct().tipBg, titleColor: ct().tipBody,
@@ -1049,12 +1051,24 @@ export class ChartManager {
                     }
                 },
                 scales: {
-                    x: { grid: { color: ct().gridXs }, ticks: { maxTicksLimit: 8, color: ct().tick, font: { size: 10 } } },
+                    x: { grid: { color: ct().gridXs }, ticks: { maxTicksLimit: 8, color: ct().tick, font: { size: 12, weight: 500 } } },
                     y: {
                         type: logScale ? 'logarithmic' : 'linear',
                         position: 'right',
                         grid: { color: ct().gridSm },
-                        ticks: { color: ct().tick, font: { size: 10 }, callback: v => `${v}GB` },
+                        ticks: { 
+                            color: ct().tick, 
+                            font: { size: 12, weight: 500 }, 
+                            callback: v => {
+                                if (v <= 0) return null;
+                                if (!logScale) return `${v}GB`;
+                                const log = Math.log10(v);
+                                if (Math.abs(log - Math.round(log)) < 1e-9) return `${v}GB`;
+                                const mantissa = Math.round(v / Math.pow(10, Math.floor(log)));
+                                if (mantissa === 2 || mantissa === 5) return `${v}GB`;
+                                return null;
+                            }
+                        },
                         ...(logScale ? { min: 0.01 } : {})
                     }
                 }

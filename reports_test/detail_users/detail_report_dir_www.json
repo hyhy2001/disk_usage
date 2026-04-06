@@ -1,0 +1,9 @@
+{
+    "date": 1774760371,
+    "directory": "/www/wwwroot",
+    "user": "www",
+    "total_used": 4096,
+    "dirs": [
+        { "path": "/www/wwwroot/disk.hydev.me", "used": 4096 }
+    ]
+}

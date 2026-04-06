@@ -19,7 +19,9 @@ function initThemeToggle() {
     const saved = localStorage.getItem(STORAGE_KEY) || 'dark';
     applyTheme(saved);
 
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const current = document.documentElement.getAttribute('data-theme') || 'dark';
         applyTheme(current === 'dark' ? 'light' : 'dark');
     });

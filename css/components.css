@@ -21,7 +21,8 @@
     color: #e2e8f0;
     letter-spacing: 0.015em;
     line-height: 1.4;
-    white-space: nowrap;
+    white-space: pre;
+    text-align: left;
     pointer-events: none;
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.04);
     /* Hidden by default */
@@ -3354,8 +3355,10 @@ body[data-design='pro-max'] .glass-panel {
 
 /* -- Usage bars track background in light mode ----------------------------- */
 :root[data-theme='light'] .usage-bar-track,
-:root[data-theme='light'] .pivot-mini-bar {
-    background: rgba(0,0,0,0.08) !important;
+:root[data-theme='light'] .pivot-mini-bar,
+:root[data-theme='light'] .progress-track,
+:root[data-theme='light'] .sbar-track {
+    background: rgba(0,0,0,0.12) !important;
 }
 
 /* -- Code inline text in unknown notes ------------------------------------- */
@@ -3397,10 +3400,10 @@ body[data-design='pro-max'] .glass-panel {
 
 /* -- Scale toggle button -- Light mode --------------------------------------- */
 .scale-toggle-btn {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    padding: 2px 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px;
     border-radius: 6px;
     border: 1px solid rgba(255,255,255,0.18);
     background: rgba(255,255,255,0.10);
@@ -3408,6 +3411,9 @@ body[data-design='pro-max'] .glass-panel {
     cursor: pointer;
     transition: all 0.18s;
 }
+.scale-toggle-btn .icon-log { display: none; }
+.scale-toggle-btn.active .icon-linear { display: none; }
+.scale-toggle-btn.active .icon-log { display: block; }
 .scale-toggle-btn:hover {
     background: rgba(255,255,255,0.18);
     color: var(--text-primary);
@@ -3457,8 +3463,13 @@ body[data-design='pro-max'] .glass-panel {
 }
 
 :root[data-theme='light'] .nav-item.active {
-    background: rgba(16,185,129,0.10);
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.3);
     color: #059669;
+}
+:root[data-theme='light'] .disk-team-group.active-team {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.3);
 }
 
 /* -- Disk selector --------------------------------------------------------- */
@@ -3475,17 +3486,37 @@ body[data-design='pro-max'] .glass-panel {
 }
 
 :root[data-theme='light'] .disk-list-item.active {
-    background: rgba(16,185,129,0.1);
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.3);
     color: #059669;
 }
 
+:root[data-theme='light'] .team-disk-card .disk-path {
+    background: rgba(0, 0, 0, 0.08); /* fallback */
+}
+:root[data-theme='light'] .team-disk-card .disk-path.usage-pill-success {
+    background: #d1fae5;
+    color: #059669;
+}
+:root[data-theme='light'] .team-disk-card .disk-path.usage-pill-warning {
+    background: #fef3c7;
+    color: #d97706;
+}
+:root[data-theme='light'] .team-disk-card .disk-path.usage-pill-danger {
+    background: #ffe4e6;
+    color: #e11d48;
+}
+
 :root[data-theme='light'] .disk-search-wrap {
-    background: rgba(0,0,0,0.03);
-    border-color: rgba(0,0,0,0.07);
+    background: rgba(0,0,0,0.06);
+    border-color: rgba(0,0,0,0.15);
 }
 
 :root[data-theme='light'] .disk-search-input {
-    color: #374151;
+    color: #0f172a;
+}
+:root[data-theme='light'] .disk-search-input::placeholder {
+    color: #64748b;
 }
 
 /* -- System status footer -------------------------------------------------- */
@@ -3532,9 +3563,9 @@ body[data-design='pro-max'] .glass-panel {
 
 /* -- Glass panels / cards -------------------------------------------------- */
 :root[data-theme='light'] .glass-panel {
-    background: rgba(255,253,250,0.92);
-    border: 1px solid rgba(0,0,0,0.06);
-    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    background: rgba(255,255,255,0.95);
+    border: 1px solid rgba(0,0,0,0.12);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
 }
 
 /* -- Separators that use white rgba ---------------------------------------- */
@@ -5175,6 +5206,47 @@ body[data-design='pro-max'] .glass-panel {
     gap: 8px; /* High density row layout */
 }
 
+/* ── Sidebar Text Input ─────────────────────────────────── */
+.sidebar-text-input {
+    width: 100%;
+    padding: 8px 12px 8px 34px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color, rgba(255,255,255,0.08));
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+    font-family: inherit;
+}
+.sidebar-text-input:focus {
+    border-color: var(--accent, #38bdf8);
+    background: rgba(0, 0, 0, 0.4);
+}
+.sidebar-text-input::placeholder {
+    color: var(--text-muted, #94a3b8);
+}
+
+:root[data-theme='light'] .sidebar-text-input {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.1);
+    color: #0f172a;
+}
+:root[data-theme='light'] .sidebar-text-input:focus {
+    background: rgba(0, 0, 0, 0.06);
+    border-color: rgba(16, 185, 129, 0.4);
+}
+:root[data-theme='light'] .sidebar-text-input::placeholder {
+    color: #64748b;
+}
+
+#sidebar-team-search {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    padding-left: 30px;
+    font-size: 0.75rem;
+}
+
 .team-disk-card {
     background: var(--glass-bg, var(--bg-surface));
     border: 1px solid var(--glass-border);
@@ -5266,6 +5338,21 @@ body[data-design='pro-max'] .team-disk-card:hover {
     background: rgba(0,0,0,0.2);
     padding: 2px 6px;
     border-radius: var(--border-radius-md);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.team-disk-card .disk-path.usage-pill-success {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--emerald-400, #34d399);
+}
+.team-disk-card .disk-path.usage-pill-warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--amber-400, #fbbf24);
+}
+.team-disk-card .disk-path.usage-pill-danger {
+    background: rgba(244, 63, 94, 0.15);
+    color: var(--rose-400, #fb7185);
 }
 
 .team-disk-card .card-stats {
@@ -5312,10 +5399,15 @@ body[data-design='pro-max'] .team-disk-card:hover {
     box-shadow: var(--glass-shadow, 0 8px 24px rgba(0,0,0,0.6));
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    z-index: 100;
+    z-index: 1000; /* Bump to 1000 to be absolutely sure */
     display: none;
     flex-direction: column;
     gap: 4px;
+    pointer-events: auto !important;
+}
+
+.dropdown-item {
+    pointer-events: auto !important;
 }
 
 :root[data-theme='light'] .settings-dropdown {
@@ -5335,3 +5427,24 @@ body[data-design='pro-max'] .team-disk-card:hover {
 :root[data-theme='dark'] .dropdown-item .theme-label::before { content: "Light Mode"; }
 .dropdown-item .theme-label { font-size: 0; }
 .dropdown-item .theme-label::before { font-size: 13px; }
+
+/* ── Selected Disk Card Highlight ─────────────────────────── */
+.team-disk-card.selected {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid var(--accent);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+}
+.team-disk-card.selected .disk-name {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* Light mode overrides for selected card */
+:root[data-theme='light'] .team-disk-card.selected {
+    background: rgba(16, 185, 129, 0.08) !important;
+    border-color: rgba(16, 185, 129, 0.4);
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.15);
+}
+:root[data-theme='light'] .team-disk-card.selected .disk-name {
+    color: var(--emerald-600, #059669);
+}

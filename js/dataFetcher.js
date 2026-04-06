@@ -134,19 +134,13 @@ class DataFetcher {
             
             // Flatten the disks for internal application logic
             const flatDisks = [];
-            rawDisks.forEach((p_or_d, pIdx) => {
-                if (p_or_d.project && p_or_d.teams) {
-                    p_or_d.teams.forEach((t, tIdx) => {
-                        t.disks?.forEach(d => {
-                            flatDisks.push({ ...d, project: p_or_d.project, team: t.name, pIdx, tIdx });
-                        });
+            rawDisks.forEach((team, tIdx) => {
+                if (team.name && team.disks) {
+                    team.disks.forEach(d => {
+                        flatDisks.push({ ...d, team: team.name, tIdx });
                     });
-                } else if (p_or_d.name && p_or_d.disks) {
-                    p_or_d.disks.forEach(d => {
-                        flatDisks.push({ ...d, project: "Workspace", team: p_or_d.name, pIdx, tIdx: -1 });
-                    });
-                } else if (p_or_d.id) {
-                    flatDisks.push(p_or_d);
+                } else if (team.id) {
+                    flatDisks.push(team);
                 }
             });
             this.disksConfig = flatDisks;
@@ -161,8 +155,23 @@ class DataFetcher {
                     const target = list.querySelector(`.disk-list-item[data-id="${id}"]`);
                     if (target) target.classList.add('active');
                 }
+                
+                // Highlight the card in the middle column
+                const grid = document.getElementById('team-disk-grid');
+                if (grid) {
+                    grid.querySelectorAll('.team-disk-card').forEach(card => card.classList.remove('selected'));
+                    const card = grid.querySelector(`.team-disk-card[data-id="${id}"]`);
+                    if (card) card.classList.add('selected');
+                }
+                
                 this._activeDisk = id;
                 saveFilters({ activeDisk: id });
+
+                // Hiding empty state constraints & show features
+                const currentTab = loadFilters().activePage || 'overview';
+                navigateTo(currentTab === 'detail' ? 'detail' : 'overview');
+                const tabs = document.querySelector('.detail-tabs');
+                if (tabs) tabs.style.display = ''; // Restore subtabs visibility
 
                 const activeCfg = this.disksConfig?.find(d => d.id === id);
                 const titleEl = document.getElementById('shared-page-title');
@@ -178,26 +187,8 @@ class DataFetcher {
                 if (headerSepEl) headerSepEl.style.display = '';
 
                 const breadcrumbEl = document.getElementById('shared-page-breadcrumb');
-                if (breadcrumbEl && activeCfg) {
-                    if (activeCfg.project && activeCfg.project !== "Workspace") {
-                        const backSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>`;
-                        breadcrumbEl.innerHTML = `<button class="bc-link" data-pidx="${activeCfg.pIdx}" data-tidx="${activeCfg.tIdx}" style="cursor:pointer; display:inline-flex; align-items:center; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:var(--text-secondary); font-family:inherit; font-size:0.75rem; font-weight:600; padding:4px 10px; margin-bottom:8px; text-transform:none; letter-spacing:normal;" data-tooltip="Back to Team Overview" data-tooltip-pos="bottom">${backSvg}Back to ${activeCfg.team}</button>`;
-                        breadcrumbEl.style.display = 'inline-block';
-                        
-                        const linkEl = breadcrumbEl.querySelector('.bc-link');
-                        if (linkEl) {
-                            linkEl.addEventListener('mouseenter', e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; });
-                            linkEl.addEventListener('mouseleave', e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; });
-                            linkEl.addEventListener('click', (e) => {
-                                const pIdx = e.currentTarget.dataset.pidx;
-                                const tIdx = e.currentTarget.dataset.tidx;
-                                const teamGroup = document.querySelector(`.disk-team-group[data-pidx="${pIdx}"][data-tidx="${tIdx}"]`);
-                                if (teamGroup) teamGroup.click();
-                            });
-                        }
-                    } else {
-                        breadcrumbEl.style.display = 'none';
-                    }
+                if (breadcrumbEl) {
+                    breadcrumbEl.style.display = 'none';
                 }
 
                 this._permissionsLoaded = false;
@@ -287,21 +278,11 @@ class DataFetcher {
             
             const rawD = rawDisks;
             
-            rawD.forEach((p_or_d, pIdx) => {
-                if (p_or_d.project) {
-                    phtml += `<div class="disk-project-group">
-                                <div class="disk-project-header" data-tooltip="${p_or_d.project}" data-tooltip-pos="right">${chevronSVG}${projectSVG}<span>${p_or_d.project}</span></div>`;
-                    p_or_d.teams?.forEach((t, tIdx) => {
-                        const tooltipText = `${p_or_d.project} - ${t.name}`;
-                        phtml += `<div class="disk-team-group" data-pidx="${pIdx}" data-tidx="${tIdx}" data-tooltip="${tooltipText}" data-tooltip-pos="right">
-                                    <div class="disk-team-header">${teamSVG}<span>${t.name}</span></div>
-                                  </div>`;
-                    });
-                    phtml += `</div>`;
-                } else if (p_or_d.name && p_or_d.disks) {
-                    phtml += `<div class="disk-project-group">
-                                <div class="disk-team-group standalone" data-pidx="${pIdx}" data-tidx="-1" data-tooltip="${p_or_d.name}" data-tooltip-pos="right">
-                                    <div class="disk-team-header">${teamSVG}<span>${p_or_d.name}</span></div>
+            rawD.forEach((team, tIdx) => {
+                if (team.name && team.disks) {
+                    phtml += `<div class="disk-project-group" style="margin-bottom: 8px;">
+                                <div class="disk-team-group" data-tidx="${tIdx}" data-tooltip="${team.name}" data-tooltip-pos="right" style="margin-bottom: 2px;">
+                                    <div class="disk-team-header" style="padding: 12px 14px; font-size: 0.85rem;">${teamSVG}<span style="font-weight: 600;">${team.name}</span></div>
                                 </div>
                               </div>`;
                 }
@@ -317,27 +298,15 @@ class DataFetcher {
                     const groupNodes = projectContainer.querySelectorAll('.disk-project-group');
                     
                     groupNodes.forEach(group => {
-                        const projectHeader = group.querySelector('.disk-project-header');
-                        const projectName = projectHeader ? projectHeader.textContent.toLowerCase() : '';
-                        const teams = group.querySelectorAll('.disk-team-group');
-                        let hasMatchingTeam = false;
-                        
-                        teams.forEach(team => {
+                        const team = group.querySelector('.disk-team-group');
+                        if (team) {
                             const teamName = team.textContent.toLowerCase();
-                            if (projectName.includes(term) || teamName.includes(term)) {
-                                team.style.display = '';
-                                hasMatchingTeam = true;
+                            if (teamName.includes(term)) {
+                                group.style.display = '';
                             } else {
-                                team.style.display = 'none';
+                                group.style.display = 'none';
                             }
-                        });
-                        
-                        // Auto-expand if searching
-                        if (term && hasMatchingTeam) {
-                            group.classList.remove('collapsed');
                         }
-                        
-                        group.style.display = hasMatchingTeam ? '' : 'none';
                     });
                 });
             }
@@ -358,71 +327,51 @@ class DataFetcher {
                     });
                     teamGroup.classList.add('active-team');
                     
-                    const pIdx = parseInt(teamGroup.dataset.pidx);
                     const tIdx = parseInt(teamGroup.dataset.tidx);
-                    const node = rawD[pIdx];
-                    let teamNode = null, pName = "Workspace";
-                    
-                    if (tIdx === -1) { teamNode = node; } 
-                    else { teamNode = node.teams[tIdx]; pName = node.project; }
+                    const teamNode = rawD[tIdx];
                     
                     this._activeDisk = null;
-                    saveFilters({ activeDisk: null, activeTeamPIdx: pIdx, activeTeamTIdx: tIdx });
+                    saveFilters({ activeDisk: null, activeTeamTIdx: tIdx });
                     const list = document.getElementById('disk-list');
                     if (list) list.querySelectorAll('.disk-list-item').forEach(el => el.classList.remove('active'));
 
                     // Always render the context (which populates the dropdown menu disk-list)
-                    this.renderTeamContext(teamNode, pName);
+                    this.renderTeamContext(teamNode, teamNode.name);
 
                     if (!window._isRestoringDisk) {
-                        // Logic defined by user: 
-                        // Logic defined by user: 
-                        // - Standalone Team (tIdx === -1) -> Jump directly to its first disk
-                        // - Project Team (tIdx >= 0) -> ALWAYS show Team Overview grid
-                        if (tIdx === -1 && teamNode.disks && teamNode.disks.length > 0) {
-                            setTimeout(() => {
-                                const diskEl = document.querySelector(`.disk-list-item[data-id="${teamNode.disks[0].id}"]`);
-                                if (diskEl) diskEl.click();
-                            }, 50);
-                        } else {
-                            this.loadTeamOverview(teamNode.name || pName);
-                        }
+                         this.loadTeamOverview(teamNode.name);
                     }
                 });
             });
 
             const savedFilters = loadFilters();
             const savedDisk = savedFilters.activeDisk;
-            const savedPIdx = savedFilters.activeTeamPIdx;
             const savedTIdx = savedFilters.activeTeamTIdx;
             
             if (savedDisk) {
                 let foundTeamEl = null;
-                rawD.forEach((p, pIdx) => {
-                    if (p.project) {
-                        p.teams?.forEach((t, tIdx) => {
-                            if (t.disks?.find(d => d.id === savedDisk)) {
-                                foundTeamEl = projectContainer.querySelector(`.disk-team-group[data-pidx="${pIdx}"][data-tidx="${tIdx}"]`);
-                            }
-                        });
-                    } else if (p.name && p.disks?.find(d => d.id === savedDisk)) {
-                         foundTeamEl = projectContainer.querySelector(`.disk-team-group[data-pidx="${pIdx}"][data-tidx="-1"]`);
+                let foundTIdx = null;
+                rawD.forEach((team, tIdx) => {
+                    if (team.name && team.disks?.find(d => d.id === savedDisk)) {
+                         foundTeamEl = projectContainer.querySelector(`.disk-team-group[data-tidx="${tIdx}"]`);
+                         foundTIdx = tIdx;
                     }
                 });
                 if (foundTeamEl) {
-                    window._isRestoringDisk = true;
-                    foundTeamEl.click();
-                    setTimeout(() => {
-                        const dl = document.querySelector(`.disk-list-item[data-id="${savedDisk}"]`);
-                        if (dl) dl.click();
-                        window._isRestoringDisk = false;
-                    }, 100);
+                    projectContainer.querySelectorAll('.disk-team-group').forEach(g => {
+                        g.classList.remove('active-team');
+                    });
+                    foundTeamEl.classList.add('active-team');
+                    
+                    const teamNode = rawD[foundTIdx];
+                    this.renderTeamContext(teamNode, teamNode.name);
+                    this.loadTeamOverview(teamNode.name, savedDisk);
                 } else {
                    const firstTeam = projectContainer.querySelector('.disk-team-group');
                    if (firstTeam) firstTeam.click();
                 }
-            } else if (savedPIdx !== undefined && savedTIdx !== undefined) {
-                const teamEl = projectContainer.querySelector(`.disk-team-group[data-pidx="${savedPIdx}"][data-tidx="${savedTIdx}"]`);
+            } else if (savedTIdx !== undefined && savedTIdx !== null) {
+                const teamEl = projectContainer.querySelector(`.disk-team-group[data-tidx="${savedTIdx}"]`);
                 if (teamEl) {
                     teamEl.click();
                 } else {
@@ -438,8 +387,10 @@ class DataFetcher {
         }
     }
 
-    async loadTeamOverview(teamName) {
-        this._activeDisk = null;
+    async loadTeamOverview(teamName, restoreDiskId = null) {
+        if (!restoreDiskId) {
+            this._activeDisk = null;
+        }
 
         // Reset Header
         const titleEl = document.getElementById('shared-page-title');
@@ -455,24 +406,8 @@ class DataFetcher {
         if (titleText) titleText.textContent = "Select a disk...";
         
         // Switch to Team Overview Page
-        // Hide irrelevant tabs/buttons for the team aggregated view
-        const workspaceHeader = document.querySelector('.workspace-header');
-        if (workspaceHeader) workspaceHeader.style.display = 'none';
-        
-        const navTabs = document.querySelector('.workspace-nav-tabs');
-        if (navTabs) navTabs.style.display = 'none';
-        
-        const syncBtn = document.getElementById('btn-fetch');
-        if (syncBtn) syncBtn.style.display = 'none';
-        
-        const syncStatusPill = document.getElementById('sync-status-pill');
-        if (syncStatusPill) syncStatusPill.style.display = 'none';
-
-        const sharedHeader = document.getElementById('shared-header');
-        if (sharedHeader) sharedHeader.style.display = 'none'; // Hide entirely on Team view
-
         // Switch to Team Overview Page via Router
-        navigateTo('team');
+        // navigateTo('team'); // Removed because we now have a 3-column layout where team disks are in the sidebar
 
         const grid = document.getElementById('team-disk-grid');
         if (!grid) return;
@@ -513,30 +448,25 @@ class DataFetcher {
                 const diskId = d._disk_id || '';
                 const dirPath = d.directory || sys.directory || d._disk_path || 'Unknown path';
                 
-                let usedColor = 'var(--text-secondary)';
-                if (usedPct >= 85) usedColor = '#f43f5e'; // rose-500
-                else if (usedPct >= 70) usedColor = '#f59e0b'; // amber-500
-                else usedColor = '#10b981'; // emerald-500
+                let usedClass = 'usage-pill-success';
+                if (usedPct >= 85) usedClass = 'usage-pill-danger';
+                else if (usedPct >= 70) usedClass = 'usage-pill-warning';
                 
-                cardsHTML += `<div class="team-disk-card" onclick="document.querySelector('.disk-list-item[data-id=\\'${diskId}\\']')?.click()" data-tooltip="Path: ${dirPath}">
-                    <div class="card-header" style="margin-bottom: 12px;">
-                        <span class="disk-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display: flex; align-items: center; gap: 6px;" title="${diskName}">
-                            ${diskIcon}
-                            ${diskName}
-                        </span>
-                        <span class="disk-path" style="font-size: 0.8rem; white-space:nowrap; font-weight:700; color:${usedColor}; font-family:'JetBrains Mono', monospace;">${usedPct}% Used</span>
-                    </div>
-                    
-                    <div class="team-card-bar-wrapper" style="width: 100%;">
-                        <div class="sbar-track sbar-track-stacked" style="height: 10px; margin-bottom: 12px; border-radius: 5px;">
-                            <div class="sbar-seg seg-amber" style="width:${scannedPct}%;" data-tooltip="Scanned: ${fmt(scanned)}"></div>
-                            <div class="sbar-seg seg-slate" style="width:${unknownPct}%;" data-tooltip="Unknown: ${fmt(unknown)}"></div>
+                const free = Math.max(0, total - used);
+                const tooltipText = `<div style='display:grid; grid-template-columns: auto 1fr; gap: 4px 16px; text-align: left;'>
+                    <div style='color:var(--text-secondary)'>Total:</div><div style='text-align:right; font-weight:600; font-variant-numeric: tabular-nums;'>${fmt(total)}</div>
+                    <div style='color:var(--text-secondary)'>Used:</div><div style='text-align:right; font-weight:600; font-variant-numeric: tabular-nums;'>${fmt(used)}</div>
+                    <div style='color:var(--text-secondary)'>Scanned:</div><div style='text-align:right; font-weight:600; font-variant-numeric: tabular-nums;'>${fmt(scanned)}</div>
+                    <div style='color:var(--text-secondary)'>Free:</div><div style='text-align:right; font-weight:600; font-variant-numeric: tabular-nums;'>${fmt(free)}</div>
+                </div>`;
+
+                cardsHTML += `<div class="team-disk-card" data-id="${diskId}" onclick="document.querySelector('.disk-list-item[data-id=\\'${diskId}\\']')?.click()" data-tooltip="${tooltipText}" data-tooltip-pos="top" style="flex-direction: column; align-items: stretch; padding: 12px 16px; gap: 8px;">
+                    <div class="card-header" style="display: flex; flex-direction: column; gap: 6px; width: 100%; align-items: flex-start; margin-bottom: 0;">
+                        <div class="disk-name" style="display: flex; align-items: flex-start; gap: 8px; width: 100%;" title="${diskName}">
+                            <div style="margin-top:2px; flex-shrink:0; display:flex;">${diskIcon}</div>
+                            <span style="white-space: normal; overflow-wrap: anywhere; line-height: 1.3; font-weight: 600;">${diskName}</span>
                         </div>
-                        
-                        <div class="team-card-stats" style="display: flex; justify-content: space-between; font-size: 0.75rem;">
-                            <span class="text-secondary"><span class="legend-dot dot-amber"></span> Scanned <strong>${scannedPct}%</strong></span>
-                            <span class="text-secondary"><span class="legend-dot dot-slate"></span> Unknown <strong>${unknownPct}%</strong></span>
-                        </div>
+                        <div class="disk-path ${usedClass}" style="white-space: nowrap; margin-left: 24px; align-self: flex-start;">${usedPct}% Used</div>
                     </div>
                 </div>`;
             });
@@ -598,6 +528,54 @@ class DataFetcher {
         } catch (e) {
             console.error("Team load error:", e);
             grid.innerHTML = '<div class="glass-panel" style="padding:20px; color:#f43f5e;">Failed to load team aggregated data. Please check connection.</div>';
+        }
+
+        // Do not auto-select the disk unless restoring previous session
+        if (!restoreDiskId) {
+            const currentTab = loadFilters().activePage || 'overview';
+            navigateTo(currentTab === 'detail' ? 'detail' : 'overview'); // ensure the overview chart blocks are shown or hidden appropriately
+
+            const sharedHeader = document.getElementById('shared-header');
+            if (sharedHeader) sharedHeader.style.display = 'none';
+            
+            // Clean global charts since no specific disk is active
+            resetDashboardToEmpty(AppState.chartManagerInstance);
+            
+            // Toggle overview states
+            const overviewGrid = document.getElementById('overview-charts-grid');
+            const overviewEmpty = document.getElementById('overview-empty-state');
+            if (overviewGrid) overviewGrid.style.display = 'none';
+            if (overviewEmpty) overviewEmpty.style.display = 'flex';
+            
+            const tabs = document.querySelector('.detail-tabs');
+            if (tabs) tabs.style.display = 'none'; // hide tabs when no disk selected
+            
+            const detailViewArea = document.getElementById('detail-view-area');
+            if (detailViewArea) detailViewArea.innerHTML = '';
+            
+            // Switch tabs to snapshot natively
+            document.querySelectorAll('.detail-tab-pane').forEach(p => p.classList.remove('active'));
+            const snapPane = document.getElementById('tab-pane-snapshot');
+            if (snapPane) snapPane.classList.add('active');
+            
+            const snapBody = document.getElementById('tab-snapshot-body');
+            if (snapBody) {
+                snapBody.innerHTML = `
+                    <div class="empty-state" style="margin-top: 15vh;">
+                        <div class="empty-state-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </div>
+                        <h3>No Disk Selected</h3>
+                        <p>Please select a disk from the list to view its details.</p>
+                    </div>`;
+            }
+        } else {
+            setTimeout(() => {
+                const diskEl = document.querySelector(`.disk-list-item[data-id='${restoreDiskId}']`);
+                if (diskEl) diskEl.click();
+            }, 100);
         }
     }
 
@@ -739,6 +717,12 @@ class DataFetcher {
         this.setProcessingState(false);
         UINodes.statusText.textContent = "System Optimized";
         
+        // Restore overview charts grid
+        const overviewGrid = document.getElementById('overview-charts-grid');
+        const overviewEmpty = document.getElementById('overview-empty-state');
+        if (overviewGrid) overviewGrid.style.display = '';
+        if (overviewEmpty) overviewEmpty.style.display = 'none';
+        
         this.dataStore.finalizeProcessing();
         this.updateMetricCards();
         AppState.chartManagerInstance.render(this.dataStore);
@@ -848,7 +832,11 @@ function initMobileSidebar() {
         el.addEventListener('click', () => { if (window.innerWidth <= 640) close(); })
     );
     // Auto-close sidebar when disk is selected on mobile (PF-03)
-    document.addEventListener('diskSelected', () => { if (window.innerWidth <= 640) close(); });
+    document.addEventListener('diskSelected', () => { 
+        if (window.innerWidth <= 640) close(); 
+        const teamSidebar = document.getElementById('team-disk-sidebar');
+        if (teamSidebar) teamSidebar.classList.remove('expanded');
+    });
 }
 
 // Bootstrap

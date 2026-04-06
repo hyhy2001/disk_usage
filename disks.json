@@ -1,21 +1,16 @@
 [
   {
-    "name": "Standalone Team",
+    "name": "Backend Team",
     "disks": [
-      { "id": "disk_882", "name": "Disk Storage", "path": "reports_test" }
+      { "id": "disk_test1", "name": "Primary Storage", "path": "reports_test" },
+      { "id": "disk_test2", "name": "Disk 2", "path": "reports_test" },
+      { "id": "disk_test3", "name": "Disk 3", "path": "reports_test" }
     ]
   },
   {
-    "project": "StorageOS Core",
-    "teams": [
-      {
-        "name": "Backend Team",
-        "disks": [
-          { "id": "disk_test", "name": "Primary Storage", "path": "reports_test" },
-          { "id": "disk_test", "name": "Disk 2", "path": "reports_test" },
-          { "id": "disk_test", "name": "Disk 3", "path": "reports_test" }
-        ]
-      }
+    "name": "Frontend Team",
+    "disks": [
+      { "id": "disk_882", "name": "Assets Disk", "path": "reports_test" }
     ]
   }
 ]

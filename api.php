@@ -341,25 +341,27 @@ if ($type === 'permissions') {
                         $recording = false;
                         
                         if (strpos($obj_buf, '"error"') !== false && strpos($obj_buf, '"path"') !== false) {
-                            $item = @json_decode($obj_buf, true);
-                            if (is_array($item) && isset($item['path']) && isset($item['error'])) {
-                                $u = isset($item['user']) ? $item['user'] : $current_user;
-                                $t = isset($item['type']) ? $item['type'] : '';
-                                $e = $item['error'];
-                                $item['user'] = $u;
+                            $e = ''; $t = ''; $p = ''; $u = $current_user;
+                            if (preg_match('/"error"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"/', $obj_buf, $m)) $e = @json_decode('"' . $m[1] . '"');
+                            if (preg_match('/"type"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"/', $obj_buf, $m)) $t = @json_decode('"' . $m[1] . '"');
+                            if (preg_match('/"path"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"/', $obj_buf, $m)) $p = @json_decode('"' . $m[1] . '"');
+                            if (preg_match('/"user"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"/', $obj_buf, $m)) $u = @json_decode('"' . $m[1] . '"');
 
+                            if ($p !== '' && $e !== '') {
                                 $user_summary[$u] = isset($user_summary[$u]) ? $user_summary[$u] + 1 : 1;
-                                if ($e !== '') {
-                                    $error_summary[$e] = isset($error_summary[$e]) ? $error_summary[$e] + 1 : 1;
-                                }
+                                $error_summary[$e] = isset($error_summary[$e]) ? $error_summary[$e] + 1 : 1;
 
                                 $pass_user = empty($user_filter) || in_array($u, $user_filter);
                                 $pass_type = ($item_type === '' || $t === $item_type);
-                                $pass_path = ($path_query === '' || stripos($item['path'], $path_query) !== false);
+                                $pass_path = ($path_query === '' || stripos($p, $path_query) !== false);
 
                                 if ($pass_user && $pass_type && $pass_path) {
                                     if ($total >= $offset && count($page) < $limit) {
-                                        $page[] = $item;
+                                        $item = @json_decode($obj_buf, true);
+                                        if (is_array($item)) {
+                                            $item['user'] = $u;
+                                            $page[] = $item;
+                                        }
                                     }
                                     $total++;
                                 }
@@ -529,14 +531,14 @@ if ($type === 'files') {
         $depth += substr_count($ln, '{') - substr_count($ln, '}');
 
         if ($depth <= 0 && ltrim($buf) !== '') {
-            $obj = @json_decode(rtrim(trim($buf), ','), true);
-            if ($obj !== null && is_array($obj)) {
-                if ($idx >= $offset && count($collected) < $limit) {
+            if ($idx >= $offset && count($collected) < $limit) {
+                $obj = @json_decode(rtrim(trim($buf), ','), true);
+                if ($obj !== null && is_array($obj)) {
                     $collected[] = $obj;
                 }
-                $idx++;
-                if (count($collected) >= $limit && $idx >= $offset + $limit) break;
             }
+            $idx++;
+            if (count($collected) >= $limit) break;
             $buf = ''; $depth = 0;
         }
     }

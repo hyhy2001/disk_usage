@@ -97,10 +97,13 @@
                     <div class="sidebar-search sidebar-label" style="padding: 0 15px; margin-bottom: 10px; margin-top: 10px;">
                         <div style="position:relative;">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                            <input type="text" id="sidebar-team-search" placeholder="Search spaces..." style="width: 100%; padding: 6px 10px 6px 30px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.15); color: var(--text-primary); font-size: 0.75rem; outline: none; transition: border-color 0.2s, background 0.2s;" onfocus="this.style.borderColor='var(--accent-color)'; this.style.background='rgba(0,0,0,0.3)';" onblur="this.style.borderColor='var(--border-color)'; this.style.background='rgba(0,0,0,0.15)';">
+                            <input type="text" id="sidebar-team-search" class="sidebar-text-input" placeholder="Search spaces...">
                         </div>
                     </div>
                     <div id="project-team-list" style="flex:1; overflow-y:auto; padding: 0 15px 10px 15px;"></div>
+                    <div id="page-load-time" style="padding: 15px; font-size: 0.75rem; color: var(--text-muted, #64748b); text-align: center; border-top: 1px solid rgba(255,255,255,0.05); font-family: 'JetBrains Mono', monospace;">
+                        Load time: <span style="opacity:0.5">-- ms</span>
+                    </div>
                 </div>
             </div>
         </aside>
@@ -118,20 +121,54 @@
 
 <div class="workspace-body" style="display:flex; flex:1; min-height: calc(100vh - 40px); gap: 24px;">
 
-<div id="workspace-canvas" class="workspace-canvas" style="flex:1; position:relative; display:flex; flex-direction:column;">
+<!-- Column 2: Disk List for selected Team -->
+<aside id="team-disk-sidebar" class="team-disk-sidebar glass-panel" style="width: 260px; display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;">
+    <div class="section-header" style="display: flex; flex-direction: column; gap: 12px; margin: 16px;">
+        <h2 class="section-title" style="margin: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px; line-height: 1.2; cursor: pointer; user-select: none;" onclick="document.getElementById('team-disk-sidebar').classList.toggle('expanded');">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button id="btn-team-hamburger-mobile" class="hamburger-btn" aria-label="Toggle navigation" data-tooltip="Toggle sidebar" onclick="event.stopPropagation();">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                </button>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="display: flex; align-items: center;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                            <line x1="6" y1="6" x2="6.01" y2="6"/>
+                            <line x1="6" y1="18" x2="6.01" y2="18"/>
+                        </svg>
+                    </span>
+                    <span id="team-overview-title-text" style="color:var(--text-primary); font-size: 1.05rem;">All Teams</span>
+                </div>
+            </div>
+            <svg class="mobile-dropdown-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none; transition: transform 0.3s; flex-shrink: 0; color: var(--text-muted);"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </h2>
+        <div class="team-disk-dropdown-content" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+            <div class="team-overview-search-container" style="position:relative; width:100%; padding: 0 16px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="position:absolute; left:28px; top:50%; transform:translateY(-50%); color:var(--text-muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="team-disk-search" class="sidebar-text-input" placeholder="Search disks...">
+            </div>
+            
+            <div class="team-disk-list-scrollable" id="team-disk-grid" style="flex:1; overflow-y:auto; padding: 12px 16px 16px 16px; display: flex; flex-direction: column; gap: 10px;">
+                <!-- Cards will be populated by JS -->
+            </div>
+        </div>
+    </div>
+</aside>
+
+<!-- Column 3: The Work Canvas (Overview/Detail elements) -->
+<div id="workspace-canvas" class="workspace-canvas" style="flex:1; position:relative; display:flex; flex-direction:column; min-width: 0;">
 
         <!-- ===== DISK HEADER — shown only on disk detail/overview pages ===== -->
         <header id="shared-header" class="top-header" style="display:none;">
             <!-- Row 1: disk name · path · quick stats (all inline) -->
             <div class="header-top-row">
                 <div class="header-identity">
-                    <button id="btn-hamburger" class="hamburger-btn" aria-label="Toggle navigation" data-tooltip="Toggle sidebar">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                            <line x1="3" y1="6" x2="21" y2="6"/>
-                            <line x1="3" y1="12" x2="21" y2="12"/>
-                            <line x1="3" y1="18" x2="21" y2="18"/>
-                        </svg>
-                    </button>
+
                     <div style="display:flex; flex-direction:column; justify-content:center; gap: 2px;">
                         <div id="shared-page-breadcrumb" style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: none;"></div>
                         <div style="display:flex; align-items:center; gap: 10px;">
@@ -182,34 +219,11 @@
                     </div>
                 </div>
             </div>
-            <!-- Row 2: timestamp -->
-            <p class="subtitle" id="data-timerange">Waiting for data payload...</p>
-
-            <!-- Row 3: Tabs & Actions -->
-            <div class="workspace-header" style="padding-bottom: 16px; margin-bottom: 24px; border-bottom: 2px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between; align-items:center;">
-                <div class="workspace-nav-tabs">
-                    <button id="nav-overview" class="tab-btn active">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="14" width="7" height="7"></rect>
-                            <rect x="3" y="14" width="7" height="7"></rect>
-                        </svg>
-                        Overview
-                    </button>
-                    <button id="nav-detail" class="tab-btn">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="8" y1="6" x2="21" y2="6"></line>
-                            <line x1="8" y1="12" x2="21" y2="12"></line>
-                            <line x1="8" y1="18" x2="21" y2="18"></line>
-                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                        </svg>
-                        Detail
-                    </button>
-                </div>
-                <div class="workspace-actions" style="display:flex; align-items:center; gap:16px;">
+            <!-- Row 2 & 3: Timestamp and Actions -->
+            <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-bottom: 8px; margin-top: 4px;">
+                <p class="subtitle" id="data-timerange" style="margin:0;">Waiting for data payload...</p>
+                
+                <div class="workspace-actions" style="display:flex; align-items:center; flex-wrap:wrap; gap:12px;">
                     <!-- System Monitor Horizontal Pill (Moved from Sidebar) -->
                     <div id="sync-status-pill" style="display:flex; align-items:stretch; background:rgba(0,0,0,0.15); border:1px solid rgba(255,255,255,0.06); border-radius:8px; position:relative; overflow:hidden;">
                         <!-- Progress bar at the absolute bottom -->
@@ -244,55 +258,49 @@
                     </button>
                 </div>
             </div>
-        </header>
 
-            <!-- ===== TEAM OVERVIEW PAGE ===== -->
-            <section id="page-team-overview" class="page-section page-hidden">
-                <div class="section-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-top: 10px; margin-bottom: 4px;">
-                    <h2 class="section-title" style="margin: 0; display: flex; align-items: center; justify-content: flex-start; gap: 8px; line-height: 1.2;">
-                        <!-- Hamburger button for mobile when in team view (shared-header hidden) -->
-                        <button class="hamburger-btn" aria-label="Toggle navigation" data-tooltip="Toggle sidebar">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="3" y1="6" x2="21" y2="6"/>
-                                <line x1="3" y1="12" x2="21" y2="12"/>
-                                <line x1="3" y1="18" x2="21" y2="18"/>
-                            </svg>
-                        </button>
-                        <span style="display: flex; align-items: center;">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
-                                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
-                                <line x1="6" y1="6" x2="6.01" y2="6"/>
-                                <line x1="6" y1="18" x2="6.01" y2="18"/>
-                            </svg>
-                        </span>
-                        <span id="team-overview-title-text" style="color:var(--text-primary);">All Teams</span>
-                    </h2>
-                    
-                    <div class="team-overview-search-container" style="position:relative; width:240px; max-width:100%;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                        <input type="text" id="team-disk-search" placeholder="Search disks..." style="width: 100%; padding: 8px 12px 8px 34px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); font-size: 0.85rem; outline: none; transition: border-color 0.2s, background 0.2s;" onfocus="this.style.borderColor='var(--accent-color)'; this.style.background='rgba(0,0,0,0.4)';" onblur="this.style.borderColor='var(--border-color)'; this.style.background='rgba(0,0,0,0.2)';">
-                    </div>
-                    <div class="view-toggle" id="team-view-toggle">
-                        <button class="view-toggle-btn active" data-view="grid" title="Grid View" aria-label="Grid View">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                        </button>
-                        <button class="view-toggle-btn" data-view="list" title="List View" aria-label="List View">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-                        </button>
-                    </div>
+            <!-- Row 4: Tabs -->
+            <div class="workspace-header" style="height:auto; min-height:42px; margin-top:0; padding-top:0; padding-bottom:0; margin-bottom:24px; border-top:none; border-bottom:1px solid rgba(255,255,255,0.05); display:flex; align-items:flex-end;">
+                <div class="workspace-nav-tabs" style="margin-left:-20px;">
+                    <button id="nav-overview" class="tab-btn active">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                        Overview
+                    </button>
+                    <button id="nav-detail" class="tab-btn">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="8" y1="6" x2="21" y2="6"></line>
+                            <line x1="8" y1="12" x2="21" y2="12"></line>
+                            <line x1="8" y1="18" x2="21" y2="18"></line>
+                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                        </svg>
+                        Detail
+                    </button>
                 </div>
-                
-                <div class="disk-card-grid" id="team-disk-grid">
-                    <!-- Cards will be populated by JS -->
-                </div>
-            </section>
+            </div>
+        </header>
 
             <!-- ===== OVERVIEW PAGE ===== -->
             <section id="page-overview" class="page-section page-hidden">
 
             <!-- Charts Level -->
-            <div class="charts-grid">
+            <!-- EMPTY STATE (No Disk Selected) -->
+            <div id="overview-empty-state" class="empty-state" style="display:none; margin-top: 20vh;">
+                <div class="empty-state-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+                    </svg>
+                </div>
+                <h3>No Disk Selected</h3>
+                <p>Please select a disk from the list to view its metrics overview.</p>
+            </div>
+            <div class="charts-grid" id="overview-charts-grid">
                 <!-- Main Timeline Chart -->
                 <div class="chart-container large-span glass-panel">
                     <div class="panel-header timeline-header">
@@ -335,7 +343,10 @@
                     <div class="panel-header">
                         <h2>Top Consuming Users</h2>
                         <div class="flex-row-g6">
-                            <button id="users-scale-btn" class="scale-toggle-btn" data-tooltip="Switch log / linear scale">Lin</button>
+                            <button id="users-scale-btn" class="scale-toggle-btn" data-tooltip="Switch log / linear scale">
+                                <svg class="icon-linear" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M3 21 21 3"/></svg>
+                                <svg class="icon-log" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M3 21s6-12 18-14"/></svg>
+                            </button>
                             <button class="chart-expand-btn" data-chart="users" data-tooltip="Open full-screen chart view" aria-label="Open full-screen chart view"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                         </div>
                     </div>
@@ -414,7 +425,10 @@
                                             <span class="history-chart-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> Selected Users Usage</span>
                                             <div class="flex-row-g6">
                                                 <span class="history-chart-stat" id="history-total-stat"></span>
-                                                <button id="btn-scale-toggle" class="scale-toggle-btn" data-scale="linear">Log</button>
+                                                <button id="btn-scale-toggle" class="scale-toggle-btn" data-scale="linear" data-tooltip="Switch log / linear scale">
+                                                    <svg class="icon-linear" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M3 21 21 3"/></svg>
+                                                    <svg class="icon-log" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M3 21s6-12 18-14"/></svg>
+                                                </button>
                                                 <button class="chart-expand-btn" data-chart="trend" data-tooltip="Open full-screen chart view" aria-label="Open full-screen chart view"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                                             </div>
                                         </div>
@@ -427,7 +441,10 @@
                                             <span class="history-chart-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Fastest Growing Users</span>
                                             <div class="flex-row-g6">
                                                 <span class="history-chart-stat" id="history-growers-stat"></span>
-                                                <button id="growers-scale-btn" class="scale-toggle-btn" data-tooltip="Switch log / linear scale">Lin</button>
+                                                <button id="growers-scale-btn" class="scale-toggle-btn" data-tooltip="Switch log / linear scale">
+                                                    <svg class="icon-linear" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M3 21 21 3"/></svg>
+                                                    <svg class="icon-log" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M3 21s6-12 18-14"/></svg>
+                                                </button>
                                                 <button class="chart-expand-btn" data-chart="growers" data-tooltip="Open full-screen chart view" aria-label="Open full-screen chart view"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                                             </div>
                                         </div>
@@ -549,6 +566,20 @@
                     localStorage.setItem('sidebar-collapsed', isCollapsed ? 'true' : 'false');
                 });
             }
+            
+            // Mobile sidebar logic is handled centrally in dataFetcher.js -> initMobileSidebar()
+
+            // Calculate and display page load time
+            window.addEventListener('load', () => {
+                setTimeout(() => {
+                    const perf = performance.getEntriesByType('navigation')[0];
+                    const loadTime = perf ? Math.round(perf.loadEventEnd - perf.startTime) : 0;
+                    const loadEl = document.getElementById('page-load-time');
+                    if (loadEl && loadTime > 0) {
+                        loadEl.innerHTML = `Load time: <span style="color:var(--emerald-400)">${loadTime}ms</span>`;
+                    }
+                }, 0);
+            });
         });
     </script>
 </body>

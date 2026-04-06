@@ -129,10 +129,12 @@ function renderSnapshotView() {
         section(`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`, 'Team Usage', `${teams.length} teams`, teamRows),
     ].join('');
 
-    const rightCol = [
-        section(`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`, 'Top 10 Users', `${users.length} total`, userRows),
-        section(`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`, 'Other User', `${other.length} total`, otherRows),
-    ].join('');
+    const rightColArr = [];
+    if (users && users.length > 0) {
+        rightColArr.push(section(`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`, 'Users (TOP 10)', `${users.length} total`, userRows));
+    }
+    rightColArr.push(section(`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`, 'Other Users (TOP 10)', `${other.length} total`, otherRows));
+    const rightCol = rightColArr.join('');
 
     document.getElementById('tab-snapshot-body').innerHTML =
         `<div class="snapshot-two-col">
@@ -274,7 +276,6 @@ export function initScaleToggle() {
     if (!btn) return;
     btn.addEventListener('click', () => {
         _logScale = !_logScale;
-        btn.textContent = _logScale ? 'Linear' : 'Log';
         btn.classList.toggle('active', _logScale);
         applyFilters();
     });
@@ -559,7 +560,7 @@ function initHistoryTab() {
     if (saved.usersLogScale) {
         _logScale = saved.usersLogScale;
         const btn = document.getElementById('btn-scale-toggle');
-        if (btn) { btn.textContent = _logScale ? 'Linear' : 'Log'; btn.classList.toggle('active', _logScale); }
+        if (btn) { btn.classList.toggle('active', _logScale); }
     }
 
     // Determine which users to pre-select

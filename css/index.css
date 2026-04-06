@@ -35,17 +35,20 @@
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* -- Light Theme (Legacy) -------------------------------------------------- */
+/* -- Light Theme -------------------------------------------------- */
 :root[data-theme='light'] {
-    /* Warm cream base -- easy on the eyes */
-    --bg-base: #F0EDE6;
-    --bg-surface: rgba(255, 253, 250, 0.96);
-    --bg-surface-elevated: rgba(255, 255, 255, 1);
-    --text-primary: #1E2235;       /* Soft navy, not pure black */
-    --text-secondary: #5B6377;     /* Readable medium gray */
-    --text-accent: #059669;        /* Slightly deeper emerald */
-    --glass-border: 1px solid rgba(0, 0, 0, 0.10);
-    --glass-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.05);
+    /* Cool slate base for better contrast */
+    --bg-base: #f8fafc;
+    --bg-surface: rgba(255, 255, 255, 0.96);
+    --bg-surface-elevated: rgba(241, 245, 249, 1);
+    --text-primary: #020617;       /* slate-950 */
+    --text-secondary: #334155;     /* slate-700 for better contrast */
+    --text-accent: #059669;        /* Deeper emerald for text */
+    --emerald-500: #059669;
+    --emerald-400: #10b981;
+    --emerald-100: rgba(16, 185, 129, 0.2);
+    --glass-border: 1px solid rgba(15, 23, 42, 0.12);
+    --glass-shadow: 0 2px 8px rgba(15,23,42,0.06), 0 0 0 1px rgba(15,23,42,0.05);
 }
 
 /* -- Pro-Max Brutalism Theme ----------------------------------------------- */
@@ -78,8 +81,8 @@
     --bg-base: #f8fafc;
     --bg-surface: #ffffff;
     --bg-surface-elevated: #f1f5f9;
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
+    --text-primary: #020617;
+    --text-secondary: #334155;
     --text-accent: #ea580c;
     --glass-border: 1px solid rgba(15, 23, 42, 0.15);
     --glass-shadow: 2px 2px 0px rgba(15, 23, 42, 0.08);
@@ -102,6 +105,7 @@ body {
     background-color: var(--bg-base);
     color: var(--text-primary);
     font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 1.05rem; /* Slightly larger base font for readability */
     line-height: 1.5;
     position: relative;
     /* Legacy has no default grid background here */
@@ -123,7 +127,7 @@ body {
 
 /* Light mode background */
 :root[data-theme='light'] .background-mesh {
-    background: radial-gradient(ellipse at 60% 0%, #EDE8E0 0%, #F7F4EF 60%, #F2EFE8 100%) !important;
+    background: #f8fafc !important;
 }
 
 :root[data-theme='light'][data-design='pro-max'] .background-mesh {
