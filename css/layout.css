@@ -29,7 +29,7 @@
     display: flex;
     height: 100vh;
     width: 100%;
-    overflow: hidden; /* all scrolling happens inside .main-content */
+    overflow: hidden;
 }
 
 /* SPA Router -- page visibility toggle */
@@ -92,13 +92,12 @@
     display: flex;
     flex-direction: column;
     gap: 32px;
-    /* CRITICAL: allow flex child to shrink below its content width */
     min-width: 0;
-    /* All scrolling happens here, not on the page */
     overflow-y: auto;
     overflow-x: hidden;
     height: 100vh;
-    min-width: 0;
+    container-type: inline-size;
+    container-name: main;
 }
 
 /* -- Team Selector Wrapper -- */
@@ -114,10 +113,24 @@
     display: none;
 }
 
-body[data-design='pro-max'] .main-content {
-    padding: 24px;
-    gap: 20px;
+
+/* -- Workspace Body container (3-col flex) --------------------------------- */
+.workspace-body {
+    min-height: 0;
+    min-width: 0;
+    overflow: visible;
 }
+
+/* Workspace canvas: right-side work area */
+.workspace-canvas {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: visible;
+}
+
 
 /* -- Headers --------------------------------------------------------------- */
 .top-header {
@@ -182,6 +195,9 @@ body[data-design='pro-max'] .main-content {
     padding: 8px 20px;
     gap: 0;
     flex-shrink: 0;
+    /* Allow stats to wrap on narrow content areas */
+    flex-wrap: wrap;
+    min-width: 0;
 }
 
 /* Metrics Grid - 3 Columns (kept for legacy if needed) */
@@ -201,9 +217,7 @@ body[data-design='pro-max'] .main-content {
     width: 100%;
 }
 
-body[data-design='pro-max'] .charts-grid {
-    gap: 16px;
-}
+
 
 .large-span {
     grid-column: 1 / -1;
@@ -222,10 +236,7 @@ body[data-design='pro-max'] .charts-grid {
     /* NOTE: no overflow:hidden -- would clip Chart.js tooltips and expand buttons */
 }
 
-body[data-design='pro-max'] .chart-container {
-    padding: 16px 20px;
-    gap: 12px;
-}
+
 
 .panel-header h2 {
     font-size: 1.1rem;
@@ -491,7 +502,16 @@ body[data-design='pro-max'] .chart-container {
 
 /* -- Responsive Breakpoints ------------------------------------------------ */
 
-/* - 1100px: chart grid becomes single column - */
+/* - charts-grid: single column when content area < 640px
+   Using container query so it responds to .main-content width,
+   not viewport width (viewport includes the fixed sidebars) - */
+@container main (max-width: 640px) {
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Viewport fallback for browsers without container query support */
 @media (max-width: 1100px) {
     .charts-grid {
         grid-template-columns: 1fr;
@@ -572,7 +592,30 @@ body[data-design='pro-max'] .chart-container {
         height: 32px;
     }
 
+    .sidebar .brand-actions .settings-dropdown {
+        /* At icon-only mode: pop out to the right of the sidebar */
+        top: 0;
+        right: auto !important;
+        left: calc(100% + 6px);
+        transform-origin: top left;
+        /* Escape sidebar stacking context */
+        z-index: 9999;
+    }
+
     /* -- Team selector: compact icon button with flyout popup -- */
+    .sidebar .team-flyout-trigger {
+        display: flex !important;
+        justify-content: center;
+        align-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+    }
+
     .sidebar .team-selector-wrapper {
         position: relative;
         flex: 0 0 auto;
@@ -786,6 +829,29 @@ body[data-design='pro-max'] .chart-container {
         margin-left: 0;
         padding: 16px;
     }
+
+    /* -- Fix settings dropdown: use fixed so it escapes sidebar transform
+       stacking context and appears correctly above everything -- */
+    .sidebar .brand-actions {
+        position: static;
+        overflow: visible;
+    }
+
+    .sidebar .brand-actions .settings-dropdown {
+        /* Fixed positioning escapes transform stacking context */
+        position: fixed !important;
+        top: 72px !important;
+        left: 16px !important;
+        right: auto !important;
+        width: calc(100vw - 32px);
+        max-width: 280px;
+        z-index: 99999 !important;
+    }
+
+    /* Hide the flyout trigger icon — not relevant in mobile drawer mode */
+    .sidebar .team-flyout-trigger {
+        display: none !important;
+    }
 }
 
 /* - 768px: header stat bar wraps - */
@@ -852,6 +918,35 @@ body[data-design='pro-max'] .chart-container {
 }
 
 /* - History tab responsive - */
+/* Container query: collapse when content area < 680px */
+@container main (max-width: 680px) {
+    .history-main-row {
+        flex-direction: column;
+    }
+
+    .user-filter-box {
+        width: 100% !important;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .history-charts-row {
+        flex-direction: column;
+    }
+
+    .history-chart-card {
+        width: 100% !important;
+        min-width: 0;
+    }
+
+    .history-chart-body {
+        height: 220px;
+        min-height: 180px;
+        overflow: hidden;
+    }
+}
+
+/* Viewport fallback */
 @media (max-width: 900px) {
     .history-main-row {
         flex-direction: column;
@@ -1307,6 +1402,38 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
     }
 }
 
+/* -- Middle Column (Team Disks) -- */
+.team-disk-sidebar {
+    position: fixed !important;
+    top: 0;
+    left: var(--sidebar-width);
+    width: 260px !important;
+    margin: 0 !important;
+    padding: 8px 0 0 0 !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-right: var(--glass-border) !important;
+    z-index: 100;
+}
+
+
+/* Offset the main content so it doesn't overlap the newly fixed 2nd column on Desktop */
+@media (min-width: 851px) {
+    .main-content {
+        margin-left: calc(var(--sidebar-width) + 260px) !important;
+    }
+}
+
+/* Tablet (641-850px): team-disk-sidebar becomes relative → reset the extra 260px offset.
+   Only sidebar offset remains; the sidebar itself is still fixed at --sidebar-width. */
+@media (min-width: 641px) and (max-width: 850px) {
+    .main-content {
+        margin-left: var(--sidebar-width) !important;
+    }
+}
+
 /* -- 3-Column Layout Responsive Adjustments -- */
 @media (max-width: 1100px) {
     .team-disk-sidebar {
@@ -1320,17 +1447,35 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
         gap: 16px !important;
     }
     
-    .team-disk-sidebar {
+    #team-disk-sidebar.team-disk-sidebar {
         width: 100% !important;
-        border-right: none;
-        border-bottom: var(--glass-border);
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border-right: none !important;
+        border-bottom: var(--glass-border) !important;
+        border-radius: 12px !important;
         flex: none !important;
         height: auto !important;
         max-height: none !important;
-        position: relative;
-        z-index: 100;
+        position: relative !important;
+        left: auto !important;
+        top: auto !important;
+        z-index: 100 !important;
         overflow: visible !important;
-        background: var(--bg-base); /* Changed to base for solid opacity */
+        background: var(--bg-base) !important;
+    }
+
+    #team-dropdown-overlay {
+        display: block;
+    }
+
+    .team-disk-sidebar.expanded + #team-dropdown-overlay {
+        opacity: 1;
+        pointer-events: all;
+        z-index: 90;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
     }
     
     .team-disk-dropdown-content {
@@ -1364,4 +1509,306 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
     }
     
 
+}
+
+/* ============================================================================
+   MASTER RESPONSIVE CONTAINER QUERIES
+   Breakpoints target .main-content actual width (container-type: inline-size)
+   This accounts for sidebar (~280px) + team-disk sidebar (~260px) being fixed.
+   
+   Effective content widths at common viewport sizes:
+   - 1440px viewport → ~900px content
+   - 1280px viewport → ~740px content  
+   - 1024px viewport → ~484px content
+   - 768px viewport  → sidebar collapses, ~680px content
+   - 480px viewport  → mobile, full width
+   ============================================================================ */
+
+/* ── ≤ 860px: Snapshot two-col → single col ──────────────────────────────── */
+@container main (max-width: 860px) {
+    .snapshot-two-col {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+}
+
+/* ── ≤ 720px: History tab ─────────────────────────────────────────────────── */
+@container main (max-width: 720px) {
+    /* Filter box + charts stack vertically */
+    .history-main-row {
+        flex-direction: column;
+    }
+
+    .user-filter-box {
+        width: 100% !important;
+        max-height: 220px;
+        overflow-y: auto;
+    }
+
+    /* History charts stacked */
+    .history-charts-row {
+        grid-template-columns: 1fr !important;
+        flex-direction: column;
+    }
+
+    .history-chart-card {
+        width: 100% !important;
+        min-width: 0;
+    }
+
+    .history-chart-body {
+        height: 220px;
+        min-height: 180px;
+        overflow: hidden;
+    }
+}
+
+/* ── ≤ 640px: Charts grid single col (already defined, reinforced) ───────── */
+@container main (max-width: 640px) {
+    /* stat bar wraps */
+    .page-stat-bar {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    /* snapshot bar rows stack */
+    .general-row.sbar-row {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+
+    .general-row .sbar-name {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+
+    .general-row .sbar-track {
+        width: 100%;
+        height: 10px;
+    }
+
+    .general-row .sbar-pct {
+        display: none;
+    }
+
+    .general-val-col {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        white-space: nowrap;
+    }
+
+    /* User Detail 2-col grid → 1-col */
+    .ud-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Perm Issues meta columns shrink */
+    .perm-meta-dir {
+        max-width: 140px;
+    }
+
+    /* Detail tab buttons wrap */
+    .detail-tabs {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .detail-tab-btn {
+        font-size: 0.78rem;
+        padding: 7px 10px;
+    }
+
+    /* snapshot two-col guaranteed */
+    .snapshot-two-col {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── ≤ 480px: extra compact ──────────────────────────────────────────────── */
+@container main (max-width: 480px) {
+    /* header */
+    .header-top-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    /* stat bar 2×2 grid */
+    .page-stat-bar {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        padding: 8px 10px;
+    }
+
+    /* main-content padding reduces */
+    .main-content {
+        padding: 12px;
+        gap: 16px;
+    }
+
+    /* chart canvas shrinks */
+    .canvas-wrapper {
+        height: 200px;
+        min-height: 180px;
+    }
+
+    .large-span .canvas-wrapper {
+        height: 240px;
+        min-height: 200px;
+    }
+
+    /* perm items hide columns */
+    .perm-item {
+        grid-template-columns: 20px 1fr;
+    }
+
+    .perm-user-badge,
+    .perm-item-type,
+    .perm-item-error {
+        display: none;
+    }
+
+    /* range buttons smaller */
+    .range-btn {
+        padding: 5px 7px;
+        font-size: 0.68rem;
+    }
+}
+
+
+/* ============================================================================
+   STAT HEADER + PERMISSION ISSUES — Container Query Fixes
+   ============================================================================ */
+
+/* ── Stat bar: compact at < 600px content ────────────────────────────────── */
+@container main (max-width: 600px) {
+    /* Stat bar becomes a compact 3-col grid (TOTAL USED SCANNED / FREE USAGE) */
+    .page-stat-bar {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0;
+        padding: 6px 12px;
+    }
+
+    /* Hide vertical dividers between stat blocks */
+    .stat-divider {
+        display: none !important;
+    }
+
+    /* Add subtle top border between rows instead */
+    .stat-block {
+        padding: 8px 6px;
+        border-right: 1px solid rgba(255,255,255,0.06);
+        min-width: 0;
+    }
+
+    .stat-block:nth-child(3n) {
+        border-right: none;
+    }
+}
+
+@container main (max-width: 400px) {
+    /* 2-col grid for very narrow */
+    .page-stat-bar {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .stat-block:nth-child(3n) {
+        border-right: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .stat-block:nth-child(2n) {
+        border-right: none;
+    }
+}
+
+/* ── Permission Issues: perm-item grid collapse ──────────────────────────── */
+@container main (max-width: 700px) {
+    /* 4-col → icon + path only, type below */
+    .perm-item {
+        grid-template-columns: 22px 1fr auto;
+        gap: 4px 8px;
+    }
+
+    /* Move error under path */
+    .perm-item-error {
+        grid-column: 2 / -1;
+        font-size: 0.68rem;
+    }
+}
+
+@container main (max-width: 520px) {
+    /* icon + path + type stacked */
+    .perm-item {
+        grid-template-columns: 22px 1fr;
+        grid-template-rows: auto auto;
+        gap: 3px 8px;
+    }
+
+    .perm-item-type {
+        grid-column: 2;
+        justify-self: start;
+        font-size: 0.62rem;
+        padding: 1px 5px;
+    }
+
+    .perm-item-error {
+        grid-column: 1 / -1;
+        font-size: 0.66rem;
+        padding-left: 4px;
+    }
+}
+
+/* ── Permission summary bar (3 stats) wraps on narrow ───────────────────── */
+@container main (max-width: 480px) {
+    .perm-summary-bar {
+        padding: 12px 16px;
+        gap: 0;
+    }
+
+    .perm-summary-num {
+        font-size: 1.4rem;
+    }
+
+    .perm-summary-label {
+        font-size: 0.6rem;
+    }
+}
+
+/* ── Permission meta (date / dir path) wraps ─────────────────────────────── */
+@container main (max-width: 560px) {
+    .perm-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .perm-meta-dir {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+/* ── Stat bar header disk title/path wrap on narrow ─────────────────────── */
+@container main (max-width: 500px) {
+    .top-header h1 {
+        font-size: clamp(0.95rem, 3vw, 1.2rem);
+    }
+
+    .header-disk-path {
+        font-size: 0.7rem;
+        max-width: 160px;
+    }
+
+    .header-identity {
+        gap: 6px;
+    }
 }

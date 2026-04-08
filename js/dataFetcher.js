@@ -749,7 +749,7 @@ class DataFetcher {
 
         // Usage % (formatted separately — not TB)
         if (UINodes.valPct) {
-            UINodes.valPct.textContent = usagePct.toFixed(1) + '%';
+            UINodes.valPct.textContent = usagePct.toFixed(1);
             UINodes.valPct.style.color = usagePct > 80 ? '#f43f5e' : '';
         }
 

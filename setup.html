@@ -9,16 +9,22 @@
     <link rel="stylesheet" href="css/index.css?v=31">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
+        html, body {
+            overflow-y: auto !important; /* Override index.css */
+            height: auto !important;
+        }
         body {
             font-family: 'Fira Sans', sans-serif;
             background: var(--bg-base, #0b0f1a);
             color: var(--text-primary, #e2e8f0);
             min-height: 100vh;
+            overflow-y: auto !important; /* Override index.css overflow: hidden */
+            height: auto !important;
         }
 
         .cfg-page {
-            max-width: 1100px;
+            max-width: 1600px; /* Make it wider */
+            width: 95%;
             margin: 0 auto;
             padding: 32px 24px 80px;
         }
@@ -54,14 +60,16 @@
         }
         .cfg-home-link:hover { color: #e2e8f0; border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); }
 
-        /* Two-col layout */
         .cfg-layout {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 24px;
             align-items: start;
         }
-        @media (max-width: 720px) { .cfg-layout { grid-template-columns: 1fr; } }
+        .cfg-layout > * {
+            min-width: 0;
+        }
+        @media (max-width: 950px) { .cfg-layout { grid-template-columns: 1fr; } .cfg-preview-panel { position: relative !important; max-height: 500px !important; } }
 
         /* ── Left: Form panel ── */
         .cfg-form-panel {
@@ -88,13 +96,20 @@
         /* ── Right: Preview panel (sticky) ── */
         .cfg-preview-panel {
             position: sticky;
-            top: 20px;
+            top: 24px;
+            max-height: calc(100vh - 48px);
+            display: flex;
+            flex-direction: column;
         }
         .cfg-preview-box {
             background: rgba(0,0,0,0.35);
             border: 1px solid rgba(255,255,255,0.08);
             border-radius: 16px;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
         }
         .cfg-preview-head {
             padding: 10px 16px;
@@ -116,8 +131,21 @@
             color: #94a3b8;
             overflow-x: auto;
             white-space: pre;
-            max-height: 70vh;
+            flex: 1; /* take up remaining height */
             overflow-y: auto;
+        }
+        
+        /* Make scrollbar clearly visible */
+        .cfg-preview-pre::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .cfg-preview-pre::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2) !important;
+            border-radius: 4px;
+        }
+        .cfg-preview-pre::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2) !important;
         }
         .cfg-preview-pre .key { color: #818cf8; }
         .cfg-preview-pre .str { color: #34d399; }
@@ -203,8 +231,8 @@
             border-radius: 10px;
             padding: 10px 12px;
         }
-        .cfg-card-row { display: flex; gap: 8px; align-items: flex-end; }
-        .cfg-card-row .field { margin-bottom: 0; flex: 1; }
+        .cfg-card-row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+        .cfg-card-row .field { margin-bottom: 0; flex: 1; min-width: 140px; }
         .cfg-card-num {
             width: 20px; height: 20px; border-radius: 50%;
             background: rgba(255,255,255,0.07);

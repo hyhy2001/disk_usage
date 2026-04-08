@@ -406,7 +406,7 @@ function renderGeneralSystem() {
     setNum('shared-stat-used',    fmt(s.used));
     setNum('shared-stat-scanned', fmt(scanned));
     setNum('shared-stat-free',    fmt(s.available));
-    setNum('shared-stat-pct',     `${p}%`, cl);
+    setNum('shared-stat-pct',     `${p}`, cl);
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────

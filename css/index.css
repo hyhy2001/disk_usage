@@ -51,42 +51,7 @@
     --glass-shadow: 0 2px 8px rgba(15,23,42,0.06), 0 0 0 1px rgba(15,23,42,0.05);
 }
 
-/* -- Pro-Max Brutalism Theme ----------------------------------------------- */
-:root[data-design='pro-max'] {
-    --bg-base: #0f172a;
-    --bg-surface: #1e293b;
-    --bg-surface-elevated: #334155;
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-accent: #f97316;
-    --emerald-500: #3b82f6;
-    --emerald-400: #60a5fa;
-    --emerald-100: rgba(59, 130, 246, 0.15);
-    --rose-500: #f43f5e;
-    --rose-400: #fb7185;
-    --rose-100: rgba(244, 63, 94, 0.15);
-    --sky-500: #14b8a6;
-    --sky-400: #2dd4bf;
-    --sky-100: rgba(20, 184, 166, 0.15);
-    --sidebar-width: 250px;
-    --border-radius-lg: 4px;
-    --border-radius-md: 2px;
-    --border-radius-sm: 0px;
-    --glass-border: 1px solid rgba(255, 255, 255, 0.12);
-    --glass-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5);
-    --transition-smooth: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
 
-:root[data-theme='light'][data-design='pro-max'] {
-    --bg-base: #f8fafc;
-    --bg-surface: #ffffff;
-    --bg-surface-elevated: #f1f5f9;
-    --text-primary: #020617;
-    --text-secondary: #334155;
-    --text-accent: #ea580c;
-    --glass-border: 1px solid rgba(15, 23, 42, 0.15);
-    --glass-shadow: 2px 2px 0px rgba(15, 23, 42, 0.08);
-}
 
 * {
     margin: 0;
@@ -98,7 +63,7 @@ html, body {
     margin: 0;
     padding: 0;
     height: 100vh;
-    overflow: hidden; /* Prevent 2nd outer scrollbar */
+    overflow: hidden;
 }
 
 body {
@@ -108,14 +73,6 @@ body {
     font-size: 1.05rem; /* Slightly larger base font for readability */
     line-height: 1.5;
     position: relative;
-    /* Legacy has no default grid background here */
-}
-
-/* Override for Pro Max */
-body[data-design='pro-max'] {
-    font-family: 'Fira Sans', sans-serif;
-    background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-    background-size: 20px 20px;
 }
 
 
@@ -130,9 +87,7 @@ body {
     background: #f8fafc !important;
 }
 
-:root[data-theme='light'][data-design='pro-max'] .background-mesh {
-    background: #f8fafc !important;
-}
+
 
 :root[data-theme='light'] .glow-orb {
     opacity: 0.04;
@@ -206,20 +161,12 @@ body {
     background: radial-gradient(circle at 50% 0%, #171b22 0%, #0f1115 100%);
 }
 
-body[data-design='pro-max'] .background-mesh {
-    background: #0f172a;
-}
-
 .glow-orb {
     position: absolute;
     border-radius: 50%;
     filter: blur(120px);
     opacity: 0.15;
     animation: float 20s infinite ease-in-out alternate;
-}
-
-body[data-design='pro-max'] .glow-orb {
-    display: none !important;
 }
 
 .orb-1 {
@@ -245,9 +192,7 @@ body[data-design='pro-max'] .glow-orb {
     font-weight: 500;
 }
 
-body[data-design='pro-max'] .number {
-    font-family: 'Fira Code', monospace;
-}
+
 
 .text-accent { color: var(--text-accent); }
 .text-emerald { color: var(--emerald-500); }

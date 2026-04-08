@@ -180,10 +180,15 @@ if ($type === 'team') {
             $json = @file_get_contents($latest);
             $parsed = @json_decode($json, true);
             if ($parsed && is_array($parsed)) {
-                $parsed['_disk_id'] = isset($d['id']) ? $d['id'] : '';
-                $parsed['_disk_name'] = isset($d['name']) ? $d['name'] : 'Unknown Disk';
-                $parsed['_disk_path'] = isset($d['path']) ? $d['path'] : 'Unknown Path';
-                $result_data[] = $parsed;
+                $summary = array();
+                $summary['_disk_id'] = isset($d['id']) ? $d['id'] : '';
+                $summary['_disk_name'] = isset($d['name']) ? $d['name'] : 'Unknown Disk';
+                $summary['_disk_path'] = isset($d['path']) ? $d['path'] : 'Unknown Path';
+                $summary['general_system'] = isset($parsed['general_system']) ? $parsed['general_system'] : array();
+                $summary['team_usage'] = isset($parsed['team_usage']) ? $parsed['team_usage'] : array();
+                $summary['date'] = isset($parsed['date']) ? $parsed['date'] : 0;
+                $summary['directory'] = isset($parsed['directory']) ? $parsed['directory'] : '';
+                $result_data[] = $summary;
             }
         }
     }

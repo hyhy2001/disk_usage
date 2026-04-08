@@ -82,10 +82,6 @@
     box-shadow: var(--glass-shadow);
 }
 
-body[data-design='pro-max'] .glass-panel {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-}
 
 /* ── Utility Classes (IMP-02) ─────────────────────────────────────────────── */
 /* Replace scattered inline styles with reusable utilities */
@@ -577,6 +573,7 @@ body[data-design='pro-max'] .glass-panel {
     flex-direction: column;
     gap: 32px;
     opacity: 1;
+    min-width: 0;
     transition: opacity 0.2s ease;
 }
 
@@ -766,20 +763,23 @@ body[data-design='pro-max'] .glass-panel {
 }
 
 .stat-block {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;       /* allow flex item to shrink below its content */
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 2px;
     text-align: center;
     padding: 0 8px;
+    overflow: hidden;   /* clip rather than overflow */
 }
 
 .stat-numbers-row {
     display: flex;
     align-items: baseline;
     gap: 6px;
-    white-space: nowrap;
+    /* allow wrap so numbers don't overflow container */
+    flex-wrap: wrap;
 }
 
 /* Inline row: big number + small unit side-by-side */
@@ -790,8 +790,8 @@ body[data-design='pro-max'] .glass-panel {
 }
 
 .stat-number {
-    /* TASK-07: Fluid typography for key stat numbers */
-    font-size: clamp(1rem, 2vw, 1.3rem);
+    /* Fluid: scales from 1rem to 1.3rem based on viewport */
+    font-size: clamp(0.85rem, 2.5cqi, 1.3rem);
     font-weight: 700;
     font-family: 'JetBrains Mono', monospace;
     letter-spacing: -0.02em;
@@ -1476,7 +1476,18 @@ body[data-design='pro-max'] .glass-panel {
     padding: 0 0 4px;
     margin-bottom: 20px;
     border-bottom: 1px solid rgba(255,255,255,0.06);
+    min-width: 0;
+    /* Always scrollable so tabs never get clipped */
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none;       /* Firefox */
+    -ms-overflow-style: none;    /* IE/Edge */
+    /* Smooth scroll on touch */
+    -webkit-overflow-scrolling: touch;
 }
+.detail-tabs::-webkit-scrollbar { height: 4px; display: block; }
+.detail-tabs::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+.detail-tabs::-webkit-scrollbar-track { background: transparent; }
 
 .detail-tab-btn {
     padding: 9px 20px;
@@ -1489,7 +1500,8 @@ body[data-design='pro-max'] .glass-panel {
     font-family: 'Inter', sans-serif;
     cursor: pointer;
     transition: background 0.18s, color 0.18s, border-color 0.18s;
-    white-space: nowrap;
+    white-space: nowrap;   /* prevent text wrap */
+    flex-shrink: 0;        /* prevent button from being squished */
 }
 
 .detail-tab-btn:hover {
@@ -3124,6 +3136,7 @@ body[data-design='pro-max'] .glass-panel {
 /* History main row: filter box left + content right */
 .history-main-row {
     display: flex;
+    flex-wrap: wrap;    /* filter box drops below on narrow screens */
     gap: 14px;
     align-items: stretch;
 }
@@ -3138,21 +3151,26 @@ body[data-design='pro-max'] .glass-panel {
 
 /* The filter panel box */
 .user-filter-box {
-    width: 240px;
-    flex-shrink: 0;
+    /* Fluid: preferred 220px, shrinks to 180px min, won't grow beyond 260px */
+    width: clamp(180px, 22%, 260px);
+    flex-shrink: 1;
     display: flex;
     flex-direction: column;
     gap: 8px;
     padding: 14px;
-    max-height: 480px;
     align-self: flex-start;
 }
 
-/* At 960-1200px with full sidebar, chart area is tight -- shrink filter slightly */
-@media (max-width: 1200px) and (min-width: 769px) {
+/* Container query: when content < 560px, filter goes full-width above list */
+@container main (max-width: 560px) {
     .user-filter-box {
-        width: 200px;
-        padding: 12px;
+        width: 100%;
+        max-height: none;
+        align-self: stretch;
+    }
+
+    .history-content {
+        min-width: 0;
     }
 }
 
@@ -3260,8 +3278,8 @@ body[data-design='pro-max'] .glass-panel {
     color: #0369a1;
 }
 
-/* Extend sidebar height for the extra sections */
-.user-filter-box { max-height: 580px; }
+/* Ensure sidebar height adjusts correctly */
+.user-filter-box { height: fit-content; }
 
 .user-filter-footer .user-bar-btn { flex: 1; text-align: center; }
 
@@ -4019,10 +4037,7 @@ body[data-design='pro-max'] .glass-panel {
         overflow-x: auto;
         flex-wrap: nowrap;
         padding-bottom: 8px;
-        /* Hide scrollbar but keep scrollability */
-        scrollbar-width: none;
     }
-    .detail-tabs::-webkit-scrollbar { display: none; }
     .detail-tab-btn {
         white-space: nowrap;
         flex-shrink: 0;
@@ -4933,6 +4948,8 @@ body[data-design='pro-max'] .glass-panel {
     margin-bottom: 4px;
     transition: opacity 0.2s;
 }
+
+/* DESKTOP: 5-column grid (icon | user | path | type | error) */
 .perm-item {
     display: grid;
     grid-template-columns: 20px 100px 2fr 100px 2fr;
@@ -5002,6 +5019,84 @@ body[data-design='pro-max'] .glass-panel {
 }
 .perm-pagination { margin-top: 8px; }
 
+/* MOBILE CARD LAYOUT: content area < 750px
+   ┌─────────────────────────────────┐
+   │ [binh]              [directory] │  ← row 1: badge + type
+   │ /www/wwwroot/binh/thu_muc1      │  ← row 2: path
+   │ ⚠ os error 13                   │  ← row 3: error
+   └─────────────────────────────────┘
+*/
+@container main (max-width: 750px) {
+    .perm-item {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto auto;
+        gap: 3px 8px;
+        padding: 10px 14px;
+        align-items: start;
+    }
+
+    /* Hide file/dir icon to save space */
+    .perm-item-icon { display: none; }
+
+    /* Row 1 left: user badge */
+    .perm-user-badge {
+        grid-column: 1;
+        grid-row: 1;
+        justify-self: start;
+        align-self: center;
+        max-width: 120px;
+    }
+
+    /* Row 1 right: type chip */
+    .perm-item-type {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+        align-self: center;
+        opacity: 1;
+        font-size: 0.66rem;
+        background: rgba(56,189,248,0.1);
+        color: #38bdf8;
+        border: 1px solid rgba(56,189,248,0.2);
+        border-radius: 4px;
+        padding: 1px 6px;
+        text-align: center;
+    }
+
+    /* Row 2: path full width */
+    .perm-item-path {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        font-size: 0.78rem;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        opacity: 0.9;
+    }
+
+    /* Row 3: error full width */
+    .perm-item-error {
+        grid-column: 1 / -1;
+        grid-row: 3;
+        white-space: normal;
+        overflow: visible;
+        font-size: 0.72rem;
+        font-style: italic;
+        color: #f87171;
+    }
+}
+
+/* Ultra compact < 440px */
+@container main (max-width: 440px) {
+    .perm-item { padding: 8px 10px; gap: 2px 6px; }
+    .perm-user-badge { font-size: 0.65rem; padding: 1px 5px; }
+    .perm-item-type { font-size: 0.6rem; padding: 1px 4px; }
+    .perm-item-path { font-size: 0.72rem; }
+    .perm-item-error { font-size: 0.67rem; }
+}
+
 /* Collapsible sidebar styles */
 .disk-project-group.collapsed > .disk-team-group,
 .disk-project-group.collapsed > .disk-list-item,
@@ -5056,7 +5151,13 @@ body[data-design='pro-max'] .glass-panel {
     display: flex;
     align-items: stretch;
     gap: 0;
+    overflow-x: auto;
+    min-width: 0;
+    scrollbar-width: thin;
 }
+.workspace-nav-tabs::-webkit-scrollbar { height: 4px; display: block; }
+.workspace-nav-tabs::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+.workspace-nav-tabs::-webkit-scrollbar-track { background: transparent; }
 
 .workspace-nav-tabs .tab-btn {
     position: relative;
@@ -5271,20 +5372,6 @@ body[data-design='pro-max'] .glass-panel {
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
 }
 
-body[data-design='pro-max'] .team-disk-card {
-    background: var(--bg-surface);
-    border-radius: var(--border-radius-lg);
-    border: var(--glass-border);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-body[data-design='pro-max'] .team-disk-card:hover {
-    transform: translateY(-2px);
-    background: var(--bg-surface-elevated);
-    box-shadow: var(--glass-shadow);
-}
 
 :root[data-theme='light'] .team-disk-card:hover {
     border-color: rgba(15, 23, 42, 0.3);
@@ -5450,4 +5537,153 @@ body[data-design='pro-max'] .team-disk-card:hover {
 }
 :root[data-theme='light'] .team-disk-card.selected .disk-name {
     color: var(--emerald-600, #059669);
+}
+
+/* ============================================================================
+   CONTAINER QUERY RESPONSIVE OVERRIDES (components.css)
+   Supersede viewport-based @media queries for content inside .main-content.
+   .main-content has container-type: inline-size declared in layout.css.
+   ============================================================================ */
+
+/* ── ≤ 900px content: snapshot two-col guaranteed stack ─────────────────── */
+@container main (max-width: 900px) {
+    .snapshot-two-col {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    /* History charts grid → single col */
+    .history-charts-row {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* ud-grid (User Detail) → single col */
+    .ud-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── ≤ 720px content: flex-heavy layouts collapse ────────────────────────── */
+@container main (max-width: 720px) {
+    /* History filter + charts stack */
+    .history-main-row {
+        flex-direction: column;
+    }
+
+    .user-filter-box {
+        width: 100% !important;
+        max-height: none;
+        align-self: stretch;
+    }
+
+    .user-filter-list {
+        max-height: 200px;
+    }
+
+    .history-chart-card {
+        width: 100% !important;
+        min-width: 0;
+    }
+
+    .history-chart-body {
+        height: 200px;
+        min-height: 160px;
+        overflow: hidden;
+    }
+
+    /* Overview tab: disk card grid → 1 col */
+    .disk-card-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Perm items: hide some columns to save space */
+    .perm-item {
+        grid-template-columns: 20px 90px 1fr 1fr !important;
+    }
+}
+
+/* ── ≤ 560px content: compact everything ────────────────────────────────── */
+@container main (max-width: 560px) {
+    /* detail tabs scroll horizontally on very narrow */
+    .detail-tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: 6px;
+    }
+
+    .detail-tab-btn {
+        flex-shrink: 0;
+        font-size: 0.75rem;
+        padding: 6px 10px;
+        gap: 5px;
+        white-space: nowrap;
+    }
+
+    /* workspace header actions wrap */
+    .workspace-header {
+        flex-wrap: wrap;
+        height: auto;
+        gap: 8px;
+        padding-bottom: 4px;
+    }
+
+    /* stat bar in overview stacks */
+    .page-stat-bar {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 2px;
+        flex-wrap: wrap;
+    }
+
+    /* team card in list view stacks */
+    .disk-card-grid.list-view .team-disk-card {
+        flex-direction: column;
+        gap: 10px;
+        padding: 14px 16px;
+    }
+
+    .disk-card-grid.list-view .team-disk-card .card-header {
+        flex: unset;
+        width: 100%;
+    }
+
+    /* Perm flat list: simple 2-col */
+    .perm-item {
+        grid-template-columns: 20px 1fr !important;
+        gap: 6px;
+    }
+
+    .perm-user-badge,
+    .perm-item-type {
+        display: none;
+    }
+
+    .perm-item-error {
+        display: none;
+    }
+}
+
+/* ── ≤ 400px content: absolute minimum ──────────────────────────────────── */
+@container main (max-width: 400px) {
+    .workspace-nav-tabs .tab-btn {
+        padding: 8px 10px;
+        font-size: 0.78rem;
+        gap: 5px;
+    }
+
+    .workspace-nav-tabs .tab-btn span {
+        display: none; /* hide tab text, show only icon on very narrow */
+    }
+
+    .page-stat-bar {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .stat-divider {
+        display: none;
+    }
+
+    .header-disk-name {
+        font-size: 1.1rem;
+    }
 }
