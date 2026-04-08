@@ -57,6 +57,13 @@
     function _show(el) {
         const text = el.getAttribute('data-tooltip');
         if (!text) return;
+        
+        // Auto-suppress tooltip if the element is a card showing its own extended stats inline
+        const extendedStats = el.querySelector('.extended-disk-stats');
+        if (extendedStats && getComputedStyle(extendedStats).display !== 'none') {
+            return;
+        }
+
         _target         = el;
         tip.innerHTML = text;
         tip.removeAttribute('data-arrow');

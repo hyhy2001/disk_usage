@@ -14,9 +14,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <!-- CSS -->
-    <link rel="stylesheet" href="css/index.css?v=53">
-    <link rel="stylesheet" href="css/layout.css?v=64">
-    <link rel="stylesheet" href="css/components.css?v=61">
+    <link rel="stylesheet" href="css/index.css?v=32">
+    <link rel="stylesheet" href="css/layout.css?v=68">
+    <link rel="stylesheet" href="css/components.css?v=68">
     
     <!-- Chart.js (Loaded Locally for 0ms latency) -->
     <script src="js/chart.min.js" defer></script>
@@ -118,7 +118,19 @@
 <div class="workspace-body" style="display:flex; flex:1; gap: 24px;">
 
 <!-- Column 2: Disk List for selected Team -->
-<aside id="team-disk-sidebar" class="team-disk-sidebar glass-panel" style="display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;">
+<aside id="team-disk-sidebar" class="team-disk-sidebar glass-panel" style="display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; position: relative; container-type: inline-size; container-name: sidebar;">
+    <div id="col2-resizer" class="col-resizer">
+        <div class="resizer-icon">
+            <svg width="6" height="14" viewBox="0 0 6 14" fill="currentColor">
+                <circle cx="1" cy="2" r="1"></circle>
+                <circle cx="1" cy="7" r="1"></circle>
+                <circle cx="1" cy="12" r="1"></circle>
+                <circle cx="5" cy="2" r="1"></circle>
+                <circle cx="5" cy="7" r="1"></circle>
+                <circle cx="5" cy="12" r="1"></circle>
+            </svg>
+        </div>
+    </div>
     <div class="section-header" style="display: flex; flex-direction: column; gap: 12px; margin: 16px;">
         <h2 class="section-title" style="margin: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px; line-height: 1.2; cursor: pointer; user-select: none;" onclick="document.getElementById('team-disk-sidebar').classList.toggle('expanded');">
             <div style="display: flex; align-items: center; gap: 8px;">
@@ -159,7 +171,7 @@
 <div id="team-dropdown-overlay" class="sidebar-backdrop" onclick="document.getElementById('team-disk-sidebar').classList.remove('expanded');"></div>
 
 <!-- Column 3: The Work Canvas (Overview/Detail elements) -->
-<div id="workspace-canvas" class="workspace-canvas" style="flex:1; position:relative; display:flex; flex-direction:column; min-width: 0;">
+<div id="workspace-canvas" class="workspace-canvas" style="flex:1; position:relative; display:flex; flex-direction:column; min-width: 380px; container-type: inline-size; container-name: canvas;">
 
         <!-- ===== DISK HEADER — shown only on disk detail/overview pages ===== -->
         <header id="shared-header" class="top-header" style="display:none;">
@@ -502,12 +514,16 @@
     <script src="js/dataStore.js?v=38" type="module"></script>
     <script src="js/chartManager.js?v=38" type="module"></script>
     <script src="js/permissionRenderer.js?v=38" type="module"></script>
-    <script src="js/userDetailRenderer.js?v=38" type="module"></script>
-    <script src="js/main.js?v=42" type="module"></script>
-    <script src="js/chartModal.js?v=42" type="module"></script>
-    <script src="js/themeToggle.js?v=38"></script>
-    <script src="js/scrollToTop.js?v=38" type="module"></script>
-    <script src="js/tooltip.js?v=4"></script>
+    <script src="js/dataFetcher.js?v=49" type="module"></script>
+    <script src="js/dataStore.js?v=48" type="module"></script>
+    <script src="js/chartManager.js?v=48" type="module"></script>
+    <script src="js/permissionRenderer.js?v=48" type="module"></script>
+    <script src="js/userDetailRenderer.js?v=48" type="module"></script>
+    <script src="js/main.js?v=48" type="module"></script>
+    <script src="js/chartModal.js?v=48" type="module"></script>
+    <script src="js/themeToggle.js?v=48"></script>
+    <script src="js/scrollToTop.js?v=48" type="module"></script>
+    <script src="js/tooltip.js?v=49"></script>
     
     <!-- Bulletproof dropdown initializer -->
     <script>
@@ -581,6 +597,50 @@
                 }, 0);
             });
         });
+
+        // Column 2 Resizable Logic
+        (function() {
+            const resizer = document.getElementById('col2-resizer');
+            if(!resizer) return;
+            
+            let isResizing = false;
+            
+            // Restore saved width
+            const savedW = localStorage.getItem('col2_width');
+            if(savedW) document.documentElement.style.setProperty('--col2-width', savedW + 'px');
+
+            resizer.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                document.body.style.cursor = 'col-resize';
+                resizer.classList.add('active');
+                e.preventDefault();
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                const col2 = document.getElementById('team-disk-sidebar');
+                if(!col2) return;
+                const col2Rect = col2.getBoundingClientRect();
+                const newWidth = e.clientX - col2Rect.left;
+                
+                // Constraints: min 200px, max so that at least 450px is left for the right canvas
+                const maxColWidth = Math.max(200, window.innerWidth - col2Rect.left - 450);
+                if (newWidth >= 200 && newWidth <= Math.min(800, maxColWidth)) {
+                    document.documentElement.style.setProperty('--col2-width', newWidth + 'px');
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    document.body.style.cursor = '';
+                    resizer.classList.remove('active');
+                    // Save
+                    const w = getComputedStyle(document.documentElement).getPropertyValue('--col2-width').replace('px','').trim();
+                    localStorage.setItem('col2_width', w);
+                }
+            });
+        })();
     </script>
 </body>
 </html>

@@ -460,13 +460,30 @@ class DataFetcher {
                     <div style='color:var(--text-secondary)'>Free:</div><div style='text-align:right; font-weight:600; font-variant-numeric: tabular-nums;'>${fmt(free)}</div>
                 </div>`;
 
-                cardsHTML += `<div class="team-disk-card" data-id="${diskId}" onclick="document.querySelector('.disk-list-item[data-id=\\'${diskId}\\']')?.click()" data-tooltip="${tooltipText}" data-tooltip-pos="top" style="flex-direction: column; align-items: stretch; padding: 12px 16px; gap: 8px;">
-                    <div class="card-header" style="display: flex; flex-direction: column; gap: 6px; width: 100%; align-items: flex-start; margin-bottom: 0;">
-                        <div class="disk-name" style="display: flex; align-items: flex-start; gap: 8px; width: 100%;" title="${diskName}">
-                            <div style="margin-top:2px; flex-shrink:0; display:flex;">${diskIcon}</div>
-                            <span style="white-space: normal; overflow-wrap: anywhere; line-height: 1.3; font-weight: 600;">${diskName}</span>
+                const freePct = Math.max(0, 100 - usedPct).toFixed(1);
+
+                cardsHTML += `<div class="team-disk-card" data-id="${diskId}" onclick="document.querySelector('.disk-list-item[data-id=\\'${diskId}\\']')?.click()" data-tooltip="${tooltipText}" data-tooltip-pos="top">
+                    <div class="card-content-wrapper">
+                        <div class="card-left">
+                            <div class="card-header" style="display: flex; flex-direction: column; gap: 6px; width: 100%; align-items: flex-start; margin-bottom: 0;">
+                                <div class="disk-name" style="display: flex; align-items: flex-start; gap: 8px; width: 100%;" title="${diskName}">
+                                    <div style="margin-top:2px; flex-shrink:0; display:flex;">${diskIcon}</div>
+                                    <span style="white-space: normal; overflow-wrap: anywhere; line-height: 1.3; font-weight: 600;">${diskName}</span>
+                                </div>
+                                <div class="disk-path ${usedClass}" style="white-space: nowrap; margin-left: 24px; align-self: flex-start;">${usedPct}% Used</div>
+                            </div>
+                            <div class="team-disk-mini-bar">
+                                <div class="segment used-scanned" style="width: ${scannedPct}%"></div>
+                                <div class="segment used-unknown" style="width: ${unknownPct}%"></div>
+                                <div class="segment free" style="width: ${freePct}%"></div>
+                            </div>
                         </div>
-                        <div class="disk-path ${usedClass}" style="white-space: nowrap; margin-left: 24px; align-self: flex-start;">${usedPct}% Used</div>
+                        <div class="extended-disk-stats">
+                            <div class="extended-stat"><span class="label">Total</span><span class="value">${fmt(total)}</span></div>
+                            <div class="extended-stat"><span class="label">Used</span><span class="value">${fmt(used)}</span></div>
+                            <div class="extended-stat"><span class="label">Scanned</span><span class="value">${fmt(scanned)}</span></div>
+                            <div class="extended-stat"><span class="label">Free</span><span class="value">${fmt(free)}</span></div>
+                        </div>
                     </div>
                 </div>`;
             });
