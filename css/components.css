@@ -5557,7 +5557,24 @@
         letter-spacing: normal;
         font-weight: 400;
         white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 6px;
     }
+    .extended-stat .label::before {
+        content: '';
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        background: transparent;
+    }
+    
+    .extended-stat.stat-scanned .label::before { background: var(--emerald-400, #34d399); }
+    .extended-stat.stat-used .label::before { background: var(--gray-500, #6b7280); }
+    .extended-stat.stat-free .label::before { background: rgba(255, 255, 255, 0.1); }
+    :root[data-theme='light'] .extended-stat.stat-free .label::before { background: rgba(0, 0, 0, 0.1); }
     .extended-stat .value {
         color: var(--text-primary);
         font-weight: 500;
@@ -5565,6 +5582,8 @@
         font-size: 0.8rem;
         white-space: nowrap;
     }
+    .extended-stat.stat-scanned .value { color: var(--emerald-400, #34d399); }
+    .extended-stat.stat-used .value { color: var(--gray-400, #9ca3af); }
 }
 
 /* Expanded Sidebar -> Side-by-side */

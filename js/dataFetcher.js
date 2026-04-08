@@ -479,10 +479,10 @@ class DataFetcher {
                             </div>
                         </div>
                         <div class="extended-disk-stats">
-                            <div class="extended-stat"><span class="label">Total</span><span class="value">${fmt(total)}</span></div>
-                            <div class="extended-stat"><span class="label">Used</span><span class="value">${fmt(used)}</span></div>
-                            <div class="extended-stat"><span class="label">Scanned</span><span class="value">${fmt(scanned)}</span></div>
-                            <div class="extended-stat"><span class="label">Free</span><span class="value">${fmt(free)}</span></div>
+                            <div class="extended-stat stat-total"><span class="label">Total</span><span class="value">${fmt(total)}</span></div>
+                            <div class="extended-stat stat-used"><span class="label">Used</span><span class="value">${fmt(used)}</span></div>
+                            <div class="extended-stat stat-scanned"><span class="label">Scanned</span><span class="value">${fmt(scanned)}</span></div>
+                            <div class="extended-stat stat-free"><span class="label">Free</span><span class="value">${fmt(free)}</span></div>
                         </div>
                     </div>
                 </div>`;
