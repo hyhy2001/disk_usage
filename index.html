@@ -143,7 +143,9 @@
             </div>
             <svg class="mobile-dropdown-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none; transition: transform 0.3s; flex-shrink: 0; color: var(--text-muted);"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </h2>
-        <div class="team-disk-dropdown-content" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+    </div> <!-- Close section-header here -->
+    
+    <div class="team-disk-dropdown-content" style="display: flex; flex-direction: column; flex: 1; min-height: 0; padding-bottom: 16px;">
             <div class="team-overview-search-container" style="position:relative; width:100%; padding: 0 16px;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="position:absolute; left:28px; top:50%; transform:translateY(-50%); color:var(--text-muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                 <input type="text" id="team-disk-search" class="sidebar-text-input" placeholder="Search disks...">
@@ -153,7 +155,6 @@
                 <!-- Cards will be populated by JS -->
             </div>
         </div>
-    </div>
 </aside>
 <div id="team-dropdown-overlay" class="sidebar-backdrop" onclick="document.getElementById('team-disk-sidebar').classList.remove('expanded');"></div>
 
