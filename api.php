@@ -212,11 +212,11 @@ if ($type === 'team') {
                 $summary = array();
                 $summary['_disk_id'] = isset($d['id']) ? $d['id'] : '';
                 $summary['_disk_name'] = isset($d['name']) ? $d['name'] : 'Unknown Disk';
-                $summary['_disk_path'] = isset($d['path']) ? $d['path'] : 'Unknown Path';
+                $summary['_disk_path'] = '***';
                 $summary['general_system'] = isset($parsed['general_system']) ? $parsed['general_system'] : array();
                 $summary['team_usage'] = isset($parsed['team_usage']) ? $parsed['team_usage'] : array();
                 $summary['date'] = isset($parsed['date']) ? $parsed['date'] : 0;
-                $summary['directory'] = isset($parsed['directory']) ? $parsed['directory'] : '';
+                $summary['directory'] = '***';
                 $result_data[] = $summary;
             }
         }
@@ -425,7 +425,7 @@ if ($type === 'permissions') {
 
     b64_success(array(
         'date'          => $date,
-        'directory'     => $directory,
+        'directory'     => '***',
         'total'         => $total,
         'offset'        => $offset,
         'limit'         => $limit,
@@ -654,10 +654,14 @@ header('Content-Type: application/json; charset=utf-8');
 echo '{"status":"success","total_files":' . count($files) . ',"data":[';
 $first = true;
 foreach ($files as $file) {
-    if (!$first) echo ',';
-    // Just dump the raw JSON file text directly into the array structure
-    readfile($file);
-    $first = false;
+    // Mask the directory via regex to avoid memory-heavy json_decode on the whole file
+    $raw_json = @file_get_contents($file);
+    if ($raw_json) {
+        $raw_json = preg_replace('/"directory"\s*:\s*"[^"]*"/', '"directory": "***"', $raw_json, 1);
+        if (!$first) echo ',';
+        echo $raw_json;
+        $first = false;
+    }
 }
 echo ']}';
 exit;
