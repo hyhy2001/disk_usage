@@ -22,12 +22,21 @@ function param($key, $default) {
     return isset($_GET[$key]) ? $_GET[$key] : $default;
 }
 
+function get_b64_param($key, $default) {
+    $b64_key = $key . '_b64';
+    if (isset($_GET[$b64_key])) {
+        return base64_decode($_GET[$b64_key]);
+    }
+    return param($key, $default);
+}
+
 function get_int($key, $default, $min, $max) {
     return min($max, max($min, (int)param($key, $default)));
 }
 
 function sanitize_name($raw) {
-    return preg_replace('/[^a-zA-Z0-9_\-]/', '', $raw);
+    $raw = str_replace(array('../', '..\\'), '', $raw);
+    return preg_replace('/[^a-zA-Z0-9_\-\.\@\$\s]/', '', $raw);
 }
 
 function b64_success($data) {
@@ -474,7 +483,7 @@ function find_file_by_pattern($dir, $pattern) {
 // type=dirs  — full directory report for a user
 // =============================================================================
 if ($type === 'dirs') {
-    $who        = sanitize_name(param('user', ''));
+    $who        = sanitize_name(get_b64_param('user', ''));
     $offset     = get_int('offset', 0,   0,    PHP_INT_MAX);
     $limit      = get_int('limit',  500, 1,    2000000);
     $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
@@ -525,7 +534,7 @@ if ($type === 'dirs') {
 // type=files  — paginated file report for a user (line-by-line streaming)
 // =============================================================================
 if ($type === 'files') {
-    $who        = sanitize_name(param('user', ''));
+    $who        = sanitize_name(get_b64_param('user', ''));
     $offset     = get_int('offset', 0,   0,    PHP_INT_MAX);
     $limit      = get_int('limit',  500, 1,    2000000);
     $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';

@@ -243,7 +243,8 @@ function _renderError(msg) {
 async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE) {
     if (_abortCtrl) _abortCtrl.abort();
     _abortCtrl = new AbortController();
-    const url = `api.php?id=${encodeURIComponent(diskId)}&type=dirs&user=${encodeURIComponent(user)}&offset=${offset}&limit=${limit}`;
+    const b64User = btoa(unescape(encodeURIComponent(user)));
+    const url = `api.php?id=${encodeURIComponent(diskId)}&type=dirs&user_b64=${encodeURIComponent(b64User)}&offset=${offset}&limit=${limit}`;
     const res = await fetch(url, { signal: _abortCtrl.signal });
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     const text = await res.text();
@@ -254,7 +255,8 @@ async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE) {
 }
 
 async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE) {
-    const url = `api.php?id=${encodeURIComponent(diskId)}&type=files&user=${encodeURIComponent(user)}&offset=${offset}&limit=${limit}`;
+    const b64User = btoa(unescape(encodeURIComponent(user)));
+    const url = `api.php?id=${encodeURIComponent(diskId)}&type=files&user_b64=${encodeURIComponent(b64User)}&offset=${offset}&limit=${limit}`;
     const res = await fetch(url);
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     const text = await res.text();
