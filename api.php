@@ -445,8 +445,8 @@ if ($type === 'users') {
     if (is_dir($detail_dir)) {
         $dh = @opendir($detail_dir);
         while ($dh && ($f = readdir($dh)) !== false) {
-            // Match detail_report_dir_*.json, with optional prefix
-            if (preg_match('/(?:.*_)?detail_report_dir_(.+)\.json$/', $f, $m)) {
+            // Match detail_report_dir_*.json or detail_report_dirs_*.json, with optional prefix
+            if (preg_match('/(?:.*_)?detail_report_dirs?_(.+)\.json$/', $f, $m)) {
                 $users[] = $m[1];
             }
         }
@@ -488,8 +488,8 @@ if ($type === 'dirs') {
     $limit      = get_int('limit',  500, 1,    2000000);
     $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
     
-    // Look for file ending in detail_report_dir_{user}.json, prefixed optionally
-    $pattern = '/(?:.*_)?detail_report_dir_' . preg_quote($who, '/') . '\.json$/';
+    // Look for file ending in detail_report_dir_{user}.json or detail_report_dirs_{user}.json, prefixed optionally
+    $pattern = '/(?:.*_)?detail_report_dirs?_' . preg_quote($who, '/') . '\.json$/';
     $file_path = find_file_by_pattern($detail_dir, $pattern);
 
     if (!$file_path || !is_file($file_path)) {
@@ -539,8 +539,8 @@ if ($type === 'files') {
     $limit      = get_int('limit',  500, 1,    2000000);
     $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
     
-    // Look for file ending in detail_report_file_{user}.json, prefixed optionally
-    $pattern = '/(?:.*_)?detail_report_file_' . preg_quote($who, '/') . '\.json$/';
+    // Look for file ending in detail_report_file_{user}.json or detail_report_files_{user}.json, prefixed optionally
+    $pattern = '/(?:.*_)?detail_report_files?_' . preg_quote($who, '/') . '\.json$/';
     $file_path = find_file_by_pattern($detail_dir, $pattern);
 
     if (!$file_path || !is_file($file_path)) {
