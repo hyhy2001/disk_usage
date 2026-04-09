@@ -188,31 +188,32 @@ export class DataStore {
     }
 
     getTeamDistribution() {
-        return Array.from(this.teamUsageMap.entries())
-            .map(([name, used]) => ({ name, used, team_id: this.teamIdMap.get(name) }))
-            .sort((a, b) => b.used - a.used);
+        if (!this.latestSnapshot || !this.latestSnapshot.teams) return [];
+        return this.latestSnapshot.teams.slice().sort((a, b) => b.used - a.used);
     }
 
     /** Return only users belonging to a given team_id, sorted by usage desc */
     getUsersByTeamId(teamId) {
-        const names = this.teamUserMap.get(teamId);
-        if (!names || !names.size) return [];
-        return Array.from(names)
-            .map(name => ({ name, used: this.userUsageMap.get(name) ?? 0 }))
+        if (!this.latestSnapshot || !this.latestSnapshot.users) return [];
+        return this.latestSnapshot.users
+            .filter(u => u.team_id === teamId)
+            .slice()
             .sort((a, b) => b.used - a.used);
     }
 
     /** Return other_usage (system/unregistered users), sorted by usage desc */
     getOtherUsers() {
-        return Array.from(this.otherUsageMap.entries())
-            .map(([name, used]) => ({ name, used }))
-            .sort((a, b) => b.used - a.used);
+        if (!this.latestSnapshot || !this.latestSnapshot.other) return [];
+        return this.latestSnapshot.other.slice().sort((a, b) => b.used - a.used);
     }
 
     getTopUsers(limit = 10) {
-        const combined = new Map([...this.userUsageMap, ...this.otherUsageMap]);
-        return Array.from(combined.entries())
-            .map(([name, used]) => ({ name, used }))
+        if (!this.latestSnapshot) return [];
+        const combined = [
+            ...(this.latestSnapshot.users || []),
+            ...(this.latestSnapshot.other || [])
+        ];
+        return combined
             .sort((a, b) => b.used - a.used)
             .slice(0, limit);
     }
