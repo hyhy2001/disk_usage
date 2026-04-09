@@ -1,4 +1,5 @@
 <?php
+ob_start('ob_gzhandler');
 // api.php - Disk Usage API (PHP 5.4+)
 //
 // All endpoints use ?id=<disk_id> (resolved server-side via disks.json).
@@ -45,6 +46,17 @@ function b64_error($message, $code) {
 function json_success($data) {
     echo json_encode($data);
     exit;
+}
+
+function get_json_date($fp) {
+    if ($fh = @fopen($fp, 'r')) {
+        $header = fread($fh, 8192);
+        fclose($fh);
+        if (preg_match('/"date"\s*:\s*(\d+)/', $header, $m)) {
+            return (int)$m[1];
+        }
+    }
+    return 0;
 }
 
 // =============================================================================
@@ -173,9 +185,17 @@ if ($type === 'team') {
             if ($is_report) $files[] = $disk_path . DIRECTORY_SEPARATOR . $f;
         }
         if ($dh) closedir($dh);
-        sort($files);
         
-        $latest = end($files);
+        $latest = false;
+        $max_date = -1;
+        foreach ($files as $f) {
+            $file_date = get_json_date($f);
+            if ($file_date > $max_date) {
+                $max_date = $file_date;
+                $latest = $f;
+            }
+        }
+        
         if ($latest) {
             $json = @file_get_contents($latest);
             $parsed = @json_decode($json, true);
@@ -282,8 +302,8 @@ if ($type === 'permissions') {
         // Match: permission_issue, permission_issues, or any *permission_issue*.json
         if (strpos($fl, 'permission_issue') !== false) {
             $fp = $disk_path . DIRECTORY_SEPARATOR . $f;
-            $mt = @filemtime($fp);
-            if ($mt > $perm_mtime) { $perm_file = $fp; $perm_mtime = $mt; }
+            $d = get_json_date($fp);
+            if ($d > $perm_mtime) { $perm_file = $fp; $perm_mtime = $d; }
         }
     }
     if ($dh) closedir($dh);
@@ -430,15 +450,20 @@ if ($type === 'users') {
     b64_success(array('users' => $users));
 }
 
-// Helper to find a file by pattern in a directory
+// Helper to find a file by pattern in a directory (latest by date field)
 function find_file_by_pattern($dir, $pattern) {
     if (!is_dir($dir)) return false;
     $dh = @opendir($dir);
     $found = false;
+    $max_date = -1;
     while ($dh && ($f = readdir($dh)) !== false) {
         if (preg_match($pattern, $f)) {
-            $found = $dir . DIRECTORY_SEPARATOR . $f;
-            break;
+            $fp = $dir . DIRECTORY_SEPARATOR . $f;
+            $d = get_json_date($fp);
+            if ($d > $max_date) {
+                $max_date = $d;
+                $found = $fp;
+            }
         }
     }
     if ($dh) closedir($dh);

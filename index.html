@@ -13,6 +13,19 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Eliminate Render/Import Waterfalls -->
+    <link rel="preload" href="css/index.css?v=32" as="style">
+    <link rel="preload" href="css/layout.css?v=68" as="style">
+    <link rel="preload" href="css/components.css?v=69" as="style">
+    <link rel="preload" href="js/chart.min.js" as="script">
+    <link rel="modulepreload" href="js/main.js?v=48">
+    <link rel="modulepreload" href="js/dataStore.js?v=48">
+    <link rel="modulepreload" href="js/dataFetcher.js?v=50">
+    <link rel="modulepreload" href="js/chartManager.js?v=48">
+    <link rel="modulepreload" href="js/permissionRenderer.js?v=48">
+    <link rel="modulepreload" href="js/userDetailRenderer.js?v=48">
+
     <!-- CSS -->
     <link rel="stylesheet" href="css/index.css?v=32">
     <link rel="stylesheet" href="css/layout.css?v=68">
@@ -510,10 +523,6 @@
 
 
 
-    <script src="js/dataFetcher.js?v=44" type="module"></script>
-    <script src="js/dataStore.js?v=38" type="module"></script>
-    <script src="js/chartManager.js?v=38" type="module"></script>
-    <script src="js/permissionRenderer.js?v=38" type="module"></script>
     <script src="js/dataFetcher.js?v=50" type="module"></script>
     <script src="js/dataStore.js?v=48" type="module"></script>
     <script src="js/chartManager.js?v=48" type="module"></script>
