@@ -607,7 +607,14 @@ while ($dh && ($f = readdir($dh)) !== false) {
     }
 }
 if ($dh) closedir($dh);
-sort($files);
+
+$file_dates = array();
+foreach ($files as $f) {
+    $file_dates[$f] = get_json_date($f);
+}
+usort($files, function($a, $b) use ($file_dates) {
+    return $file_dates[$a] - $file_dates[$b];
+});
 
 header('Cache-Control: public, max-age=60');
 header('Content-Type: application/json; charset=utf-8');
