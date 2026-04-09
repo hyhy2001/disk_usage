@@ -496,27 +496,41 @@ if ($type === 'dirs') {
         b64_error('No directory report for user: ' . $who, 404);
     }
 
-    $raw = @file_get_contents($file_path);
-    if (!$raw) {
-        b64_error('Cannot read directory report.', 500);
+    $fh = @fopen($file_path, 'r');
+
+    // Read header fields before the "dirs" array
+    $date = 0; $user_name = $who; $total_dirs = 0; $total_used = 0;
+    while ($fh && ($ln = fgets($fh)) !== false) {
+        if      (preg_match('/"date"\s*:\s*(\d+)/',        $ln, $m)) $date        = (int)$m[1];
+        elseif  (preg_match('/"user"\s*:\s*"([^"]+)"/',    $ln, $m)) $user_name   = $m[1];
+        elseif  (preg_match('/"total_dirs"\s*:\s*(\d+)/',  $ln, $m)) $total_dirs  = (int)$m[1];
+        elseif  (preg_match('/"total_used"\s*:\s*(\d+)/',  $ln, $m)) $total_used  = (int)$m[1];
+        if (strpos($ln, '"dirs"') !== false && strpos($ln, '[') !== false) break;
     }
 
-    $data = @json_decode($raw, true);
-    if (!$data || !isset($data['dirs'])) {
-        b64_error('Invalid directory report format.', 500);
-    }
+    // Stream items with brace-depth parser — O(page_size) RAM
+    $idx = 0; $collected = array(); $buf = ''; $depth = 0;
+    while ($fh && ($ln = fgets($fh)) !== false) {
+        $trimmed = trim($ln);
+        if ($trimmed === ']' || $trimmed === '];') break;
+        if ($trimmed === '' || $trimmed === '[')   continue;
 
-    $total_dirs = count($data['dirs']);
-    $date       = isset($data['date']) ? (int)$data['date'] : 0;
-    $user_name  = isset($data['user']) ? $data['user'] : $who;
-    $total_used = isset($data['total_used']) ? (int)$data['total_used'] : 0;
+        $buf   .= $ln;
+        $depth += substr_count($ln, '{') - substr_count($ln, '}');
 
-    $sliced = array();
-    if ($offset === 0 && $limit >= 900000) {
-        $sliced = $data['dirs'];
-    } else {
-        $sliced = array_slice($data['dirs'], $offset, $limit);
+        if ($depth <= 0 && ltrim($buf) !== '') {
+            if ($idx >= $offset && count($collected) < $limit) {
+                $obj = @json_decode(rtrim(trim($buf), ','), true);
+                if ($obj !== null && is_array($obj)) {
+                    $collected[] = $obj;
+                }
+            }
+            $idx++;
+            if (count($collected) >= $limit) break;
+            $buf = ''; $depth = 0;
+        }
     }
+    if ($fh) fclose($fh);
 
     b64_success(array('dir' => array(
         'date'        => $date,
@@ -525,8 +539,8 @@ if ($type === 'dirs') {
         'total_used'  => $total_used,
         'offset'      => $offset,
         'limit'       => $limit,
-        'has_more'    => ($offset + count($sliced)) < $total_dirs,
-        'dirs'        => $sliced,
+        'has_more'    => count($collected) >= $limit,
+        'dirs'        => $collected,
     )));
 }
 
