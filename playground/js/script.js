@@ -492,8 +492,10 @@ searchInput.addEventListener('input', (e) => {
         const js = jsEditor.getValue();
 
         // Dynamically resolve the absolute path to the CSS folder based on CURRENT URL
-        // Example: from .../playground/index.html -> resolves to .../css/
-        const cssPath = new URL("../css", window.location.href).href;
+        // Regex strips "/playground" tracking properly back to finding the true project root
+        const currentUrl = window.location.href.split('?')[0].split('#')[0];
+        const basePath = currentUrl.replace(/\/?playground(?:\/index\.html)?\/?$/, '');
+        const cssPath = basePath + '/css';
         
         const sourceHtml = `<!DOCTYPE html>
 <html lang="en">
