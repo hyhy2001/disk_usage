@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-width=1.0">
+    <title>Disk Usage UI Playground</title>
+    <!-- CodeMirror CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/monokai.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <h1>Disk Usage Playground</h1>
+            <p>Explore and build components based on the Disk Usage project interface.</p>
+        </div>
+    </header>
+    
+    <div class="main-wrapper">
+        <aside class="sidebar">
+            <div class="sidebar-title">Components</div>
+            <ul id="component-list" class="component-list">
+                <!-- Dynamically populated via JS -->
+            </ul>
+        </aside>
+
+        <div class="container">
+            <div class="editors">
+                <div class="editor-pane">
+                    <div class="editor-title">HTML</div>
+                    <textarea id="html-code"></textarea>
+                </div>
+                
+                <div class="editor-pane">
+                    <div class="editor-title">CSS</div>
+                    <textarea id="css-code"></textarea>
+                </div>
+                
+                <div class="editor-pane">
+                    <div class="editor-title">JavaScript</div>
+                    <textarea id="js-code"></textarea>
+                </div>
+            </div>
+            
+            <div class="resizer" id="resizer"></div>
+            
+            <div class="preview-pane">
+                <div class="editor-title">Preview</div>
+                <iframe id="preview" title="Output result"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- CodeMirror JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+    
+    <script src="js/script.js"></script>
+</body>
+</html>
