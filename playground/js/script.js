@@ -502,10 +502,9 @@ searchInput.addEventListener('input', (e) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="${cssPath}/vars.css" onerror="console.log('vars.css optional')">
-    <link rel="stylesheet" href="${cssPath}/layout.css" onerror="console.log('layout.css optional')">
-    <link rel="stylesheet" href="${cssPath}/components.css">
     <link rel="stylesheet" href="${cssPath}/index.css">
+    <link rel="stylesheet" href="${cssPath}/layout.css">
+    <link rel="stylesheet" href="${cssPath}/components.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; margin: 0; min-height: 100vh; }
