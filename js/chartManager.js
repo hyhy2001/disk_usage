@@ -328,7 +328,6 @@ export class ChartManager {
         const labels    = timelineData.map(d => new Date(d.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }));
         const usedData  = timelineData.map(d => d.used / 1e12);
         const scanData  = timelineData.map(d => (d.scanned || 0) / 1e12);
-        
         const totalData = timelineData.map(d => d.total / 1e12);
 
         const deltaData = [0];

@@ -58,6 +58,13 @@ function json_success($data) {
 }
 
 function get_json_date($fp) {
+    $basename = basename($fp);
+    // Extremely fast O(1) filename extraction (disk_usage_report_1711234567.json)
+    if (preg_match('/_(\d{10})(?:\.json)?$/', $basename, $m)) return (int)$m[1];
+    // Legacy mapping (report_YYYY-MM-DD.json)
+    if (preg_match('/_(\d{4}-\d{2}-\d{2})(?:\.json)?$/', $basename, $m)) return strtotime($m[1]);
+
+    // Fallback: Check file header
     if ($fh = @fopen($fp, 'r')) {
         $header = fread($fh, 8192);
         fclose($fh);
@@ -65,7 +72,9 @@ function get_json_date($fp) {
             return (int)$m[1];
         }
     }
-    return 0;
+    
+    // Ultimate fallback
+    return @filemtime($fp);
 }
 
 // =============================================================================
@@ -654,13 +663,9 @@ header('Content-Type: application/json; charset=utf-8');
 echo '{"status":"success","total_files":' . count($files) . ',"data":[';
 $first = true;
 foreach ($files as $file) {
-    // Dump the raw JSON file text directly into the array structure
-    $raw_json = @file_get_contents($file);
-    if ($raw_json) {
-        if (!$first) echo ',';
-        echo $raw_json;
-        $first = false;
-    }
+    if (!$first) echo ',';
+    readfile($file);
+    $first = false;
 }
 echo ']}';
 exit;
