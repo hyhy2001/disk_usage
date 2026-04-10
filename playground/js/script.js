@@ -491,18 +491,19 @@ searchInput.addEventListener('input', (e) => {
         const css = cssEditor.getValue();
         const js = jsEditor.getValue();
 
-        // Need absolute paths for CSS since Blob URL is not in the same directory context
-        const rootPath = window.location.origin + '/disk_usage/css';
+        // Dynamically resolve the absolute path to the CSS folder based on CURRENT URL
+        // Example: from .../playground/index.html -> resolves to .../css/
+        const cssPath = new URL("../css", window.location.href).href;
         
         const sourceHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="${rootPath}/vars.css" onerror="console.log('vars.css optional')">
-    <link rel="stylesheet" href="${rootPath}/layout.css" onerror="console.log('layout.css optional')">
-    <link rel="stylesheet" href="${rootPath}/components.css">
-    <link rel="stylesheet" href="${rootPath}/index.css">
+    <link rel="stylesheet" href="${cssPath}/vars.css" onerror="console.log('vars.css optional')">
+    <link rel="stylesheet" href="${cssPath}/layout.css" onerror="console.log('layout.css optional')">
+    <link rel="stylesheet" href="${cssPath}/components.css">
+    <link rel="stylesheet" href="${cssPath}/index.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; margin: 0; min-height: 100vh; }
