@@ -275,48 +275,6 @@ async function _fetchUserList(diskId) {
     return json?.data?.users || [];
 }
 
-async function _fetchAllDirs(diskId, user) {
-    let allDirs = [];
-    let offset = 0;
-    const limit = 5000;
-    const b64User = btoa(unescape(encodeURIComponent(user)));
-    while (true) {
-        const params = new URLSearchParams({ id: diskId, type: 'dirs', user_b64: b64User, offset, limit });
-        const res = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const text = await res.text();
-        let json;
-        try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { throw new Error('Invalid JSON response'); } }
-        if (json?.status !== 'success') throw new Error(json?.message || 'API error');
-        const dirs = json.data.dir.dirs || [];
-        allDirs = allDirs.concat(dirs);
-        if (!json.data.dir.has_more || dirs.length === 0) break;
-        offset += limit;
-    }
-    return allDirs;
-}
-
-async function _fetchAllFiles(diskId, user) {
-    let allFiles = [];
-    let offset = 0;
-    const limit = 5000;
-    const b64User = btoa(unescape(encodeURIComponent(user)));
-    while (true) {
-        const params = new URLSearchParams({ id: diskId, type: 'files', user_b64: b64User, offset, limit });
-        const res = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const text = await res.text();
-        let json;
-        try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { throw new Error('Invalid JSON response'); } }
-        if (json?.status !== 'success') throw new Error(json?.message || 'API error');
-        const files = json.data.file.files || [];
-        allFiles = allFiles.concat(files);
-        if (!json.data.file.has_more || files.length === 0) break;
-        offset += limit;
-    }
-    return allFiles;
-}
-
 
 // ── Core render ───────────────────────────────────────────────────────────────
 
@@ -618,109 +576,76 @@ function _attachBannerEvents(root) {
 
 // ── CSV Export ────────────────────────────────────────────────────────────────
 
-async function _downloadBackendZip(type, users) {
-    if (!_currentDisk) return;
-    const progId = `export-zip-${Date.now()}`;
-    showProgressToast(progId, `Preparing Server-Side ZIP...`);
-    try {
-        const params = new URLSearchParams();
-        params.set('id', _currentDisk);
-        params.set('type', type);
-        params.set('users', users.join(','));
-
-        const res = await fetch('api.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString()
-        });
-
-        if (!res.ok) {
-            const txt = await res.text();
-            throw new Error(`Server error: ${txt}`);
-        }
-
-        const disp = res.headers.get('Content-Disposition');
-        let filename = 'export.zip';
-        if (disp && disp.includes('filename=')) {
-            filename = disp.split('filename=')[1].replace(/"/g, '');
-        }
-
-        updateProgressToast(progId, 50, 'Streaming ZIP to disk...');
-
-        // Stream straight to disk if possible
-        if (window.showSaveFilePicker) {
-            try {
-                const handle = await showSaveFilePicker({ suggestedName: filename });
-                const writable = await handle.createWritable();
-                await res.body.pipeTo(writable);
-                showToast('Success', 'ZIP downloaded directly to disk.', 'success');
-                closeProgressToast(progId);
-                return;
-            } catch(e) {
-                if (e.name !== 'AbortError') throw e;
-                closeProgressToast(progId);
-                return; // User aborted picker
-            }
-        }
-
-        // Fallback for Firefox/Safari
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(url);
-        
-        showToast('Success', 'ZIP download complete.', 'success');
-    } catch(e) {
-        showToast('Export Failed', e.message, 'error');
-    } finally {
-        closeProgressToast(progId);
-    }
-}
-
 async function _udExportDirs(allUsers) {
     if (!_currentDisk) return;
     const btnId = allUsers ? '#ud-export-dirs-all' : '#ud-export-dirs-user';
     const btn   = document.querySelector(btnId);
     
-    let usersToExport;
+    let usersToExport = [];
     if (allUsers) {
-        usersToExport = ['all'];
+        const users = await _fetchUserList(_currentDisk);
+        usersToExport = [...new Set([...users, ..._otherUsers.map(o => o.name)])];
     } else {
         if (!_selectedUser) return;
         usersToExport = [_selectedUser];
     }
 
+    if (!usersToExport.length) return;
+
+    const originalBtnHTML = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
 
     try {
-        if (usersToExport.length === 1 && usersToExport[0] !== 'all') {
-            // SINGLE USER: Fast streaming CSV (existing logic)
-            const headers = ['User', 'Path', 'Used (bytes)'];
-            const uName = usersToExport[0];
-            const suggestedName = `dirs_${_currentDisk}_${uName}`;
-            const formatRow = (row, h) => ({ User: row.user, Path: row.path, 'Used (bytes)': row.used })[h] ?? '';
-            let isDone = false;
+        const headers = ['User', 'Path', 'Used (bytes)'];
+        const suggestedName = allUsers ? `all_dirs_${_currentDisk}` : `dirs_${_currentDisk}_${usersToExport[0]}`;
+        const formatRow = (row, h) => ({ User: row.user, Path: row.path, 'Used (bytes)': row.used })[h] ?? '';
+        
+        let uIdx = 0;
+        let offset = 0;
+        const limit = 5000;
+
+        const fetchChunk = async () => {
+            if (uIdx >= usersToExport.length) return null;
+
+            const uName = usersToExport[uIdx];
+            const b64User = btoa(unescape(encodeURIComponent(uName)));
             
-            const fetchChunk = async () => {
-                if (isDone) return null;
-                isDone = true;
-                const dirs = await _fetchAllDirs(_currentDisk, uName);
-                return { rows: dirs.map(d => ({ user: uName, path: d.path, used: d.used })), isLast: true };
-            };
+            const params = new URLSearchParams({ id: _currentDisk, type: 'dirs', user_b64: b64User, offset, limit });
+            const res = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             
-            const streamed = await streamExportGzip(suggestedName, headers, fetchChunk, formatRow);
-            if (streamed) showToast('Export Complete', 'Exported directories directly to disk (.gz)', 'success');
-        } else {
-            // MULTIPLE USERS OR ALL: Server-side ZIP
-            await _downloadBackendZip('export_ud_dirs_zip', usersToExport);
-        }
+            const text = await res.text();
+            let json;
+            try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { throw new Error('Invalid JSON response'); } }
+            if (json?.status !== 'success') throw new Error(json?.message || 'API error');
+            
+            const dirs = json.data.dir.dirs || [];
+            const rows = dirs.map(d => ({ user: uName, path: d.path, used: d.used }));
+            
+            const hasMore = json.data.dir.has_more && dirs.length > 0;
+            if (!hasMore) {
+                uIdx++;
+                offset = 0;
+            } else {
+                offset += limit;
+            }
+            
+            if (allUsers && rows.length > 0) {
+                updateProgressToast('export-dirs', Math.min(99, Math.round((uIdx / usersToExport.length) * 100)), `Streaming user ${uIdx}/${usersToExport.length}...`);
+            }
+            
+            return { rows, isLast: uIdx >= usersToExport.length && !hasMore };
+        };
+        
+        showProgressToast('export-dirs', allUsers ? 'Initializing export...' : 'Streaming directories...');
+        const streamed = await streamExportGzip(suggestedName, headers, fetchChunk, formatRow);
+        if (streamed) showToast('Export Complete', 'Exported directories directly to disk (.gz)', 'success');
+        
     } catch (err) {
         if (err.name !== 'AbortError') alert('Export failed: ' + err.message);
     } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> CSV' + (allUsers ? ' All' : ''); }
+        closeProgressToast('export-dirs');
+        if (btn) { btn.disabled = false; btn.innerHTML = originalBtnHTML; }
     }
 }
 
@@ -729,44 +654,74 @@ async function _udExportFiles(allUsers) {
     const btnId = allUsers ? '#ud-export-files-all' : '#ud-export-files-user';
     const btn   = document.querySelector(btnId);
     
-    let usersToExport;
+    let usersToExport = [];
     if (allUsers) {
-        usersToExport = ['all'];
+        const users = await _fetchUserList(_currentDisk);
+        usersToExport = [...new Set([...users, ..._otherUsers.map(o => o.name)])];
     } else {
         if (!_selectedUser) return;
         usersToExport = [_selectedUser];
     }
 
+    if (!usersToExport.length) return;
+
+    const originalBtnHTML = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
 
     try {
-        if (usersToExport.length === 1 && usersToExport[0] !== 'all') {
-            // SINGLE USER: Fast streaming CSV
-            const headers = ['User', 'Path', 'Size (bytes)'];
-            const uName = usersToExport[0];
-            const suggestedName = `files_${_currentDisk}_${uName}`;
-            const formatRow = (row, h) => ({ User: row.user, Path: row.path, 'Size (bytes)': row.size })[h] ?? '';
-            let isDone = false;
+        const headers = ['User', 'Path', 'Size (bytes)'];
+        const suggestedName = allUsers ? `all_files_${_currentDisk}` : `files_${_currentDisk}_${usersToExport[0]}`;
+        const formatRow = (row, h) => ({ User: row.user, Path: row.path, 'Size (bytes)': row.size })[h] ?? '';
+        
+        let uIdx = 0;
+        let offset = 0;
+        const limit = 5000;
+
+        const fetchChunk = async () => {
+            if (uIdx >= usersToExport.length) return null;
+
+            const uName = usersToExport[uIdx];
+            const b64User = btoa(unescape(encodeURIComponent(uName)));
             
-            const fetchChunk = async () => {
-                if (isDone) return null;
-                isDone = true;
-                const files = await _fetchAllFiles(_currentDisk, uName);
-                return { rows: files.map(f => ({ user: uName, path: f.path, size: f.size })), isLast: true };
-            };
+            const params = new URLSearchParams({ id: _currentDisk, type: 'files', user_b64: b64User, offset, limit });
+            const res = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             
-            const streamed = await streamExportGzip(suggestedName, headers, fetchChunk, formatRow);
-            if (streamed) showToast('Export Complete', 'Exported files directly to disk (.gz)', 'success');
-        } else {
-            // MULTIPLE USERS OR ALL: Server-side ZIP
-            await _downloadBackendZip('export_ud_files_zip', usersToExport);
-        }
+            const text = await res.text();
+            let json;
+            try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { throw new Error('Invalid JSON response'); } }
+            if (json?.status !== 'success') throw new Error(json?.message || 'API error');
+            
+            const files = json.data.file.files || [];
+            const rows = files.map(f => ({ user: uName, path: f.path, size: f.size }));
+            
+            const hasMore = json.data.file.has_more && files.length > 0;
+            if (!hasMore) {
+                uIdx++;
+                offset = 0;
+            } else {
+                offset += limit;
+            }
+            
+            if (allUsers && rows.length > 0) {
+                updateProgressToast('export-files', Math.min(99, Math.round((uIdx / usersToExport.length) * 100)), `Streaming user ${uIdx}/${usersToExport.length}...`);
+            }
+            
+            return { rows, isLast: uIdx >= usersToExport.length && !hasMore };
+        };
+        
+        showProgressToast('export-files', allUsers ? 'Initializing export...' : 'Streaming files...');
+        const streamed = await streamExportGzip(suggestedName, headers, fetchChunk, formatRow);
+        if (streamed) showToast('Export Complete', 'Exported files directly to disk (.gz)', 'success');
+        
     } catch (err) {
         if (err.name !== 'AbortError') alert('Export failed: ' + err.message);
     } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> CSV' + (allUsers ? ' All' : ''); }
+        closeProgressToast('export-files');
+        if (btn) { btn.disabled = false; btn.innerHTML = originalBtnHTML; }
     }
 }
+
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
