@@ -576,6 +576,7 @@ async function _udExportDirs() {
         let offset = 0;
         const limit = 5000;
         const b64User = btoa(unescape(encodeURIComponent(_selectedUser)));
+        let totalItems = 0;
 
         const fetchChunk = async () => {
             const params = new URLSearchParams({ id: _currentDisk, type: 'dirs', user_b64: b64User, offset, limit });
@@ -588,9 +589,17 @@ async function _udExportDirs() {
             if (json?.status !== 'success') throw new Error(json?.message || 'API error');
             
             const dirs = json.data.dir.dirs || [];
+            if (offset === 0) totalItems = json.data.dir.total_dirs || 0;
+            
             const rows = dirs.map(d => ({ user: _selectedUser, path: d.path, used: d.used }));
             
             const hasMore = json.data.dir.has_more && dirs.length > 0;
+            
+            const processed = offset + rows.length;
+            const limitStr = totalItems > 0 ? ` / ${totalItems.toLocaleString()}` : '';
+            const pct = totalItems > 0 ? Math.max(1, Math.round((processed / totalItems) * 100)) : Math.min(99, Math.max(1, Math.round((processed / (processed + limit)) * 100)));
+            updateProgressToast('export-dirs', pct, `Streaming directories: ${processed.toLocaleString()}${limitStr}`);
+            
             offset += limit;
             
             return { rows, isLast: !hasMore };
@@ -623,6 +632,7 @@ async function _udExportFiles() {
         let offset = 0;
         const limit = 5000;
         const b64User = btoa(unescape(encodeURIComponent(_selectedUser)));
+        let totalItems = 0;
 
         const fetchChunk = async () => {
             const params = new URLSearchParams({ id: _currentDisk, type: 'files', user_b64: b64User, offset, limit });
@@ -635,9 +645,17 @@ async function _udExportFiles() {
             if (json?.status !== 'success') throw new Error(json?.message || 'API error');
             
             const files = json.data.file.files || [];
+            if (offset === 0) totalItems = json.data.file.total_files || 0;
+            
             const rows = files.map(f => ({ user: _selectedUser, path: f.path, size: f.size }));
             
             const hasMore = json.data.file.has_more && files.length > 0;
+            
+            const processed = offset + rows.length;
+            const limitStr = totalItems > 0 ? ` / ${totalItems.toLocaleString()}` : '';
+            const pct = totalItems > 0 ? Math.max(1, Math.round((processed / totalItems) * 100)) : Math.min(99, Math.max(1, Math.round((processed / (processed + limit)) * 100)));
+            updateProgressToast('export-files', pct, `Streaming files: ${processed.toLocaleString()}${limitStr}`);
+            
             offset += limit;
             
             return { rows, isLast: !hasMore };
