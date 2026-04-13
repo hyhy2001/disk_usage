@@ -489,8 +489,12 @@ async function _exportCsv(useFilters, btn) {
         
         if (zipFiles.length > 0) {
             btn.textContent = '⏳ Compressing...';
-            updateProgressToast(progId, 100, 'Zipping chunks...');
-            await downloadZip(`${suggestedName}.zip`, zipFiles);
+            updateProgressToast(progId, 0, 'Zipping chunks...');
+            await new Promise(r => setTimeout(r, 50)); // let UI render
+            await downloadZip(`${suggestedName}.zip`, zipFiles, (pct) => {
+                updateProgressToast(progId, pct, `Zipping chunks (${Math.round(pct)}%)...`);
+            });
+            closeProgressToast(progId);
             showToast('Export Complete', 'Downloaded ZIP file.', 'success');
         }
     } catch (err) {

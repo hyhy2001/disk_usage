@@ -46,8 +46,9 @@ export function toCsv(headers, rows, getValue) {
  * Compress an array of files into a ZIP and download.
  * @param {string} filename 
  * @param {{name: string, content: string}[]} filesArr 
+ * @param {Function} [onProgress] 
  */
-export async function downloadZip(filename, filesArr) {
+export async function downloadZip(filename, filesArr, onProgress) {
     if (!window.JSZip) {
         alert("JSZip library is not loaded.");
         return;
@@ -56,7 +57,9 @@ export async function downloadZip(filename, filesArr) {
     for (const file of filesArr) {
        zip.file(file.name, file.content);
     }
-    const content = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+    const content = await zip.generateAsync({ type: "blob", compression: "DEFLATE" }, (metadata) => {
+        if (onProgress) onProgress(metadata.percent);
+    });
     
     const url = URL.createObjectURL(content);
     const a = document.createElement('a');
