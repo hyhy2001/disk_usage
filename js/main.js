@@ -103,4 +103,55 @@ export function showToast(title, desc = '', type = 'success', duration = 3200) {
     setTimeout(dismiss, duration);
 }
 
+/**
+ * Show a persistent progress toast
+ */
+export function showProgressToast(id, title) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    
+    let toast = document.getElementById(id);
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = id;
+        toast.className = 'toast toast-info';
+        toast.style.display = 'flex';
+        toast.style.flexDirection = 'column';
+        toast.style.alignItems = 'stretch';
+        toast.style.cursor = 'default';
+        toast.style.minWidth = '280px';
+        toast.innerHTML = `
+            <div style="display:flex; align-items:center; gap: 8px; margin-bottom: 8px;">
+                <span class="toast-icon">⏳</span>
+                <span class="toast-title" style="flex:1;">${title}</span>
+                <span class="toast-desc" id="${id}-desc" style="font-variant-numeric:tabular-nums; font-size: 0.75rem; color: var(--text-secondary);">0%</span>
+            </div>
+            <div style="height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden;">
+                <div id="${id}-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #10b981, #0ea5e9); transition: width 0.2s;"></div>
+            </div>
+        `;
+        container.appendChild(toast);
+    }
+}
+
+/**
+ * Update a persistent progress toast
+ */
+export function updateProgressToast(id, pct, descLabel) {
+    const desc = document.getElementById(`${id}-desc`);
+    const bar = document.getElementById(`${id}-bar`);
+    if (desc) desc.textContent = descLabel !== undefined ? descLabel : `${Math.round(pct)}%`;
+    if (bar) bar.style.width = `${Math.round(pct)}%`;
+}
+
+/**
+ * Close a persistent progress toast
+ */
+export function closeProgressToast(id) {
+    const toast = document.getElementById(id);
+    if (toast) {
+        toast.classList.add('toast-exiting');
+        setTimeout(() => toast.remove(), 280);
+    }
+}
 

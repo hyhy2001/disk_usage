@@ -41,3 +41,97 @@ export function toCsv(headers, rows, getValue) {
     );
     return [headerLine, ...lines].join('\r\n');
 }
+
+/**
+ * Compress an array of files into a ZIP and download.
+ * @param {string} filename 
+ * @param {{name: string, content: string}[]} filesArr 
+ */
+export async function downloadZip(filename, filesArr) {
+    if (!window.JSZip) {
+        alert("JSZip library is not loaded.");
+        return;
+    }
+    const zip = new JSZip();
+    for (const file of filesArr) {
+       zip.file(file.name, file.content);
+    }
+    const content = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+    
+    const url = URL.createObjectURL(content);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+/**
+ * Native GZIP Streaming Export
+ * Directly writes compressed data to the user's hard drive without consuming RAM.
+ * @param {string} filename - The suggested file name (e.g., export.csv)
+ * @param {string[]} headers - The CSV headers
+ * @param {Function} fetchChunkCallback - async function returning { rows: Object[], isLast: boolean }
+ * @param {Function} [formatRow] - Optional mapper function(row, header)
+ * @returns {Promise<boolean>} True if successful, false if not supported or canceled.
+ */
+export async function streamExportGzip(filename, headers, fetchChunkCallback, formatRow) {
+    if (!window.showSaveFilePicker || !window.CompressionStream) {
+        return false; // Not supported, fallback to JSZip
+    }
+
+    let fileHandle;
+    try {
+        fileHandle = await window.showSaveFilePicker({
+            suggestedName: filename + '.gz',
+            types: [{ description: 'GZIP Compressed CSV', accept: { 'application/gzip': ['.gz'] } }]
+        });
+    } catch (err) {
+        if (err.name === 'AbortError') throw new Error('AbortError');
+        return false;
+    }
+
+    const writable = await fileHandle.createWritable();
+    const cs = new CompressionStream('gzip');
+    const writer = cs.writable.getWriter();
+    cs.readable.pipeTo(writable);
+
+    const encoder = new TextEncoder();
+    const bom = '\uFEFF';
+
+    const escape = v => {
+        const s = String(v ?? '');
+        return s.includes(',') || s.includes('"') || s.includes('\n')
+            ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+
+    // Header
+    const headerLine = headers.map(escape).join(',');
+    await writer.write(encoder.encode(bom + headerLine + '\r\n'));
+
+    let hasMore = true;
+    while (hasMore) {
+        const chunkData = await fetchChunkCallback();
+        if (!chunkData) break;
+        
+        hasMore = !chunkData.isLast;
+        const rows = chunkData.rows || [];
+
+        if (rows.length > 0) {
+            const lines = rows.map(row => 
+                headers.map(h => {
+                    const val = formatRow ? formatRow(row, h) : row[h.toLowerCase().replace(/ /g, '_')];
+                    return escape(val ?? '');
+                }).join(',')
+            ).join('\r\n') + '\r\n';
+            
+            await writer.write(encoder.encode(lines));
+        }
+    }
+
+    await writer.close();
+    return true;
+}

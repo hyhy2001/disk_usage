@@ -2,7 +2,8 @@
 // Server-side pagination + filtering: users, item_type, path search.
 
 import { fmtDateSec as fmtDate } from './formatters.js';
-import { downloadCsv, toCsv }   from './csvExport.js';
+import { downloadCsv, downloadZip, streamExportGzip, toCsv }   from './csvExport.js';
+import { showProgressToast, updateProgressToast, closeProgressToast, showToast } from './main.js';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const PERM_PAGE    = 100;
@@ -379,47 +380,119 @@ async function _exportCsv(useFilters, btn) {
     btn.textContent = '⏳ Loading…';
 
     try {
-        let allItems = [];
         let offset = 0;
         const limit = 5000;
+        let totalLoaded = 0;
         
-        while (true) {
-            btn.textContent = `⏳ Loading… (${allItems.length})`;
-            const params = new URLSearchParams({ id: _diskId, type: 'permissions', offset: offset, limit: limit });
-            
-            if (useFilters) {
-                if (_activeUsers !== null && _activeUsers.size > 0) params.set('users', [..._activeUsers].join(','));
-                if (_itemType)   params.set('item_type', _itemType);
-                if (_pathSearch) params.set('path', _pathSearch);
+        const suffix = useFilters ? 'filtered' : 'all';
+        const suggestedName = `permissions_${_diskId}_${suffix}`;
+        const progId = `export-perm-${Date.now()}`;
+        
+        showProgressToast(progId, 'Exporting Permissions');
+
+        let fetchError = null;
+        const fetchChunk = async () => {
+            try {
+                const params = new URLSearchParams({ id: _diskId, type: 'permissions', offset: offset, limit: limit });
+                
+                if (useFilters) {
+                    if (_activeUsers !== null && _activeUsers.size > 0) params.set('users', [..._activeUsers].join(','));
+                    if (_itemType)   params.set('item_type', _itemType);
+                    if (_pathSearch) params.set('path', _pathSearch);
+                }
+                
+                const res  = await fetch('api.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params.toString()
+                });
+                
+                const text = await res.text();
+                let json;
+                try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { throw new Error('Invalid JSON response'); } }
+
+                if (json?.status !== 'success') throw new Error(json?.message || 'API error');
+
+                const items = json.data.items || [];
+                totalLoaded += items.length;
+                
+                // We don't have total_count, so we render a generic progress
+                updateProgressToast(progId, 100, `${totalLoaded} items exported`);
+                btn.textContent = `⏳ ${totalLoaded}`;
+                
+                offset += limit;
+                return { rows: items, isLast: (!json.data.has_more || items.length === 0) };
+            } catch (err) {
+                fetchError = err;
+                throw err;
             }
-            
-            const res  = await fetch('api.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: params.toString()
-            });
-            
-            const text = await res.text();
-            let json;
-            try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { throw new Error('Invalid JSON response'); } }
+        };
 
-            if (json?.status !== 'success') throw new Error(json?.message || 'API error');
-
-            const items = json.data.items || [];
-            allItems = allItems.concat(items);
-            
-            if (!json.data.has_more || items.length === 0) {
-                break;
-            }
-            offset += limit;
-        }
-
-        const csv   = toCsv(PERM_CSV_HEADERS, allItems, (row, h) => {
+        const formatRow = (row, h) => {
             const map = { User: 'user', Path: 'path', Type: 'type', Error: 'error' };
             return row[map[h]] ?? '';
-        });
-        const suffix = useFilters ? 'filtered' : 'all';
-        downloadCsv(`permissions_${_diskId}_${suffix}.csv`, csv);
+        };
+
+        // Try Native Streaming First
+        let streamed = false;
+        try {
+            streamed = await streamExportGzip(suggestedName, PERM_CSV_HEADERS, fetchChunk, formatRow);
+        } catch(e) {
+            if (e.message !== 'AbortError' && !fetchError) console.error(e);
+            streamed = true; // prevent fallback if it was a fetch error or aborted
+        }
+
+        if (streamed) {
+             if (!fetchError) showToast('Export Complete', 'Exported directly to .gz file', 'success');
+             closeProgressToast(progId);
+             if (btn) { btn.disabled = false; btn.textContent = originalText; }
+             return;
+        }
+
+        // FALLBACK: ZIP Chunking
+        offset = 0;
+        totalLoaded = 0;
+        const MAX_ROWS = 500000;
+        let fileIndex = 1;
+        let zipFiles = [];
+        let allItems = [];
+
+        while (true) {
+            const { rows, isLast } = await fetchChunk();
+            allItems = allItems.concat(rows);
+            
+            // Chunking to avoid Excel limits and OOM
+            while (allItems.length >= MAX_ROWS) {
+                const chunk = allItems.splice(0, MAX_ROWS);
+                const csv   = toCsv(PERM_CSV_HEADERS, chunk, formatRow);
+                zipFiles.push({
+                    name: `${suggestedName}_part${fileIndex}.csv`,
+                    content: '\uFEFF' + csv
+                });
+                fileIndex++;
+            }
+            if (isLast) break;
+        }
+
+        if (allItems.length > 0) {
+            const csv   = toCsv(PERM_CSV_HEADERS, allItems, formatRow);
+            const filename = fileIndex === 1 
+                ? `${suggestedName}.csv` 
+                : `${suggestedName}_part${fileIndex}.csv`;
+            
+            if (fileIndex === 1) {
+                downloadCsv(filename, csv);
+            } else {
+                zipFiles.push({ name: filename, content: '\uFEFF' + csv });
+            }
+        }
+        
+        if (zipFiles.length > 0) {
+            btn.textContent = '⏳ Compressing...';
+            updateProgressToast(progId, 100, 'Zipping chunks...');
+            await downloadZip(`${suggestedName}.zip`, zipFiles);
+            showToast('Export Complete', 'Downloaded ZIP file.', 'success');
+        }
     } catch (err) {
         alert('Export failed: ' + err.message);
     } finally {
