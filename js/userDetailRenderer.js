@@ -208,17 +208,6 @@ function _renderPicker(users, otherUsers) {
             </div>
         </div>
         <span class="ud-picker-hint">${allUsers.length} users available</span>
-        <div class="ud-picker-export">
-            <span class="ud-picker-export-label">Export all:</span>
-            <button class="ud-export-btn" id="ud-export-dirs-all" data-tooltip="Download top directories for all users as CSV">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                Dirs CSV
-            </button>
-            <button class="ud-export-btn" id="ud-export-files-all" data-tooltip="Download all tracked files across users as CSV">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-                Files CSV
-            </button>
-        </div>
     </div>`;
 }
 
@@ -495,10 +484,6 @@ function _attachPickerEvents(root) {
 
     // Keyboard: Escape to close
     list.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
-
-    // Export all buttons (in picker bar)
-    root.querySelector('#ud-export-dirs-all')?.addEventListener('click',  () => _udExportDirs(true));
-    root.querySelector('#ud-export-files-all')?.addEventListener('click', () => _udExportFiles(true));
 }
 
 async function _renderRoot(diskDir) {
@@ -576,40 +561,23 @@ function _attachBannerEvents(root) {
 
 // ── CSV Export ────────────────────────────────────────────────────────────────
 
-async function _udExportDirs(allUsers) {
-    if (!_currentDisk) return;
-    const btnId = allUsers ? '#ud-export-dirs-all' : '#ud-export-dirs-user';
-    const btn   = document.querySelector(btnId);
+async function _udExportDirs() {
+    if (!_currentDisk || !_selectedUser) return;
+    const btn = document.querySelector('#ud-export-dirs-user');
     
-    let usersToExport = [];
-    if (allUsers) {
-        const users = await _fetchUserList(_currentDisk);
-        usersToExport = [...new Set([...users, ..._otherUsers.map(o => o.name)])];
-    } else {
-        if (!_selectedUser) return;
-        usersToExport = [_selectedUser];
-    }
-
-    if (!usersToExport.length) return;
-
     const originalBtnHTML = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
 
     try {
         const headers = ['User', 'Path', 'Used (bytes)'];
-        const suggestedName = allUsers ? `all_dirs_${_currentDisk}` : `dirs_${_currentDisk}_${usersToExport[0]}`;
+        const suggestedName = `dirs_${_currentDisk}_${_selectedUser}`;
         const formatRow = (row, h) => ({ User: row.user, Path: row.path, 'Used (bytes)': row.used })[h] ?? '';
         
-        let uIdx = 0;
         let offset = 0;
         const limit = 5000;
+        const b64User = btoa(unescape(encodeURIComponent(_selectedUser)));
 
         const fetchChunk = async () => {
-            if (uIdx >= usersToExport.length) return null;
-
-            const uName = usersToExport[uIdx];
-            const b64User = btoa(unescape(encodeURIComponent(uName)));
-            
             const params = new URLSearchParams({ id: _currentDisk, type: 'dirs', user_b64: b64User, offset, limit });
             const res = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -620,24 +588,15 @@ async function _udExportDirs(allUsers) {
             if (json?.status !== 'success') throw new Error(json?.message || 'API error');
             
             const dirs = json.data.dir.dirs || [];
-            const rows = dirs.map(d => ({ user: uName, path: d.path, used: d.used }));
+            const rows = dirs.map(d => ({ user: _selectedUser, path: d.path, used: d.used }));
             
             const hasMore = json.data.dir.has_more && dirs.length > 0;
-            if (!hasMore) {
-                uIdx++;
-                offset = 0;
-            } else {
-                offset += limit;
-            }
+            offset += limit;
             
-            if (allUsers && rows.length > 0) {
-                updateProgressToast('export-dirs', Math.min(99, Math.round((uIdx / usersToExport.length) * 100)), `Streaming user ${uIdx}/${usersToExport.length}...`);
-            }
-            
-            return { rows, isLast: uIdx >= usersToExport.length && !hasMore };
+            return { rows, isLast: !hasMore };
         };
         
-        showProgressToast('export-dirs', allUsers ? 'Initializing export...' : 'Streaming directories...');
+        showProgressToast('export-dirs', 'Streaming directories...');
         const streamed = await streamExportGzip(suggestedName, headers, fetchChunk, formatRow);
         if (streamed) showToast('Export Complete', 'Exported directories directly to disk (.gz)', 'success');
         
@@ -649,40 +608,23 @@ async function _udExportDirs(allUsers) {
     }
 }
 
-async function _udExportFiles(allUsers) {
-    if (!_currentDisk) return;
-    const btnId = allUsers ? '#ud-export-files-all' : '#ud-export-files-user';
-    const btn   = document.querySelector(btnId);
-    
-    let usersToExport = [];
-    if (allUsers) {
-        const users = await _fetchUserList(_currentDisk);
-        usersToExport = [...new Set([...users, ..._otherUsers.map(o => o.name)])];
-    } else {
-        if (!_selectedUser) return;
-        usersToExport = [_selectedUser];
-    }
-
-    if (!usersToExport.length) return;
+async function _udExportFiles() {
+    if (!_currentDisk || !_selectedUser) return;
+    const btn = document.querySelector('#ud-export-files-user');
 
     const originalBtnHTML = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
 
     try {
         const headers = ['User', 'Path', 'Size (bytes)'];
-        const suggestedName = allUsers ? `all_files_${_currentDisk}` : `files_${_currentDisk}_${usersToExport[0]}`;
+        const suggestedName = `files_${_currentDisk}_${_selectedUser}`;
         const formatRow = (row, h) => ({ User: row.user, Path: row.path, 'Size (bytes)': row.size })[h] ?? '';
         
-        let uIdx = 0;
         let offset = 0;
         const limit = 5000;
+        const b64User = btoa(unescape(encodeURIComponent(_selectedUser)));
 
         const fetchChunk = async () => {
-            if (uIdx >= usersToExport.length) return null;
-
-            const uName = usersToExport[uIdx];
-            const b64User = btoa(unescape(encodeURIComponent(uName)));
-            
             const params = new URLSearchParams({ id: _currentDisk, type: 'files', user_b64: b64User, offset, limit });
             const res = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -693,24 +635,15 @@ async function _udExportFiles(allUsers) {
             if (json?.status !== 'success') throw new Error(json?.message || 'API error');
             
             const files = json.data.file.files || [];
-            const rows = files.map(f => ({ user: uName, path: f.path, size: f.size }));
+            const rows = files.map(f => ({ user: _selectedUser, path: f.path, size: f.size }));
             
             const hasMore = json.data.file.has_more && files.length > 0;
-            if (!hasMore) {
-                uIdx++;
-                offset = 0;
-            } else {
-                offset += limit;
-            }
+            offset += limit;
             
-            if (allUsers && rows.length > 0) {
-                updateProgressToast('export-files', Math.min(99, Math.round((uIdx / usersToExport.length) * 100)), `Streaming user ${uIdx}/${usersToExport.length}...`);
-            }
-            
-            return { rows, isLast: uIdx >= usersToExport.length && !hasMore };
+            return { rows, isLast: !hasMore };
         };
         
-        showProgressToast('export-files', allUsers ? 'Initializing export...' : 'Streaming files...');
+        showProgressToast('export-files', 'Streaming files...');
         const streamed = await streamExportGzip(suggestedName, headers, fetchChunk, formatRow);
         if (streamed) showToast('Export Complete', 'Exported files directly to disk (.gz)', 'success');
         
