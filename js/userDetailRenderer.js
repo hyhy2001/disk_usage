@@ -276,6 +276,49 @@ async function _fetchUserList(diskId) {
     return json?.data?.users || [];
 }
 
+async function _fetchAllDirs(diskId, user) {
+    let allDirs = [];
+    let offset = 0;
+    const limit = 5000;
+    const b64User = btoa(unescape(encodeURIComponent(user)));
+    while (true) {
+        const params = new URLSearchParams({ id: diskId, type: 'dirs', user_b64: b64User, offset, limit });
+        const res = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { throw new Error('Invalid JSON response'); } }
+        if (json?.status !== 'success') throw new Error(json?.message || 'API error');
+        const dirs = json.data.dir.dirs || [];
+        allDirs = allDirs.concat(dirs);
+        if (!json.data.dir.has_more || dirs.length === 0) break;
+        offset += limit;
+    }
+    return allDirs;
+}
+
+async function _fetchAllFiles(diskId, user) {
+    let allFiles = [];
+    let offset = 0;
+    const limit = 5000;
+    const b64User = btoa(unescape(encodeURIComponent(user)));
+    while (true) {
+        const params = new URLSearchParams({ id: diskId, type: 'files', user_b64: b64User, offset, limit });
+        const res = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { throw new Error('Invalid JSON response'); } }
+        if (json?.status !== 'success') throw new Error(json?.message || 'API error');
+        const files = json.data.file.files || [];
+        allFiles = allFiles.concat(files);
+        if (!json.data.file.has_more || files.length === 0) break;
+        offset += limit;
+    }
+    return allFiles;
+}
+
+
 // ── Core render ───────────────────────────────────────────────────────────────
 
 function _getRoot() { return document.getElementById('ud-root'); }
@@ -588,19 +631,21 @@ async function _udExportDirs(allUsers) {
         const headers = ['User', 'Path', 'Used (bytes)'];
 
         if (allUsers) {
-            // Fetch user list then all dirs
             const users = await _fetchUserList(_currentDisk);
-            const named = users.filter(u => u.name && u.name !== '');
-            const results = await Promise.all(
-                named.map(u => _fetchDir(_currentDisk, u.name, 0, 999999).catch(() => null))
-            );
-            named.forEach((u, i) => {
-                if (!results[i]?.dirs) return;
-                results[i].dirs.forEach(d => rows.push({ user: u.name, path: d.path, used: d.used }));
-            });
+            const named = typeof users[0] === 'string' ? users.map(u => ({name: u})) : users; // handle structure if needed
+            const validUsers = named.filter(u => u.name && u.name !== '');
+            for (const u of validUsers) {
+                if (btn) btn.textContent = `⏳ ${u.name}...`;
+                try {
+                    const dirs = await _fetchAllDirs(_currentDisk, u.name);
+                    dirs.forEach(d => rows.push({ user: u.name, path: d.path, used: d.used }));
+                } catch (e) {
+                    console.warn('Skipped export for dir ' + u.name, e);
+                }
+            }
         } else if (user) {
-            const dirData = await _fetchDir(_currentDisk, user, 0, 999999);
-            (dirData?.dirs || []).forEach(d => rows.push({ user, path: d.path, used: d.used }));
+            const dirs = await _fetchAllDirs(_currentDisk, user);
+            dirs.forEach(d => rows.push({ user, path: d.path, used: d.used }));
         }
 
         const csv = toCsv(headers, rows, (row, h) =>
@@ -627,14 +672,20 @@ async function _udExportFiles(allUsers) {
 
         if (allUsers) {
             const users = await _fetchUserList(_currentDisk);
-            const named = users.filter(u => u.name && u.name !== '');
-            for (const u of named) {
-                const fileData = await _fetchFilePage(_currentDisk, u.name, 0, 999999).catch(() => null);
-                (fileData?.files || []).forEach(f => rows.push({ user: u.name, path: f.path, size: f.size }));
+            const named = typeof users[0] === 'string' ? users.map(u => ({name: u})) : users; // handle structure if needed
+            const validUsers = named.filter(u => u.name && u.name !== '');
+            for (const u of validUsers) {
+                if (btn) btn.textContent = `⏳ ${u.name}...`;
+                try {
+                    const files = await _fetchAllFiles(_currentDisk, u.name);
+                    files.forEach(f => rows.push({ user: u.name, path: f.path, size: f.size }));
+                } catch (e) {
+                    console.warn('Skipped export for file ' + u.name, e);
+                }
             }
         } else if (user) {
-            const fileData = await _fetchFilePage(_currentDisk, user, 0, 999999);
-            (fileData?.files || []).forEach(f => rows.push({ user, path: f.path, size: f.size }));
+            const files = await _fetchAllFiles(_currentDisk, user);
+            files.forEach(f => rows.push({ user, path: f.path, size: f.size }));
         }
 
         const csv = toCsv(headers, rows, (row, h) =>

@@ -19,14 +19,14 @@ ob_start('ob_gzhandler');
 // =============================================================================
 
 function param($key, $default) {
+    if (isset($_POST[$key])) return $_POST[$key];
     return isset($_GET[$key]) ? $_GET[$key] : $default;
 }
 
 function get_b64_param($key, $default) {
     $b64_key = $key . '_b64';
-    if (isset($_GET[$b64_key])) {
-        return base64_decode($_GET[$b64_key]);
-    }
+    if (isset($_POST[$b64_key])) return base64_decode($_POST[$b64_key]);
+    if (isset($_GET[$b64_key])) return base64_decode($_GET[$b64_key]);
     return param($key, $default);
 }
 

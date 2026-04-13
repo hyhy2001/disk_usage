@@ -379,21 +379,42 @@ async function _exportCsv(useFilters, btn) {
     btn.textContent = '⏳ Loading…';
 
     try {
-        const params = new URLSearchParams({ id: _diskId, type: 'permissions', offset: 0, limit: 9999 });
-        if (useFilters) {
-            if (_activeUsers !== null && _activeUsers.size > 0) params.set('users', [..._activeUsers].join(','));
-            if (_itemType)   params.set('item_type', _itemType);
-            if (_pathSearch) params.set('path', _pathSearch);
+        let allItems = [];
+        let offset = 0;
+        const limit = 5000;
+        
+        while (true) {
+            btn.textContent = `⏳ Loading… (${allItems.length})`;
+            const params = new URLSearchParams({ id: _diskId, type: 'permissions', offset: offset, limit: limit });
+            
+            if (useFilters) {
+                if (_activeUsers !== null && _activeUsers.size > 0) params.set('users', [..._activeUsers].join(','));
+                if (_itemType)   params.set('item_type', _itemType);
+                if (_pathSearch) params.set('path', _pathSearch);
+            }
+            
+            const res  = await fetch('api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params.toString()
+            });
+            
+            const text = await res.text();
+            let json;
+            try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { throw new Error('Invalid JSON response'); } }
+
+            if (json?.status !== 'success') throw new Error(json?.message || 'API error');
+
+            const items = json.data.items || [];
+            allItems = allItems.concat(items);
+            
+            if (!json.data.has_more || items.length === 0) {
+                break;
+            }
+            offset += limit;
         }
-        const res  = await fetch('api.php?' + params.toString());
-        const text = await res.text();
-        let json;
-        try { json = JSON.parse(text); } catch { json = JSON.parse(atob(text)); }
 
-        if (json?.status !== 'success') throw new Error(json?.message || 'API error');
-
-        const items = json.data.items || [];
-        const csv   = toCsv(PERM_CSV_HEADERS, items, (row, h) => {
+        const csv   = toCsv(PERM_CSV_HEADERS, allItems, (row, h) => {
             const map = { User: 'user', Path: 'path', Type: 'type', Error: 'error' };
             return row[map[h]] ?? '';
         });
