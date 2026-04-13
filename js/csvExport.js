@@ -86,7 +86,7 @@ export async function streamExportGzip(filename, headers, fetchChunkCallback, fo
     let fileHandle;
     try {
         fileHandle = await window.showSaveFilePicker({
-            suggestedName: filename + '.gz',
+            suggestedName: filename + '.csv.gz',
             types: [{ description: 'GZIP Compressed CSV', accept: { 'application/gzip': ['.gz'] } }]
         });
     } catch (err) {

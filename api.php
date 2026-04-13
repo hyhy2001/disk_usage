@@ -628,6 +628,136 @@ if ($type === 'files') {
 }
 
 // =============================================================================
+// type=export_ud_dirs_zip / export_ud_files_zip — aggregated ZIP download
+// =============================================================================
+if ($type === 'export_ud_dirs_zip' || $type === 'export_ud_files_zip') {
+    set_time_limit(0);
+    $who_raw    = get_b64_param('users', 'all'); // can be "all" or "userA,userB"
+    $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
+    
+    if (!is_dir($detail_dir)) b64_error('No detail reports found.', 404);
+
+    $is_files = ($type === 'export_ud_files_zip');
+    $pattern  = $is_files ? '/(?:.*_)?detail_report_files?_(.+)\.json$/' : '/(?:.*_)?detail_report_dir_(.+)\.json$/';
+    
+    // Find valid users
+    $users_to_export = [];
+    $allowed = ($who_raw === 'all') ? null : array_map('trim', explode(',', $who_raw));
+    
+    $dh = @opendir($detail_dir);
+    $filesMap = []; // user => filepath
+    while ($dh && ($f = readdir($dh)) !== false) {
+        if (preg_match($pattern, $f, $m)) {
+            $u = $m[1];
+            if ($allowed === null || in_array($u, $allowed)) {
+                $users_to_export[] = $u;
+                $filesMap[$u] = $detail_dir . DIRECTORY_SEPARATOR . $f;
+            }
+        }
+    }
+    if ($dh) closedir($dh);
+
+    if (empty($users_to_export)) b64_error('No users found to export.', 404);
+    
+    // Create temp ZIP
+    $zipOutput = tempnam(sys_get_temp_dir(), 'export_zip_');
+    $zip = new ZipArchive();
+    if ($zip->open($zipOutput, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+        b64_error('Failed to create ZIP temp file', 500);
+    }
+    
+    $tmpFiles = [];
+    $MAX_ROWS = 500000;
+    $headers = $is_files ? ['User', 'Path', 'Size (bytes)'] : ['User', 'Path', 'Used (bytes)'];
+    
+    foreach ($users_to_export as $u) {
+        $fhInfo = @fopen($filesMap[$u], 'r');
+        if (!$fhInfo) continue;
+        
+        // Skip header
+        while (($ln = fgets($fhInfo)) !== false) {
+            if (strpos($ln, $is_files ? '"files"' : '"dirs"') !== false && strpos($ln, '[') !== false) break;
+        }
+        
+        $part = 1;
+        $rowCount = 0;
+        
+        $tmpCsv = tempnam(sys_get_temp_dir(), 'csv_');
+        $tmpFiles[] = $tmpCsv;
+        $fhCsv = fopen($tmpCsv, 'w');
+        fputs($fhCsv, "\xEF\xBB\xBF");
+        fputcsv($fhCsv, $headers);
+        
+        $depth = 0; $buf = '';
+        while (($ln = fgets($fhInfo)) !== false) {
+            $trimmed = trim($ln);
+            if ($trimmed === ']' || $trimmed === '];') break;
+            if ($trimmed === '' || $trimmed === '[') continue;
+            
+            $buf .= $ln;
+            $depth += substr_count($ln, '{') - substr_count($ln, '}');
+            
+            if ($depth <= 0 && ltrim($buf) !== '') {
+                $obj = @json_decode(rtrim(trim($buf), ','), true);
+                if ($obj !== null && is_array($obj)) {
+                    if ($is_files) {
+                        fputcsv($fhCsv, [$u, isset($obj['path']) ? $obj['path'] : '', isset($obj['size']) ? $obj['size'] : 0]);
+                    } else {
+                        fputcsv($fhCsv, [$u, isset($obj['path']) ? $obj['path'] : '', isset($obj['used']) ? $obj['used'] : 0]);
+                    }
+                    $rowCount++;
+                    
+                    if ($rowCount >= $MAX_ROWS) {
+                        fclose($fhCsv);
+                        $prefix = $id ? "{$id}_" : "";
+                        $tName = $is_files ? "files_{$prefix}{$u}_part{$part}.csv" : "dirs_{$prefix}{$u}_part{$part}.csv";
+                        $zip->addFile($tmpCsv, $tName);
+                        
+                        $part++;
+                        $rowCount = 0;
+                        $tmpCsv = tempnam(sys_get_temp_dir(), 'csv_');
+                        $tmpFiles[] = $tmpCsv;
+                        $fhCsv = fopen($tmpCsv, 'w');
+                        fputs($fhCsv, "\xEF\xBB\xBF");
+                        fputcsv($fhCsv, $headers);
+                    }
+                }
+                $buf = ''; $depth = 0;
+            }
+        }
+        fclose($fhInfo);
+        fclose($fhCsv);
+        
+        // Add remaining
+        if ($rowCount > 0 || $part === 1) {
+            $prefix = $id ? "{$id}_" : "";
+            $tName = $part === 1 
+                ? ($is_files ? "files_{$prefix}{$u}.csv" : "dirs_{$prefix}{$u}.csv")
+                : ($is_files ? "files_{$prefix}{$u}_part{$part}.csv" : "dirs_{$prefix}{$u}_part{$part}.csv");
+            $zip->addFile($tmpCsv, $tName);
+        }
+    }
+    
+    $zip->close();
+    
+    // Stream ZIP
+    header('Content-Type: application/zip');
+    $prefix = $id ? "{$id}_" : "";
+    $fn = $is_files ? "files_{$prefix}" . ($who_raw==='all'?'all_users':'export') . ".zip" : "dirs_{$prefix}" . ($who_raw==='all'?'all_users':'export') . ".zip";
+    header('Content-Disposition: attachment; filename="'.$fn.'"');
+    header('Content-Length: ' . filesize($zipOutput));
+    
+    // Clear PHP output buffer
+    if (ob_get_level()) ob_end_clean();
+    readfile($zipOutput);
+    
+    // Cleanup
+    @unlink($zipOutput);
+    foreach ($tmpFiles as $t) @unlink($t);
+    exit;
+}
+
+// =============================================================================
 // Default  — aggregate all disk usage report JSON files (plain JSON)
 // =============================================================================
 $dh    = @opendir($disk_path);

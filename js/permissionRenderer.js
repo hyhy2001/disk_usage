@@ -445,7 +445,7 @@ async function _exportCsv(useFilters, btn) {
         if (streamed) {
              if (!fetchError) showToast('Export Complete', 'Exported directly to .gz file', 'success');
              closeProgressToast(progId);
-             if (btn) { btn.disabled = false; btn.textContent = originalText; }
+             if (btn) { btn.disabled = false; btn.textContent = orig; }
              return;
         }
 

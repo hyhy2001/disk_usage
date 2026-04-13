@@ -182,8 +182,6 @@ function _renderSkeleton() {
 function _renderPicker(users, otherUsers) {
     const selectedLabel = _selectedUser || 'choose a user...';
 
-    // Merge all users into one flat sorted list
-    const otherNames = new Set(otherUsers.map(o => o.name));
     const allUsers = [
         ...users,
         ...otherUsers.map(o => o.name).filter(n => !users.includes(n)),
@@ -620,232 +618,152 @@ function _attachBannerEvents(root) {
 
 // ── CSV Export ────────────────────────────────────────────────────────────────
 
+async function _downloadBackendZip(type, users) {
+    if (!_currentDisk) return;
+    const progId = `export-zip-${Date.now()}`;
+    showProgressToast(progId, `Preparing Server-Side ZIP...`);
+    try {
+        const params = new URLSearchParams();
+        params.set('id', _currentDisk);
+        params.set('type', type);
+        params.set('users', users.join(','));
+
+        const res = await fetch('api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString()
+        });
+
+        if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(`Server error: ${txt}`);
+        }
+
+        const disp = res.headers.get('Content-Disposition');
+        let filename = 'export.zip';
+        if (disp && disp.includes('filename=')) {
+            filename = disp.split('filename=')[1].replace(/"/g, '');
+        }
+
+        updateProgressToast(progId, 50, 'Streaming ZIP to disk...');
+
+        // Stream straight to disk if possible
+        if (window.showSaveFilePicker) {
+            try {
+                const handle = await showSaveFilePicker({ suggestedName: filename });
+                const writable = await handle.createWritable();
+                await res.body.pipeTo(writable);
+                showToast('Success', 'ZIP downloaded directly to disk.', 'success');
+                closeProgressToast(progId);
+                return;
+            } catch(e) {
+                if (e.name !== 'AbortError') throw e;
+                closeProgressToast(progId);
+                return; // User aborted picker
+            }
+        }
+
+        // Fallback for Firefox/Safari
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        showToast('Success', 'ZIP download complete.', 'success');
+    } catch(e) {
+        showToast('Export Failed', e.message, 'error');
+    } finally {
+        closeProgressToast(progId);
+    }
+}
+
 async function _udExportDirs(allUsers) {
     if (!_currentDisk) return;
-    const user = allUsers ? null : _selectedUser;
     const btnId = allUsers ? '#ud-export-dirs-all' : '#ud-export-dirs-user';
     const btn   = document.querySelector(btnId);
+    
+    let usersToExport;
+    if (allUsers) {
+        usersToExport = ['all'];
+    } else {
+        if (!_selectedUser) return;
+        usersToExport = [_selectedUser];
+    }
+
     if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
 
     try {
-        const headers = ['User', 'Path', 'Used (bytes)'];
-        const suffix = allUsers ? 'all_users' : (user || 'unknown');
-        const suggestedName = `dirs_${_currentDisk}_${suffix}`;
-        const progId = `export-dirs-${Date.now()}`;
-
-        let validUsers = [];
-        if (allUsers) {
-            const users = await _fetchUserList(_currentDisk);
-            const named = typeof users[0] === 'string' ? users.map(u => ({name: u})) : users;
-            validUsers = named.filter(u => u.name && u.name !== '');
-        } else if (user) {
-            validUsers = [{ name: user }];
-        }
-
-        if (validUsers.length === 0) return;
-
-        showProgressToast(progId, 'Exporting User Directories');
-
-        let currentUserIdx = 0;
-        const formatRow = (row, h) =>
-            ({ User: row.user, Path: row.path, 'Used (bytes)': row.used })[h] ?? '';
-
-        const fetchChunk = async () => {
-            if (currentUserIdx >= validUsers.length) return null;
-            const u = validUsers[currentUserIdx];
-            currentUserIdx++;
+        if (usersToExport.length === 1 && usersToExport[0] !== 'all') {
+            // SINGLE USER: Fast streaming CSV (existing logic)
+            const headers = ['User', 'Path', 'Used (bytes)'];
+            const uName = usersToExport[0];
+            const suggestedName = `dirs_${_currentDisk}_${uName}`;
+            const formatRow = (row, h) => ({ User: row.user, Path: row.path, 'Used (bytes)': row.used })[h] ?? '';
+            let isDone = false;
             
-            const pct = (currentUserIdx / validUsers.length) * 100;
-            updateProgressToast(progId, pct, `User ${currentUserIdx} of ${validUsers.length}`);
-            if (btn) btn.textContent = `⏳ ${currentUserIdx}/${validUsers.length}`;
+            const fetchChunk = async () => {
+                if (isDone) return null;
+                isDone = true;
+                const dirs = await _fetchAllDirs(_currentDisk, uName);
+                return { rows: dirs.map(d => ({ user: uName, path: d.path, used: d.used })), isLast: true };
+            };
             
-            try {
-                const dirs = await _fetchAllDirs(_currentDisk, u.name);
-                const rows = dirs.map(d => ({ user: u.name, path: d.path, used: d.used }));
-                return { rows, isLast: (currentUserIdx >= validUsers.length) };
-            } catch (e) {
-                console.warn('Skipped export for dir ' + u.name, e);
-                return { rows: [], isLast: (currentUserIdx >= validUsers.length) };
-            }
-        };
-
-        // Try Native Streaming First
-        let streamed = false;
-        try {
-            streamed = await streamExportGzip(suggestedName, headers, fetchChunk, formatRow);
-        } catch(e) {
-            if (e.message !== 'AbortError') console.error(e);
-            streamed = true; // aborted, don't execute fallback
-        }
-
-        if (streamed) {
-             showToast('Export Complete', 'Exported directories directly to disk (.gz)', 'success');
-             closeProgressToast(progId);
-             if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> CSV' + (allUsers ? ' All' : ''); }
-             return;
-        }
-
-        // FALLBACK: ZIP Chunking
-        let allItems = [];
-        let zipFiles = [];
-        const MAX_ROWS = 500000;
-        let fileIndex = 1;
-        
-        currentUserIdx = 0; // reset
-        
-        while (true) {
-            const chunkData = await fetchChunk();
-            if (!chunkData) break;
-            
-            allItems = allItems.concat(chunkData.rows);
-            
-            while (allItems.length >= MAX_ROWS) {
-                const chunk = allItems.splice(0, MAX_ROWS);
-                const csv = toCsv(headers, chunk, formatRow);
-                zipFiles.push({ name: `${suggestedName}_part${fileIndex}.csv`, content: '\uFEFF' + csv });
-                fileIndex++;
-            }
-            if (chunkData.isLast) break;
-        }
-
-        if (allItems.length > 0) {
-            const csv = toCsv(headers, allItems, formatRow);
-            const filename = fileIndex === 1
-                ? `${suggestedName}.csv`
-                : `${suggestedName}_part${fileIndex}.csv`;
-            if (fileIndex === 1) {
-                downloadCsv(filename, csv);
-            } else {
-                zipFiles.push({ name: filename, content: '\uFEFF' + csv });
-            }
-        }
-        
-        if (zipFiles.length > 0) {
-            btn.textContent = '⏳ Compressing...';
-            updateProgressToast(progId, 100, 'Zipping file chunks...');
-            await downloadZip(`${suggestedName}.zip`, zipFiles);
-            showToast('Export Complete', 'Downloaded ZIP file.', 'success');
+            const streamed = await streamExportGzip(suggestedName, headers, fetchChunk, formatRow);
+            if (streamed) showToast('Export Complete', 'Exported directories directly to disk (.gz)', 'success');
+        } else {
+            // MULTIPLE USERS OR ALL: Server-side ZIP
+            await _downloadBackendZip('export_ud_dirs_zip', usersToExport);
         }
     } catch (err) {
-        alert('Export failed: ' + err.message);
+        if (err.name !== 'AbortError') alert('Export failed: ' + err.message);
     } finally {
-        const progId = `export-dirs-${Date.now()}`;
-        closeProgressToast(progId);
         if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> CSV' + (allUsers ? ' All' : ''); }
     }
 }
 
 async function _udExportFiles(allUsers) {
     if (!_currentDisk) return;
-    const user  = allUsers ? null : _selectedUser;
     const btnId = allUsers ? '#ud-export-files-all' : '#ud-export-files-user';
     const btn   = document.querySelector(btnId);
+    
+    let usersToExport;
+    if (allUsers) {
+        usersToExport = ['all'];
+    } else {
+        if (!_selectedUser) return;
+        usersToExport = [_selectedUser];
+    }
+
     if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
 
     try {
-        const headers = ['User', 'Path', 'Size (bytes)'];
-        const suffix = allUsers ? 'all_users' : (user || 'unknown');
-        const suggestedName = `files_${_currentDisk}_${suffix}`;
-        const progId = `export-files-${Date.now()}`;
-
-        let validUsers = [];
-        if (allUsers) {
-            const users = await _fetchUserList(_currentDisk);
-            const named = typeof users[0] === 'string' ? users.map(u => ({name: u})) : users;
-            validUsers = named.filter(u => u.name && u.name !== '');
-        } else if (user) {
-            validUsers = [{ name: user }];
-        }
-
-        if (validUsers.length === 0) return;
-
-        showProgressToast(progId, 'Exporting User Files');
-
-        let currentUserIdx = 0;
-        const formatRow = (row, h) =>
-            ({ User: row.user, Path: row.path, 'Size (bytes)': row.size })[h] ?? '';
-
-        const fetchChunk = async () => {
-            if (currentUserIdx >= validUsers.length) return null;
-            const u = validUsers[currentUserIdx];
-            currentUserIdx++;
+        if (usersToExport.length === 1 && usersToExport[0] !== 'all') {
+            // SINGLE USER: Fast streaming CSV
+            const headers = ['User', 'Path', 'Size (bytes)'];
+            const uName = usersToExport[0];
+            const suggestedName = `files_${_currentDisk}_${uName}`;
+            const formatRow = (row, h) => ({ User: row.user, Path: row.path, 'Size (bytes)': row.size })[h] ?? '';
+            let isDone = false;
             
-            const pct = (currentUserIdx / validUsers.length) * 100;
-            updateProgressToast(progId, pct, `User ${currentUserIdx} of ${validUsers.length}`);
-            if (btn) btn.textContent = `⏳ ${currentUserIdx}/${validUsers.length}`;
+            const fetchChunk = async () => {
+                if (isDone) return null;
+                isDone = true;
+                const files = await _fetchAllFiles(_currentDisk, uName);
+                return { rows: files.map(f => ({ user: uName, path: f.path, size: f.size })), isLast: true };
+            };
             
-            try {
-                const files = await _fetchAllFiles(_currentDisk, u.name);
-                const rows = files.map(f => ({ user: u.name, path: f.path, size: f.size }));
-                return { rows, isLast: (currentUserIdx >= validUsers.length) };
-            } catch (e) {
-                console.warn('Skipped export for file ' + u.name, e);
-                return { rows: [], isLast: (currentUserIdx >= validUsers.length) };
-            }
-        };
-
-        // Try Native Streaming First
-        let streamed = false;
-        try {
-            streamed = await streamExportGzip(suggestedName, headers, fetchChunk, formatRow);
-        } catch(e) {
-            if (e.message !== 'AbortError') console.error(e);
-            streamed = true; // aborted
-        }
-
-        if (streamed) {
-             showToast('Export Complete', 'Exported files directly to disk (.gz)', 'success');
-             closeProgressToast(progId);
-             if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> CSV' + (allUsers ? ' All' : ''); }
-             return;
-        }
-
-        // FALLBACK: ZIP Chunking
-        let allItems = [];
-        let zipFiles = [];
-        const MAX_ROWS = 500000;
-        let fileIndex = 1;
-        
-        currentUserIdx = 0; // reset
-        
-        while (true) {
-            const chunkData = await fetchChunk();
-            if (!chunkData) break;
-            
-            allItems = allItems.concat(chunkData.rows);
-            
-            while (allItems.length >= MAX_ROWS) {
-                const chunk = allItems.splice(0, MAX_ROWS);
-                const csv = toCsv(headers, chunk, formatRow);
-                zipFiles.push({ name: `${suggestedName}_part${fileIndex}.csv`, content: '\uFEFF' + csv });
-                fileIndex++;
-            }
-            if (chunkData.isLast) break;
-        }
-
-        if (allItems.length > 0) {
-            const csv = toCsv(headers, allItems, formatRow);
-            const filename = fileIndex === 1
-                ? `${suggestedName}.csv`
-                : `${suggestedName}_part${fileIndex}.csv`;
-            if (fileIndex === 1) {
-                downloadCsv(filename, csv);
-            } else {
-                zipFiles.push({ name: filename, content: '\uFEFF' + csv });
-            }
-        }
-        
-        if (zipFiles.length > 0) {
-            btn.textContent = '⏳ Compressing...';
-            updateProgressToast(progId, 100, 'Zipping chunks...');
-            await downloadZip(`${suggestedName}.zip`, zipFiles);
-            showToast('Export Complete', 'Downloaded ZIP file.', 'success');
+            const streamed = await streamExportGzip(suggestedName, headers, fetchChunk, formatRow);
+            if (streamed) showToast('Export Complete', 'Exported files directly to disk (.gz)', 'success');
+        } else {
+            // MULTIPLE USERS OR ALL: Server-side ZIP
+            await _downloadBackendZip('export_ud_files_zip', usersToExport);
         }
     } catch (err) {
-        alert('Export failed: ' + err.message);
+        if (err.name !== 'AbortError') alert('Export failed: ' + err.message);
     } finally {
-        // Needs a wildcard close if we lost the progId, but we don't, we can just select it
-        document.querySelectorAll('[id^="export-files-"]').forEach(el => closeProgressToast(el.id));
         if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> CSV' + (allUsers ? ' All' : ''); }
     }
 }
