@@ -168,8 +168,15 @@ class DataFetcher {
             }
             
             if (this._lastTeamData) {
-                const currentMode = localStorage.getItem('teamChartMode') || 'absolute';
-                this._renderTeamComparisonChart(this._lastTeamData, currentMode);
+                const storedMode = localStorage.getItem('teamChartViewMode') || 'absolute-linear';
+                let apiMode = 'linear';
+                if (storedMode === 'absolute-log') apiMode = 'logarithmic';
+                else if (storedMode === 'percent') apiMode = 'percent';
+                
+                // Add minor timeout to ensure DOM container is available over the race-condition sync flow
+                setTimeout(() => {
+                    this._renderTeamComparisonChart(this._lastTeamData, apiMode);
+                }, 50);
             }
         };
 
@@ -208,34 +215,64 @@ class DataFetcher {
     }
 
     _initTeamComparisonUI() {
-        const toggleBtn = document.getElementById('btn-chart-norm');
-        const toggleLbl = document.getElementById('lbl-chart-norm');
-        const iconNorm = document.getElementById('icon-chart-norm');
-        let currentMode = localStorage.getItem('teamChartMode') || 'absolute';
+        const btnSettings = document.getElementById('btn-chart-settings');
+        const settingsDropdown = document.getElementById('chart-settings-dropdown');
+        const modeItems = document.querySelectorAll('.chart-mode-item');
         
-        const updateBtnUI = () => {
-             if (toggleLbl) toggleLbl.textContent = currentMode === 'absolute' ? 'Absolute' : 'Percent (100%)';
-             if (iconNorm) {
-                 if (currentMode === 'percent') {
-                     toggleBtn.classList.add('active-sort-btn');
-                     iconNorm.innerHTML = '<rect x="3" y="14" width="18" height="8" rx="2" ry="2"/><rect x="3" y="2" width="18" height="8" rx="2" ry="2"/><line x1="8" y1="14" x2="8" y2="22"/><line x1="16" y1="14" x2="16" y2="22"/>'; 
-                 } else {
-                     toggleBtn.classList.remove('active-sort-btn');
-                     iconNorm.innerHTML = '<path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/>';
-                 }
-             }
-        };
-        updateBtnUI();
+        // Migrate old distinct settings to a unified setting if needed
+        let currentMode = localStorage.getItem('teamChartViewMode');
+        if (!currentMode) {
+            const currentScale = localStorage.getItem('teamChartScale') || 'linear';
+            const isPercent = localStorage.getItem('teamChartPercent') === 'true';
+            currentMode = isPercent ? 'percent' : (currentScale === 'logarithmic' ? 'absolute-log' : 'absolute-linear');
+            localStorage.setItem('teamChartViewMode', currentMode);
+        }
         
-        if (toggleBtn) {
-            toggleBtn.addEventListener('click', () => {
-                currentMode = currentMode === 'absolute' ? 'percent' : 'absolute';
-                localStorage.setItem('teamChartMode', currentMode);
-                updateBtnUI();
-                
-                if (this._lastTeamData) {
-                    this._renderTeamComparisonChart(this._lastTeamData, currentMode);
+        const updateUI = () => {
+            modeItems.forEach(item => {
+                if (item.dataset.mode === currentMode) {
+                    item.style.color = 'var(--text-primary)';
+                    item.style.background = 'var(--bg-surface-elevated)';
+                } else {
+                    item.style.color = 'var(--text-secondary)';
+                    item.style.background = 'transparent';
                 }
+            });
+            // Update the icon to reflect the currently active mode
+            if (btnSettings) {
+                const activeSvg = Array.from(modeItems).find(i => i.dataset.mode === currentMode)?.querySelector('svg')?.outerHTML;
+                if (activeSvg) btnSettings.innerHTML = activeSvg;
+            }
+        };
+        updateUI();
+        
+        if (btnSettings && settingsDropdown) {
+            btnSettings.addEventListener('click', (e) => {
+                e.stopPropagation();
+                settingsDropdown.style.display = settingsDropdown.style.display === 'none' ? 'block' : 'none';
+            });
+            
+            document.addEventListener('click', (e) => {
+                if (!btnSettings.contains(e.target) && !settingsDropdown.contains(e.target)) {
+                    settingsDropdown.style.display = 'none';
+                }
+            });
+            
+            modeItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    currentMode = item.dataset.mode;
+                    localStorage.setItem('teamChartViewMode', currentMode);
+                    settingsDropdown.style.display = 'none';
+                    updateUI();
+                    
+                    if (this._lastTeamData && window._teamCompChart) {
+                        let scale = 'linear';
+                        if (currentMode === 'absolute-log') scale = 'logarithmic';
+                        const apiMode = currentMode === 'percent' ? 'percent' : scale;
+                        this._renderTeamComparisonChart(this._lastTeamData, apiMode);
+                    }
+                });
             });
         }
     }
@@ -359,7 +396,8 @@ class DataFetcher {
                         }
                     },
                     y: {
-                        stacked: true,
+                        type: mode === 'logarithmic' ? 'logarithmic' : 'linear',
+                        stacked: mode !== 'logarithmic',
                         grid: { color: 'rgba(255,255,255,0.05)' },
                         ticks: {
                             callback: function(value) {
@@ -391,21 +429,21 @@ class DataFetcher {
             });
             
             insightsGrid.innerHTML = `
-                <div class="stat-card" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.03);">
+                <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 12px; border: var(--glass-border);">
                     <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Disks > 30% Used</div>
-                    <div style="font-size: 1.5rem; font-weight: 600; color: #10b981;">${count30}</div>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: var(--emerald-500, #10b981);">${count30}</div>
                 </div>
-                <div class="stat-card" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.03);">
+                <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 12px; border: var(--glass-border);">
                     <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Disks > 50% Used</div>
-                    <div style="font-size: 1.5rem; font-weight: 600; color: #3b82f6;">${count50}</div>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: var(--sky-500, #3b82f6);">${count50}</div>
                 </div>
-                <div class="stat-card" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.03);">
+                <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 12px; border: var(--glass-border);">
                     <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Disks > 70% Used</div>
-                    <div style="font-size: 1.5rem; font-weight: 600; color: #f59e0b;">${count70}</div>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: var(--amber-500, #f59e0b);">${count70}</div>
                 </div>
-                <div class="stat-card" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.03);">
+                <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 12px; border: var(--glass-border);">
                     <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Disks > 90% Used</div>
-                    <div style="font-size: 1.5rem; font-weight: 600; color: #f43f5e;">${count90}</div>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: var(--rose-500, #f43f5e);">${count90}</div>
                 </div>
             `;
         }
@@ -848,8 +886,7 @@ class DataFetcher {
 
         // Do not auto-select the disk unless restoring previous session
         if (!restoreDiskId) {
-            const currentTab = loadFilters().activePage || 'overview';
-            navigateTo(currentTab === 'detail' ? 'detail' : 'overview'); // ensure the overview chart blocks are shown or hidden appropriately
+            navigateTo('overview'); // Force overview because no specific disk is selected
 
             const sharedHeader = document.getElementById('shared-header');
             if (sharedHeader) sharedHeader.style.display = 'none';
@@ -865,10 +902,18 @@ class DataFetcher {
                 overviewEmpty.style.display = 'flex';
                 // Render the comparison chart
                 if (this._lastTeamData && this._lastTeamData.length > 0) {
-                    const savedMode = localStorage.getItem('teamChartMode') || 'absolute';
+                    let currentMode = localStorage.getItem('teamChartViewMode');
+                    if (!currentMode) {
+                        const savedScale = localStorage.getItem('teamChartScale') || 'linear';
+                        const isPercent = localStorage.getItem('teamChartPercent') === 'true';
+                        currentMode = isPercent ? 'percent' : (savedScale === 'logarithmic' ? 'absolute-log' : 'absolute-linear');
+                    }
+                    let apiMode = 'linear';
+                    if (currentMode === 'absolute-log') apiMode = 'logarithmic';
+                    else if (currentMode === 'percent') apiMode = 'percent';
                     // Need a small timeout to allow display:flex to compute layout before Chart.js takes over
                     setTimeout(() => {
-                        this._renderTeamComparisonChart(this._lastTeamData, savedMode);
+                        this._renderTeamComparisonChart(this._lastTeamData, apiMode);
                     }, 50);
                 }
             }

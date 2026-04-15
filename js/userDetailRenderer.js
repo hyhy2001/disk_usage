@@ -7,7 +7,7 @@ import { downloadCsv, downloadZip, streamExportGzip, toCsv }  from './csvExport.
 import { showToast, showProgressToast, updateProgressToast, closeProgressToast } from './main.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let _selectedUser   = null;
+let _selectedUser   = localStorage.getItem('ud_selected_user') || null;
 let _currentDisk    = null;
 let _abortCtrl      = null;
 let _otherUsers     = [];   // [{ name, used }] from snapshot
@@ -16,6 +16,8 @@ let _fileTotalPages = 1;    // total pages for file report
 let _dirPage        = 1;
 let _dirTotalPages  = 1;
 const FILE_PAGE     = 500;  // rows per page
+let _currentFilters = JSON.parse(localStorage.getItem('ud_filters') || 'null') || { query: '', ext: '', minSize: 0, maxSize: 0 };
+let _allUserNames   = [];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -39,6 +41,21 @@ function _shortPath(path, maxLen = 55) {
     return '\u2026/' + parts.slice(-3).join('/');
 }
 
+// Map a 0-100 linear slider value to an exponential byte size (up to ~100GB).
+function _sliderToSize(val) {
+    if (val <= 0) return 0;
+    const maxLog = Math.log(100 * 1024 * 1024 * 1024);
+    return Math.floor(Math.exp((val / 100) * maxLog));
+}
+
+// Convert a byte size back to the 0-100 slider value.
+function _sizeToSlider(size) {
+    if (size <= 0) return 0;
+    const maxLog = Math.log(100 * 1024 * 1024 * 1024);
+    const val = (Math.log(size) / maxLog) * 100;
+    return Math.min(100, Math.floor(val));
+}
+
 // ── Render helpers ────────────────────────────────────────────────────────────
 
 function _renderDirCard(dirData) {
@@ -49,7 +66,7 @@ function _renderDirCard(dirData) {
         const cls = parseFloat(pct) > 70 ? 'ud-fill-rose' : parseFloat(pct) > 40 ? 'ud-fill-amber' : 'ud-fill-sky';
         return `
         <div class="ud-path-row">
-            <div class="ud-path-name" title="${d.path}">${_shortPath(d.path)}</div>
+            <div class="ud-path-name" title="${d.path}" style="cursor: pointer;">${_shortPath(d.path)}</div>
             <div class="ud-path-bar-wrap" data-tooltip="${fmt(d.used)} · ${pct}% of user total">
                 <div class="ud-path-bar-fill ${cls}" style="width:${pct}%"></div>
             </div>
@@ -71,7 +88,7 @@ function _renderDirCard(dirData) {
             </span>
             <div class="ud-card-actions">
                 <span class="ud-card-badge" id="ud-dir-badge">${badge}</span>
-                <button class="ud-export-btn" id="ud-export-dirs-user" data-tooltip="Download this user's top directories as CSV">
+                <button class="ud-export-btn" id="ud-export-dirs-user" data-tooltip="Export filtered directories to CSV">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     CSV
                 </button>
@@ -140,7 +157,7 @@ function _renderFileCard(fileData) {
         return `
         <div class="ud-path-row">
             <span class="ud-ext-badge" style="background:${clr}20;color:${clr}">.${ext}</span>
-            <div class="ud-path-name" title="${f.path}">${_shortPath(f.path)}</div>
+            <div class="ud-path-name" title="${f.path}" style="cursor: pointer;">${_shortPath(f.path)}</div>
             <div class="ud-path-bar-wrap" data-tooltip="${fmt(f.size)} · ${pct}% of page total">
                 <div class="ud-path-bar-fill ud-fill-emerald" style="width:${pct}%"></div>
             </div>
@@ -157,7 +174,7 @@ function _renderFileCard(fileData) {
             </span>
             <div class="ud-card-actions">
                 <span class="ud-card-badge" id="ud-file-badge">${badge}</span>
-                <button class="ud-export-btn" id="ud-export-files-user" data-tooltip="Download this user's largest files as CSV">
+                <button class="ud-export-btn" id="ud-export-files-user" data-tooltip="Export filtered files to CSV">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     CSV
                 </button>
@@ -179,37 +196,6 @@ function _renderSkeleton() {
     </div>`;
 }
 
-function _renderPicker(users, otherUsers) {
-    const selectedLabel = _selectedUser || 'choose a user...';
-
-    const allUsers = [
-        ...users,
-        ...otherUsers.map(o => o.name).filter(n => !users.includes(n)),
-    ].sort((a, b) => a.localeCompare(b));
-
-    const opts = allUsers.map(name =>
-        `<div class="ud-dropdown-option${name === _selectedUser ? ' selected' : ''}" data-value="${name}">${name}</div>`
-    ).join('');
-
-    return `
-    <div class="ud-picker-wrap glass-panel">
-        <span class="ud-picker-label">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            Select User
-        </span>
-        <div class="ud-dropdown" id="ud-dropdown">
-            <button class="ud-dropdown-btn" id="ud-dropdown-btn" aria-haspopup="listbox" aria-expanded="false">
-                <span class="ud-dropdown-btn-text${_selectedUser ? '' : ' placeholder'}" id="ud-dropdown-label">${selectedLabel}</span>
-                <svg class="ud-dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-            </button>
-            <div class="ud-dropdown-list" id="ud-dropdown-list" role="listbox">
-                <input class="ud-dropdown-search" id="ud-dropdown-search" placeholder="Search user..." autocomplete="off">
-                <div id="ud-dropdown-options">${opts}</div>
-            </div>
-        </div>
-        <span class="ud-picker-hint">${allUsers.length} users available</span>
-    </div>`;
-}
 
 function _renderEmptyState() {
     return `
@@ -226,14 +212,451 @@ function _renderError(msg) {
     return `<div class="ud-error">${msg}</div>`;
 }
 
+function _formatBytesForInput(bytes) {
+    if (!bytes || bytes === 0) return { val: '', unit: 'MB' };
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+    let v = bytes;
+    while (v >= 1024 && i < units.length - 1 && v % 1024 === 0) {
+        v /= 1024;
+        i++;
+    }
+    return { val: v, unit: units[i] };
+}
+
+function _renderFilterBar() {
+    // Count active advanced filters
+    let activeAdv = 0;
+    if (_currentFilters.ext !== '') activeAdv++;
+    if (_currentFilters.minSize > 0) activeAdv++;
+    if (_currentFilters.maxSize > 0) activeAdv++;
+    const badgeHtml = activeAdv > 0 ? `<span style="background:var(--sky-500); color:#fff; border-radius:50%; width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">${activeAdv}</span>` : '';
+    const minSizePair = _formatBytesForInput(_currentFilters.minSize);
+    const maxSizePair = _formatBytesForInput(_currentFilters.maxSize);
+
+    const selectedLabel = _selectedUser || 'Select User...';
+    const opts = _allUserNames.map(name =>
+        `<div class="ud-dropdown-option${name === _selectedUser ? ' selected' : ''}" data-value="${name}">${name}</div>`
+    ).join('');
+    
+    const totalUsers = _allUserNames.length;
+
+    return `
+    <div style="display: flex; flex-wrap: wrap; gap: 6px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-surface); padding: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); align-items: stretch; position: relative; z-index: 50;">
+        
+        <!-- Total Users Count -->
+        <div style="display: flex; align-items: center; padding: 0 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); border-right: 1px solid var(--border-color); margin-right: 4px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; color: var(--sky-500);"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            ${totalUsers} Users
+        </div>
+
+        <!-- User Picker -->
+        <div style="position: relative; display: flex; align-items: center; min-width: 180px;" id="ud-picker-container">
+            <div class="ud-dropdown" id="ud-dropdown" style="width: 100%;">
+                <button class="ud-dropdown-btn" id="ud-dropdown-btn" aria-haspopup="listbox" aria-expanded="false" style="height: 34px; padding: 0 10px; border-radius: 6px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.85rem; width: 100%; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
+                        <span class="ud-dropdown-btn-text${_selectedUser ? '' : ' placeholder'}" id="ud-dropdown-label" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; font-weight: 600;">${selectedLabel}</span>
+                    </div>
+                    <svg class="ud-dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="ud-dropdown-list" id="ud-dropdown-list" role="listbox" style="top: calc(100% + 4px); background: var(--bg-surface); border: 1px solid var(--border-color); box-shadow: 0 10px 40px rgba(0,0,0,0.5); backdrop-filter: none;">
+                    <input class="ud-dropdown-search" id="ud-dropdown-search" placeholder="Search user..." autocomplete="off" style="background: var(--bg-surface); color: var(--text-primary);">
+                    <div id="ud-dropdown-options" style="background: var(--bg-surface);">${opts}</div>
+                </div>
+            </div>
+        </div>
+
+        <div style="width: 1px; background: var(--border-color); margin: 6px 4px;"></div>
+
+        <!-- Search Input -->
+        <div style="flex: 1; min-width: 250px; position: relative; display: flex; align-items: stretch;">
+            <div id="ud-filter-query-container" style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; min-height: 34px; max-height: 85px; overflow-y: auto; padding: 4px 12px 4px 34px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-elevated); cursor: text;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 12px; top: 10px; color: var(--text-muted); pointer-events: none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="ud-filter-query-input" placeholder="Search (comma or tab)..." style="flex: 1; border: none; background: transparent; color: var(--text-primary); font-size: 0.85rem; outline: none; min-width: 120px;">
+                <input type="hidden" id="ud-filter-query" value="${_currentFilters.query}">
+            </div>
+        </div>
+        
+        <!-- Advanced Filters Dropdown -->
+        <div style="position: relative; display: flex; align-items: center;">
+            <button id="ud-filter-options-btn" class="ud-export-btn" style="height: 34px; gap: 6px;" title="Advanced Filters">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                Filters ${badgeHtml}
+            </button>
+            <div id="ud-filter-options-dropdown" style="display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 260px; padding: 16px; flex-direction: column; gap: 16px; z-index: 100; box-shadow: 0 10px 40px rgba(0,0,0,0.5); border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-surface); backdrop-filter: none;">
+                
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">File Extension</label>
+                    <div id="ud-filter-ext-container" style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; min-height: 34px; max-height: 85px; overflow-y: auto; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-elevated); cursor: text;">
+                        <input type="text" id="ud-filter-ext-input" placeholder="e.g. csv, log" style="flex: 1; border: none; background: transparent; color: var(--text-primary); font-size: 0.85rem; outline: none; min-width: 100px;">
+                        <input type="hidden" id="ud-filter-ext" value="${_currentFilters.ext}">
+                    </div>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Minimum Size</label>
+                    <div style="display: flex; flex-direction: row; gap: 4px; align-items: stretch; height: 34px;">
+                        <input type="number" id="ud-filter-min-size-val" value="${minSizePair.val}" min="0" placeholder="0" style="flex: 1; min-width: 0; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-primary); font-size: 0.85rem;" autocomplete="off">
+                        <select id="ud-filter-min-size-unit" style="width: 60px; padding: 4px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-primary); font-size: 0.85rem; outline: none; cursor: pointer;">
+                            <option value="B" ${minSizePair.unit === 'B' ? 'selected' : ''}>B</option>
+                            <option value="KB" ${minSizePair.unit === 'KB' ? 'selected' : ''}>KB</option>
+                            <option value="MB" ${minSizePair.unit === 'MB' ? 'selected' : ''}>MB</option>
+                            <option value="GB" ${minSizePair.unit === 'GB' ? 'selected' : ''}>GB</option>
+                            <option value="TB" ${minSizePair.unit === 'TB' ? 'selected' : ''}>TB</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Maximum Size</label>
+                    <div style="display: flex; flex-direction: row; gap: 4px; align-items: stretch; height: 34px;">
+                        <input type="number" id="ud-filter-max-size-val" value="${maxSizePair.val}" min="0" placeholder="0" style="flex: 1; min-width: 0; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-primary); font-size: 0.85rem;" autocomplete="off">
+                        <select id="ud-filter-max-size-unit" style="width: 60px; padding: 4px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-primary); font-size: 0.85rem; outline: none; cursor: pointer;">
+                            <option value="B" ${maxSizePair.unit === 'B' ? 'selected' : ''}>B</option>
+                            <option value="KB" ${maxSizePair.unit === 'KB' ? 'selected' : ''}>KB</option>
+                            <option value="MB" ${maxSizePair.unit === 'MB' ? 'selected' : ''}>MB</option>
+                            <option value="GB" ${maxSizePair.unit === 'GB' ? 'selected' : ''}>GB</option>
+                            <option value="TB" ${maxSizePair.unit === 'TB' ? 'selected' : ''}>TB</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="width: 1px; background: var(--border-color); margin: 6px 4px;"></div>
+        
+        <div style="display: flex; gap: 6px; align-items: center;">
+            <button id="ud-filter-apply" class="ud-export-btn" style="height: 34px; background: var(--sky-500, #3b82f6); color: #fff; border-color: var(--sky-500, #3b82f6);">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Apply
+            </button>
+            <button id="ud-filter-reset" class="ud-export-btn" style="height: 34px;" title="Reset Filters">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                Reset
+            </button>
+            
+            <div style="width: 1px; height: 22px; background: var(--border-color); margin: 0 2px;"></div>
+            
+            <button id="ud-filter-import" class="ud-export-btn" data-tooltip="Import search config" aria-label="Import Config" style="height: 34px; padding: 0 8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </button>
+            <button id="ud-filter-export" class="ud-export-btn" data-tooltip="Export search config" aria-label="Export Config" style="height: 34px; padding: 0 8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+            <input type="file" id="ud-filter-file-input" accept=".json" style="display: none;">
+        </div>
+    </div>`;
+}
+
+function _attachFilterEvents(contentEl, root) {
+    const applyBtn = contentEl.querySelector('#ud-filter-apply');
+    const resetBtn = contentEl.querySelector('#ud-filter-reset');
+    const qInput = contentEl.querySelector('#ud-filter-query');
+    const extInput = contentEl.querySelector('#ud-filter-ext');
+    const minSizeValInput = contentEl.querySelector('#ud-filter-min-size-val');
+    const minSizeUnitInput = contentEl.querySelector('#ud-filter-min-size-unit');
+    const maxSizeValInput = contentEl.querySelector('#ud-filter-max-size-val');
+    const maxSizeUnitInput = contentEl.querySelector('#ud-filter-max-size-unit');
+    const importBtn = contentEl.querySelector('#ud-filter-import');
+    const exportBtn = contentEl.querySelector('#ud-filter-export');
+    const fileInput = contentEl.querySelector('#ud-filter-file-input');
+    
+    const optionsBtn = contentEl.querySelector('#ud-filter-options-btn');
+    const optionsDropdown = contentEl.querySelector('#ud-filter-options-dropdown');
+
+    // User Picker elements
+    const userBtn     = contentEl.querySelector('#ud-dropdown-btn');
+    const userList    = contentEl.querySelector('#ud-dropdown-list');
+    const userLabel   = contentEl.querySelector('#ud-dropdown-label');
+    const userSearch  = contentEl.querySelector('#ud-dropdown-search');
+    const userOptions = contentEl.querySelector('#ud-dropdown-options');
+
+    if (userBtn && userList) {
+        const openUser  = () => { userBtn.classList.add('open'); userList.classList.add('visible'); userBtn.setAttribute('aria-expanded', 'true'); userSearch?.focus(); };
+        const closeUser = () => { userBtn.classList.remove('open'); userList.classList.remove('visible'); userBtn.setAttribute('aria-expanded', 'false'); if (userSearch) userSearch.value = ''; _filterUserOptions(''); };
+        const toggleUser = () => userList.classList.contains('visible') ? closeUser() : openUser();
+
+        userBtn.addEventListener('click', e => { e.stopPropagation(); toggleUser(); });
+
+        const _filterUserOptions = (q) => {
+            userOptions?.querySelectorAll('.ud-dropdown-option').forEach(el => {
+                el.classList.toggle('hidden', q.length > 0 && !el.dataset.value.toLowerCase().includes(q.toLowerCase()));
+            });
+        };
+        userSearch?.addEventListener('input', e => _filterUserOptions(e.target.value));
+
+        userOptions?.addEventListener('click', e => {
+            const opt = e.target.closest('.ud-dropdown-option');
+            if (!opt) return;
+            const user = opt.dataset.value;
+            userOptions.querySelectorAll('.ud-dropdown-option').forEach(el => el.classList.remove('selected'));
+            opt.classList.add('selected');
+            if (userLabel) { userLabel.textContent = user; userLabel.classList.remove('placeholder'); }
+            closeUser();
+            
+            // Allow the user to keep the filter if they switch!
+            // Just update selected user state and render.
+            localStorage.setItem('ud_selected_user', user);
+            _loadAndRender(user);
+        });
+        
+        // Escape keyboard close
+        userList.addEventListener('keydown', e => { if (e.key === 'Escape') closeUser(); });
+    }
+
+
+    const setupBadgeInput = (containerId, inputId, hiddenId) => {
+        const container = contentEl.querySelector('#' + containerId);
+        const input = contentEl.querySelector('#' + inputId);
+        const hidden = contentEl.querySelector('#' + hiddenId);
+        if (!container || !input || !hidden) return;
+
+        const updateHidden = () => {
+            const badges = Array.from(container.querySelectorAll('.ud-badge')).map(b => b.dataset.val);
+            hidden.value = badges.join(',');
+        };
+
+        const addBadge = (val) => {
+            val = val.trim();
+            if (!val) return;
+            const existing = Array.from(container.querySelectorAll('.ud-badge')).map(b => b.dataset.val);
+            if (existing.includes(val)) return;
+
+            const badge = document.createElement('div');
+            badge.className = 'ud-badge';
+            badge.dataset.val = val;
+            badge.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; background: var(--sky-500); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: 500; cursor: default;';
+            badge.innerHTML = `<span>${val}</span><svg class="ud-badge-rm" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor: pointer; margin-left: 2px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+            
+            badge.querySelector('.ud-badge-rm').addEventListener('click', (e) => {
+                e.stopPropagation();
+                badge.remove();
+                updateHidden();
+                input.focus();
+            });
+
+            container.insertBefore(badge, input);
+            updateHidden();
+        };
+
+        if (hidden.value) hidden.value.split(',').forEach(addBadge);
+
+        container.addEventListener('click', () => input.focus());
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === ',' || e.key === 'Enter' || e.key === 'Tab') {
+                if (input.value.trim() !== '') {
+                    e.preventDefault();
+                    addBadge(input.value);
+                    input.value = '';
+                } else if (e.key === 'Enter') {
+                    // Let it submit via applyBtn if there's no text left
+                    applyBtn?.click();
+                }
+            } else if (e.key === 'Backspace' && input.value === '') {
+                const badges = container.querySelectorAll('.ud-badge');
+                if (badges.length > 0) {
+                    badges[badges.length - 1].remove();
+                    updateHidden();
+                }
+            }
+        });
+
+        input.addEventListener('blur', () => {
+            if (input.value.trim()) {
+                addBadge(input.value);
+                input.value = '';
+            }
+        });
+    };
+
+    setupBadgeInput('ud-filter-query-container', 'ud-filter-query-input', 'ud-filter-query');
+    setupBadgeInput('ud-filter-ext-container', 'ud-filter-ext-input', 'ud-filter-ext');
+
+    if (optionsBtn && optionsDropdown) {
+        optionsBtn.addEventListener('click', (e) => {
+            optionsDropdown.style.display = optionsDropdown.style.display === 'none' ? 'flex' : 'none';
+            e.stopPropagation();
+        });
+        optionsDropdown.addEventListener('click', e => e.stopPropagation());
+    }
+
+    // click outside to close dropdowns
+    const closeDropdowns = (e) => {
+        // Advanced Filters
+        if (optionsDropdown && optionsDropdown.style.display !== 'none' && !e.target.closest('#ud-filter-options-btn') && !e.target.closest('#ud-filter-options-dropdown')) {
+            optionsDropdown.style.display = 'none';
+        }
+        // User Picker
+        if (userList && userList.classList.contains('visible') && !e.target.closest('#ud-picker-container')) {
+            userBtn.classList.remove('open');
+            userList.classList.remove('visible');
+            userBtn.setAttribute('aria-expanded', 'false');
+            if (userSearch) userSearch.value = '';
+        }
+    };
+    document.removeEventListener('click', contentEl._filterOuterClick);
+    contentEl._filterOuterClick = closeDropdowns;
+    document.addEventListener('click', closeDropdowns);
+
+    if (applyBtn) {
+        applyBtn.addEventListener('click', () => {
+            // Flush any unsubmitted text in visible inputs into badges first
+            const qVisibleInput = contentEl.querySelector('#ud-filter-query-input');
+            const extVisibleInput = contentEl.querySelector('#ud-filter-ext-input');
+            if (qVisibleInput && qVisibleInput.value.trim()) {
+                // programmatically add the badge by dispatching comma
+                const event = new KeyboardEvent('keydown', { key: ',', bubbles: true });
+                qVisibleInput.dispatchEvent(event);
+                if (qVisibleInput.value.trim()) {
+                    // fallback if badge wasn't created
+                    const container = contentEl.querySelector('#ud-filter-query-container');
+                    const hidden = contentEl.querySelector('#ud-filter-query');
+                    if (container && hidden) {
+                        const existingVals = Array.from(container.querySelectorAll('.ud-badge')).map(b => b.dataset.val);
+                        const newVal = qVisibleInput.value.trim();
+                        if (newVal && !existingVals.includes(newVal)) {
+                            const b = document.createElement('div');
+                            b.className = 'ud-badge';
+                            b.dataset.val = newVal;
+                            b.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; background: var(--sky-500); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: 500; cursor: default;';
+                            b.innerHTML = `<span>${newVal}</span><svg class="ud-badge-rm" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor: pointer; margin-left: 2px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+                            b.querySelector('.ud-badge-rm').addEventListener('click', (ev) => { ev.stopPropagation(); b.remove(); const badges = Array.from(container.querySelectorAll('.ud-badge')).map(x => x.dataset.val); hidden.value = badges.join(','); });
+                            container.insertBefore(b, qVisibleInput);
+                            const allBadges = Array.from(container.querySelectorAll('.ud-badge')).map(x => x.dataset.val);
+                            hidden.value = allBadges.join(',');
+                        }
+                        qVisibleInput.value = '';
+                    }
+                }
+            }
+            if (extVisibleInput && extVisibleInput.value.trim()) {
+                const container = contentEl.querySelector('#ud-filter-ext-container');
+                const hidden = contentEl.querySelector('#ud-filter-ext');
+                if (container && hidden) {
+                    const existingVals = Array.from(container.querySelectorAll('.ud-badge')).map(b => b.dataset.val);
+                    const newVal = extVisibleInput.value.trim();
+                    if (newVal && !existingVals.includes(newVal)) {
+                        const b = document.createElement('div');
+                        b.className = 'ud-badge';
+                        b.dataset.val = newVal;
+                        b.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; background: var(--sky-500); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: 500; cursor: default;';
+                        b.innerHTML = `<span>${newVal}</span><svg class="ud-badge-rm" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor: pointer; margin-left: 2px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+                        b.querySelector('.ud-badge-rm').addEventListener('click', (ev) => { ev.stopPropagation(); b.remove(); const badges = Array.from(container.querySelectorAll('.ud-badge')).map(x => x.dataset.val); hidden.value = badges.join(','); });
+                        container.insertBefore(b, extVisibleInput);
+                        const allBadges = Array.from(container.querySelectorAll('.ud-badge')).map(x => x.dataset.val);
+                        hidden.value = allBadges.join(',');
+                    }
+                    extVisibleInput.value = '';
+                }
+            }
+
+            _currentFilters.query = qInput.value.trim();
+            _currentFilters.ext = extInput.value.trim();
+            
+            const minSizeVal = parseFloat(minSizeValInput.value) || 0;
+            let minSizeBytes = minSizeVal;
+            if (minSizeUnitInput.value === 'KB') minSizeBytes *= 1024;
+            else if (minSizeUnitInput.value === 'MB') minSizeBytes *= 1024 ** 2;
+            else if (minSizeUnitInput.value === 'GB') minSizeBytes *= 1024 ** 3;
+            else if (minSizeUnitInput.value === 'TB') minSizeBytes *= 1024 ** 4;
+            
+            const maxSizeVal = parseFloat(maxSizeValInput.value) || 0;
+            let maxSizeBytes = maxSizeVal;
+            if (maxSizeUnitInput.value === 'KB') maxSizeBytes *= 1024;
+            else if (maxSizeUnitInput.value === 'MB') maxSizeBytes *= 1024 ** 2;
+            else if (maxSizeUnitInput.value === 'GB') maxSizeBytes *= 1024 ** 3;
+            else if (maxSizeUnitInput.value === 'TB') maxSizeBytes *= 1024 ** 4;
+            
+            _currentFilters.minSize = Math.floor(minSizeBytes);
+            _currentFilters.maxSize = Math.floor(maxSizeBytes);
+            
+            localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
+
+            if (optionsDropdown) optionsDropdown.style.display = 'none';
+            if (_selectedUser) _loadAndRender(_selectedUser);
+        });
+    }
+    
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            _currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0 };
+            localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
+            qInput.value = '';
+            extInput.value = '';
+            
+            // clear visual badges
+            contentEl.querySelectorAll('.ud-badge').forEach(b => b.remove());
+            const qInputEl = contentEl.querySelector('#ud-filter-query-input');
+            const extInputEl = contentEl.querySelector('#ud-filter-ext-input');
+            if (qInputEl) qInputEl.value = '';
+            if (extInputEl) extInputEl.value = '';
+
+            if (minSizeValInput) minSizeValInput.value = '';
+            if (minSizeUnitInput) minSizeUnitInput.value = 'MB';
+            if (maxSizeValInput) maxSizeValInput.value = '';
+            if (maxSizeUnitInput) maxSizeUnitInput.value = 'MB';
+
+            if (optionsDropdown) optionsDropdown.style.display = 'none';
+            if (_selectedUser) _loadAndRender(_selectedUser);
+        });
+    }
+
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(_currentFilters, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", `search_config.json`);
+            document.body.appendChild(dlAnchorElem);
+            dlAnchorElem.click();
+            dlAnchorElem.remove();
+        });
+    }
+
+    if (importBtn && fileInput) {
+        importBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (parsed.query !== undefined) _currentFilters.query = parsed.query;
+                    if (parsed.ext !== undefined) _currentFilters.ext = parsed.ext;
+                    if (parsed.minSize !== undefined) _currentFilters.minSize = parsed.minSize;
+                    if (parsed.maxSize !== undefined) _currentFilters.maxSize = parsed.maxSize;
+                    localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
+                    if (_selectedUser) _loadAndRender(_selectedUser);
+                } catch (err) {
+                    alert('Invalid JSON config file');
+                }
+            };
+            reader.readAsText(file);
+            fileInput.value = ''; // Reset
+        });
+    }
+
+    const qInputEl = contentEl.querySelector('#ud-filter-query-input');
+    const extInputEl = contentEl.querySelector('#ud-filter-ext-input');
+    const onEnter = (e) => { if (e.key === 'Enter') applyBtn?.click(); };
+    qInputEl?.addEventListener('keydown', onEnter);
+    extInputEl?.addEventListener('keydown', onEnter);
+}
+
 // ── API fetch ─────────────────────────────────────────────────────────────────
 
 async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE) {
     if (_abortCtrl) _abortCtrl.abort();
     _abortCtrl = new AbortController();
     const b64User = btoa(unescape(encodeURIComponent(user)));
-    const url = `api.php?id=${encodeURIComponent(diskId)}&type=dirs&user_b64=${encodeURIComponent(b64User)}&offset=${offset}&limit=${limit}`;
-    const res = await fetch(url, { signal: _abortCtrl.signal });
+    let url = `api.php?id=${encodeURIComponent(diskId)}&type=dirs&user_b64=${encodeURIComponent(b64User)}&offset=${offset}&limit=${limit}`;
+    if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
+    if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
+    if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
+
+    const res = await fetch(url + `&_t=${Date.now()}`, { signal: _abortCtrl.signal, cache: 'no-store' });
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     const text = await res.text();
     let json;
@@ -244,8 +667,13 @@ async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE) {
 
 async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE) {
     const b64User = btoa(unescape(encodeURIComponent(user)));
-    const url = `api.php?id=${encodeURIComponent(diskId)}&type=files&user_b64=${encodeURIComponent(b64User)}&offset=${offset}&limit=${limit}`;
-    const res = await fetch(url);
+    let url = `api.php?id=${encodeURIComponent(diskId)}&type=files&user_b64=${encodeURIComponent(b64User)}&offset=${offset}&limit=${limit}`;
+    if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
+    if (_currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
+    if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
+    if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
+
+    const res = await fetch(url + `&_t=${Date.now()}`, { cache: 'no-store' });
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     const text = await res.text();
     let json;
@@ -279,8 +707,14 @@ async function _loadAndRender(user) {
     _dirPage        = 1;
     _dirTotalPages  = 1;
 
-    const contentEl = root.querySelector('#ud-content');
-    if (contentEl) contentEl.innerHTML = _renderSkeleton();
+    const toolbar = root.querySelector('#ud-unified-toolbar');
+    if (toolbar) {
+        toolbar.innerHTML = _renderFilterBar();
+        _attachFilterEvents(toolbar, root);
+    }
+
+    const contentBody = root.querySelector('#ud-content-body');
+    if (contentBody) contentBody.innerHTML = _renderSkeleton();
 
     try {
         const [dirData, fileData] = await Promise.all([
@@ -290,18 +724,19 @@ async function _loadAndRender(user) {
         _fileTotalPages = Math.max(1, Math.ceil((fileData.total_files ?? fileData.files.length) / FILE_PAGE));
         _dirTotalPages  = Math.max(1, Math.ceil((dirData.total_dirs ?? dirData.dirs.length) / FILE_PAGE));
 
-        if (contentEl) {
-            contentEl.innerHTML = `<div class="ud-grid">
-                ${_renderDirCard(dirData)}
-                ${_renderFileCard(fileData)}
-            </div>`;
-            _attachContentEvents(contentEl, root);
+        if (contentBody) {
+            contentBody.innerHTML = `
+                <div class="ud-grid">
+                    ${_renderDirCard(dirData)}
+                    ${_renderFileCard(fileData)}
+                </div>`;
+            _attachContentEvents(contentBody, root);
         }
     } catch (err) {
         if (err.name === 'AbortError') return;
         const otherUser = _otherUsers.find(o => o.name === user);
         if (otherUser && err.status === 404) {
-            if (contentEl) contentEl.innerHTML = `
+            if (contentBody) contentBody.innerHTML = `
                 <div class="ud-empty-state">
                     <div class="ud-empty-icon">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -311,7 +746,7 @@ async function _loadAndRender(user) {
                     <p class="ud-no-report-hint">No detailed breakdown available for this user.</p>
                 </div>`;
         } else {
-            if (contentEl) contentEl.innerHTML = _renderError(`Failed to load detail for "${user}": ${err.message}`);
+            if (contentBody) contentBody.innerHTML = _renderError(`Failed to load detail for "${user}": ${err.message}`);
         }
     }
 }
@@ -322,6 +757,19 @@ function _attachContentEvents(contentEl, root) {
     // Use event delegation on contentEl so we only bind once
     if (!contentEl._hasPaginationEvents) {
         contentEl.addEventListener('click', e => {
+            const pathNameEl = e.target.closest('.ud-path-name');
+            if (pathNameEl) {
+                const path = pathNameEl.getAttribute('title');
+                if (path) {
+                    navigator.clipboard.writeText(path).then(() => {
+                        showToast('Path Copied', `Copied "${path}" to clipboard`, 'success', 2500);
+                    }).catch(err => {
+                        showToast('Failed to copy', err.message, 'error', 2500);
+                    });
+                }
+                return;
+            }
+
             const btn = e.target.closest('.ud-page-btn');
             if (!btn || btn.classList.contains('disabled') || btn.classList.contains('active')) return;
             const page = parseInt(btn.dataset.page, 10);
@@ -368,7 +816,7 @@ async function _goToPageFile(root, page) {
                 return `
                 <div class="ud-path-row">
                     <span class="ud-ext-badge" style="background:${clr}20;color:${clr}">.${ext}</span>
-                    <div class="ud-path-name" title="${f.path}">${_shortPath(f.path)}</div>
+                    <div class="ud-path-name" title="${f.path}" style="cursor: pointer;">${_shortPath(f.path)}</div>
                     <div class="ud-path-bar-wrap" data-tooltip="${fmt(f.size)} · ${pct}% of page total">
                         <div class="ud-path-bar-fill ud-fill-emerald" style="width:${pct}%"></div>
                     </div>
@@ -418,7 +866,7 @@ async function _goToPageDir(root, page) {
                 const cls = parseFloat(pct) > 70 ? 'ud-fill-rose' : parseFloat(pct) > 40 ? 'ud-fill-amber' : 'ud-fill-sky';
                 return `
                 <div class="ud-path-row">
-                    <div class="ud-path-name" title="${d.path}">${_shortPath(d.path)}</div>
+                    <div class="ud-path-name" title="${d.path}" style="cursor: pointer;">${_shortPath(d.path)}</div>
                     <div class="ud-path-bar-wrap" data-tooltip="${fmt(d.used)} · ${pct}% of page total">
                         <div class="ud-path-bar-fill ${cls}" style="width:${pct}%"></div>
                     </div>
@@ -493,7 +941,11 @@ async function _renderRoot(diskDir) {
     root.innerHTML = `<div class="ud-loading">Loading users...</div>`;
 
     const users = await _fetchUserList(diskDir);
-    const total = users.length + _otherUsers.length;
+    _allUserNames = [
+        ...users,
+        ..._otherUsers.map(o => o.name).filter(n => !users.includes(n)),
+    ].sort((a, b) => a.localeCompare(b));
+    const total = _allUserNames.length;
 
     if (!total) {
         root.innerHTML = `
@@ -509,15 +961,19 @@ async function _renderRoot(diskDir) {
 
     root.innerHTML = `
         ${_renderBetaBanner()}
-        ${_renderPicker(users, _otherUsers)}
-        <div id="ud-content">${_renderEmptyState()}</div>`;
+        <div id="ud-unified-toolbar">
+            ${_renderFilterBar()}
+        </div>
+        <div id="ud-content-body">${_renderEmptyState()}</div>`;
 
     _attachBannerEvents(root);
-    _attachPickerEvents(root);
+    const toolbar = root.querySelector('#ud-unified-toolbar');
+    if (toolbar) {
+        _attachFilterEvents(toolbar, root);
+    }
 
     // Restore previously selected user
-    const allNames = [...users, ..._otherUsers.map(o => o.name)];
-    if (_selectedUser && allNames.includes(_selectedUser)) {
+    if (_selectedUser && _allUserNames.includes(_selectedUser)) {
         _loadAndRender(_selectedUser);
     }
 }
@@ -579,7 +1035,7 @@ async function _udExportDirs() {
         let totalItems = 0;
 
         const fetchChunk = async () => {
-            const params = new URLSearchParams({ id: _currentDisk, type: 'dirs', user_b64: b64User, offset, limit });
+            const params = new URLSearchParams({ id: _currentDisk, type: 'dirs', user_b64: b64User, offset, limit, filter_query: _currentFilters.query, filter_min_size: _currentFilters.minSize, filter_max_size: _currentFilters.maxSize, filter_ext: _currentFilters.ext });
             const res = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             
@@ -635,7 +1091,7 @@ async function _udExportFiles() {
         let totalItems = 0;
 
         const fetchChunk = async () => {
-            const params = new URLSearchParams({ id: _currentDisk, type: 'files', user_b64: b64User, offset, limit });
+            const params = new URLSearchParams({ id: _currentDisk, type: 'files', user_b64: b64User, offset, limit, filter_query: _currentFilters.query, filter_ext: _currentFilters.ext, filter_min_size: _currentFilters.minSize });
             const res = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             

@@ -1,5 +1,7 @@
 <?php
 ob_start('ob_gzhandler');
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
 // api.php - Disk Usage API (PHP 5.4+)
 //
 // All endpoints use ?id=<disk_id> (resolved server-side via disks.json).
@@ -43,6 +45,13 @@ function b64_success($data) {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(array('status' => 'success', 'data' => $data));
     exit;
+}
+
+function matches_wildcard($string, $wildcard) {
+    if ($wildcard === '') return true;
+    if (strpos($wildcard, '*') === false) $wildcard = '*' . $wildcard . '*';
+    $regex = '/^' . str_replace('\*', '.*', preg_quote($wildcard, '/')) . '$/i';
+    return preg_match($regex, $string);
 }
 
 function b64_error($message, $code) {
@@ -495,6 +504,9 @@ if ($type === 'dirs') {
     $who        = sanitize_name(get_b64_param('user', ''));
     $offset     = get_int('offset', 0,   0,    PHP_INT_MAX);
     $limit      = get_int('limit',  500, 1,    2000000);
+    $filter_q   = strtolower(trim(param('filter_query', '')));
+    $filter_min = get_int('filter_min_size', 0, 0, PHP_INT_MAX);
+    $filter_max = get_int('filter_max_size', 0, 0, PHP_INT_MAX);
     $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
     
     // Look for file ending in detail_report_dir_{user}.json or detail_report_dirs_{user}.json, prefixed optionally
@@ -528,6 +540,10 @@ if ($type === 'dirs') {
 
     // Stream items with brace-depth parser — O(page_size) RAM
     $idx = 0; $collected = array(); $buf = ''; $depth = 0;
+    $q_array = $filter_q !== '' ? array_values(array_filter(array_map('trim', explode(',', $filter_q)), 'strlen')) : array();
+    $has_filters = (!empty($q_array) || $filter_min > 0 || $filter_max > 0);
+    $filtered_total = 0;
+
     while ($fh && ($ln = fgets($fh)) !== false) {
         $trimmed = trim($ln);
         if ($trimmed === ']' || $trimmed === '];') break;
@@ -537,18 +553,37 @@ if ($type === 'dirs') {
         $depth += substr_count($ln, '{') - substr_count($ln, '}');
 
         if ($depth <= 0 && ltrim($buf) !== '') {
-            if ($idx >= $offset && count($collected) < $limit) {
-                $obj = @json_decode(rtrim(trim($buf), ','), true);
-                if ($obj !== null && is_array($obj)) {
-                    $collected[] = $obj;
+            $obj = @json_decode(rtrim(trim($buf), ','), true);
+            if ($obj !== null && is_array($obj)) {
+                $pass = true;
+                $usedBytes = isset($obj['used']) ? $obj['used'] : (isset($obj['s']) ? $obj['s'] : 0);
+                $pathName  = isset($obj['path']) ? $obj['path'] : (isset($obj['n']) ? $obj['n'] : '');
+                
+                if ($filter_min > 0 && $usedBytes < $filter_min) $pass = false;
+                if ($filter_max > 0 && $usedBytes > $filter_max) $pass = false;
+                if ($pass && !empty($q_array)) {
+                    $matched = false;
+                    foreach ($q_array as $q) {
+                        if (matches_wildcard($pathName, $q)) { $matched = true; break; }
+                    }
+                    if (!$matched) $pass = false;
+                }
+
+                if ($pass) {
+                    if ($idx >= $offset && count($collected) < $limit) {
+                        $collected[] = $obj;
+                    }
+                    $idx++;
+                    $filtered_total++;
                 }
             }
-            $idx++;
-            if (count($collected) >= $limit) break;
+            if (!$has_filters && count($collected) >= $limit) break;
             $buf = ''; $depth = 0;
         }
     }
     if ($fh) fclose($fh);
+
+    if ($has_filters) $total_dirs = $filtered_total;
 
     b64_success(array('dir' => array(
         'date'        => $date,
@@ -557,7 +592,7 @@ if ($type === 'dirs') {
         'total_used'  => $total_used,
         'offset'      => $offset,
         'limit'       => $limit,
-        'has_more'    => count($collected) >= $limit,
+        'has_more'    => $has_filters ? ($offset + count($collected) < $filtered_total) : (count($collected) >= $limit),
         'dirs'        => $collected,
     )));
 }
@@ -569,6 +604,10 @@ if ($type === 'files') {
     $who        = sanitize_name(get_b64_param('user', ''));
     $offset     = get_int('offset', 0,   0,    PHP_INT_MAX);
     $limit      = get_int('limit',  500, 1,    2000000);
+    $filter_q   = strtolower(trim(param('filter_query', '')));
+    $filter_ext = strtolower(trim(param('filter_ext', '')));
+    $filter_min = get_int('filter_min_size', 0, 0, PHP_INT_MAX);
+    $filter_max = get_int('filter_max_size', 0, 0, PHP_INT_MAX);
     $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
     
     // Look for file ending in detail_report_file_{user}.json or detail_report_files_{user}.json, prefixed optionally
@@ -593,6 +632,11 @@ if ($type === 'files') {
 
     // Stream items with brace-depth parser — O(page_size) RAM
     $idx = 0; $collected = array(); $buf = ''; $depth = 0;
+    $q_array = $filter_q !== '' ? array_values(array_filter(array_map('trim', explode(',', $filter_q)), 'strlen')) : array();
+    $ext_array = $filter_ext !== '' ? array_values(array_filter(array_map('trim', explode(',', $filter_ext)), 'strlen')) : array();
+    $has_filters = (!empty($q_array) || !empty($ext_array) || $filter_min > 0 || $filter_max > 0);
+    $filtered_total = 0;
+
     while ($fh && ($ln = fgets($fh)) !== false) {
         $trimmed = trim($ln);
         if ($trimmed === ']' || $trimmed === '];') break;
@@ -602,18 +646,41 @@ if ($type === 'files') {
         $depth += substr_count($ln, '{') - substr_count($ln, '}');
 
         if ($depth <= 0 && ltrim($buf) !== '') {
-            if ($idx >= $offset && count($collected) < $limit) {
-                $obj = @json_decode(rtrim(trim($buf), ','), true);
-                if ($obj !== null && is_array($obj)) {
-                    $collected[] = $obj;
+            $obj = @json_decode(rtrim(trim($buf), ','), true);
+            if ($obj !== null && is_array($obj)) {
+                $pass = true;
+                $fileSize = isset($obj['size']) ? $obj['size'] : (isset($obj['s']) ? $obj['s'] : 0);
+                $pathName = isset($obj['path']) ? $obj['path'] : (isset($obj['n']) ? $obj['n'] : '');
+
+                if ($filter_min > 0 && $fileSize < $filter_min) $pass = false;
+                if ($filter_max > 0 && $fileSize > $filter_max) $pass = false;
+                if ($pass && !empty($q_array)) {
+                    $matched = false;
+                    foreach ($q_array as $q) {
+                        if (matches_wildcard($pathName, $q)) { $matched = true; break; }
+                    }
+                    if (!$matched) $pass = false;
+                }
+                if ($pass && !empty($ext_array)) {
+                    $ext = isset($obj['xt']) ? $obj['xt'] : pathinfo($pathName, PATHINFO_EXTENSION);
+                    if (!in_array(strtolower($ext), $ext_array)) $pass = false;
+                }
+
+                if ($pass) {
+                    if ($idx >= $offset && count($collected) < $limit) {
+                        $collected[] = $obj;
+                    }
+                    $idx++;
+                    $filtered_total++;
                 }
             }
-            $idx++;
-            if (count($collected) >= $limit) break;
+            if (!$has_filters && count($collected) >= $limit) break;
             $buf = ''; $depth = 0;
         }
     }
     if ($fh) fclose($fh);
+
+    if ($has_filters) $total_files = $filtered_total;
 
     b64_success(array('file' => array(
         'date'        => $date,
@@ -622,7 +689,7 @@ if ($type === 'files') {
         'total_used'  => $total_used,
         'offset'      => $offset,
         'limit'       => $limit,
-        'has_more'    => count($collected) >= $limit,
+        'has_more'    => $has_filters ? ($offset + count($collected) < $filtered_total) : (count($collected) >= $limit),
         'files'       => $collected,
     )));
 }
