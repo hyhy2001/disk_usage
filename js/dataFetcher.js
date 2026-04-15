@@ -110,13 +110,305 @@ class DataFetcher {
             });
         }
 
-        // Dropped disk-dropdown logic completely per user request.
+        // Init sort UI
+        this._initSortUI();
+        this._initTeamComparisonUI();
 
         // Start live clock
         startClock();
 
         // Load disk list (auto-fetch is triggered inherently by disk click simulation inside)
         this._initDiskSelector();
+    }
+
+    _initSortUI() {
+        const btnAlpha = document.getElementById('btn-sort-alpha');
+        const btnMore = document.getElementById('btn-sort-disk-more');
+        const sortDropdown = document.getElementById('disk-sort-dropdown');
+        const dropdownItems = document.querySelectorAll('.sort-item');
+        const iconSortAlpha = document.getElementById('icon-sort-alpha');
+        
+        let currentSort = localStorage.getItem('teamDiskSort') || 'alpha-asc';
+        
+        const PATH_AZ = '<path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M20 8h-5"/><path d="M15 10V6.5a2.5 2.5 0 0 1 5 0V10"/><path d="M15 14h5l-5 6h5"/>';
+        const PATH_ZA = '<path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="M20 8h-5"/><path d="M15 10V6.5a2.5 2.5 0 0 1 5 0V10"/><path d="M15 14h5l-5 6h5"/>';
+        
+        const applySort = () => {
+            const grid = document.getElementById('team-disk-grid');
+            if (!grid) return;
+            const cards = Array.from(grid.querySelectorAll('.team-disk-card'));
+            if (cards.length === 0) return;
+            
+            cards.sort((a, b) => {
+                const nameA = a.dataset.name || '';
+                const nameB = b.dataset.name || '';
+                const usedA = parseFloat(a.dataset.usedPct) || 0;
+                const usedB = parseFloat(b.dataset.usedPct) || 0;
+                const freeA = parseFloat(a.dataset.freeBytes) || 0;
+                const freeB = parseFloat(b.dataset.freeBytes) || 0;
+                
+                if (currentSort === 'alpha-asc') return nameA.localeCompare(nameB);
+                if (currentSort === 'alpha-desc') return nameB.localeCompare(nameA);
+                if (currentSort === 'usage-desc') return usedB - usedA;
+                if (currentSort === 'free-desc') return freeB - freeA;
+                return 0;
+            });
+            
+            cards.forEach(card => grid.appendChild(card));
+            
+            if (btnAlpha && btnMore && iconSortAlpha) {
+                if (currentSort.startsWith('alpha')) {
+                    btnAlpha.classList.add('active-sort-btn');
+                    btnMore.classList.remove('active-sort-btn');
+                    iconSortAlpha.innerHTML = currentSort === 'alpha-asc' ? PATH_AZ : PATH_ZA;
+                } else {
+                    btnAlpha.classList.remove('active-sort-btn');
+                    btnMore.classList.add('active-sort-btn');
+                }
+            }
+            
+            if (this._lastTeamData) {
+                const currentMode = localStorage.getItem('teamChartMode') || 'absolute';
+                this._renderTeamComparisonChart(this._lastTeamData, currentMode);
+            }
+        };
+
+        this.applySort = applySort;
+        
+        if (btnAlpha) {
+            btnAlpha.addEventListener('click', () => {
+                currentSort = currentSort === 'alpha-asc' ? 'alpha-desc' : 'alpha-asc';
+                localStorage.setItem('teamDiskSort', currentSort);
+                applySort();
+            });
+        }
+        
+        if (btnMore && sortDropdown) {
+            btnMore.addEventListener('click', (e) => {
+                e.stopPropagation();
+                sortDropdown.style.display = sortDropdown.style.display === 'none' ? 'block' : 'none';
+            });
+            
+            document.addEventListener('click', (e) => {
+                if (!btnMore.contains(e.target) && !sortDropdown.contains(e.target)) {
+                    sortDropdown.style.display = 'none';
+                }
+            });
+            
+            dropdownItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    currentSort = item.dataset.sort;
+                    localStorage.setItem('teamDiskSort', currentSort);
+                    sortDropdown.style.display = 'none';
+                    applySort();
+                });
+            });
+        }
+    }
+
+    _initTeamComparisonUI() {
+        const toggleBtn = document.getElementById('btn-chart-norm');
+        const toggleLbl = document.getElementById('lbl-chart-norm');
+        const iconNorm = document.getElementById('icon-chart-norm');
+        let currentMode = localStorage.getItem('teamChartMode') || 'absolute';
+        
+        const updateBtnUI = () => {
+             if (toggleLbl) toggleLbl.textContent = currentMode === 'absolute' ? 'Absolute' : 'Percent (100%)';
+             if (iconNorm) {
+                 if (currentMode === 'percent') {
+                     toggleBtn.classList.add('active-sort-btn');
+                     iconNorm.innerHTML = '<rect x="3" y="14" width="18" height="8" rx="2" ry="2"/><rect x="3" y="2" width="18" height="8" rx="2" ry="2"/><line x1="8" y1="14" x2="8" y2="22"/><line x1="16" y1="14" x2="16" y2="22"/>'; 
+                 } else {
+                     toggleBtn.classList.remove('active-sort-btn');
+                     iconNorm.innerHTML = '<path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/>';
+                 }
+             }
+        };
+        updateBtnUI();
+        
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                currentMode = currentMode === 'absolute' ? 'percent' : 'absolute';
+                localStorage.setItem('teamChartMode', currentMode);
+                updateBtnUI();
+                
+                if (this._lastTeamData) {
+                    this._renderTeamComparisonChart(this._lastTeamData, currentMode);
+                }
+            });
+        }
+    }
+
+    _renderTeamComparisonChart(data, mode) {
+        const canvasWrapper = document.getElementById('team-comparison-canvas-wrapper');
+        const canvasGrid = document.getElementById('overview-empty-state');
+        if (!canvasGrid || canvasGrid.style.display === 'none') return;
+        
+        if (window._teamCompChart) {
+            window._teamCompChart.destroy();
+        }
+        
+        // Dynamically set width based on number of disks
+        if (canvasWrapper) {
+            const minW = Math.max(100, data.length * 60);
+            canvasWrapper.style.width = `max(100%, ${minW}px)`;
+        }
+        
+        const ctx = document.getElementById('teamComparisonChart');
+        if (!ctx) return;
+        
+        const labels = [];
+        const usedData = [];
+        const freeData = [];
+        const absoluteData = []; // for tooltips
+        
+        const currentSort = localStorage.getItem('teamDiskSort') || 'alpha-asc';
+        
+        const sortedData = [...data].sort((a, b) => {
+            const nameA = (a._disk_name || '').toLowerCase();
+            const nameB = (b._disk_name || '').toLowerCase();
+            const sysA = a.general_system || {};
+            const sysB = b.general_system || {};
+            const totalA = sysA.total || 0;
+            const totalB = sysB.total || 0;
+            const usedA = sysA.used || 0;
+            const usedB = sysB.used || 0;
+            const freeA = Math.max(0, totalA - usedA);
+            const freeB = Math.max(0, totalB - usedB);
+            
+            const usedPctA = totalA > 0 ? (usedA / totalA) * 100 : 0;
+            const usedPctB = totalB > 0 ? (usedB / totalB) * 100 : 0;
+
+            if (currentSort === 'alpha-asc') return nameA.localeCompare(nameB);
+            if (currentSort === 'alpha-desc') return nameB.localeCompare(nameA);
+            if (currentSort === 'usage-desc') return usedPctB - usedPctA;
+            if (currentSort === 'free-desc') return freeB - freeA;
+            return 0;
+        });
+        
+        sortedData.forEach(d => {
+            const sys = d.general_system || {};
+            const total = sys.total || 0;
+            const used = sys.used || 0;
+            const free = Math.max(0, total - used);
+            const diskName = d._disk_name || 'Disk';
+            
+            labels.push(diskName);
+            absoluteData.push({total, used, free});
+            
+            if (mode === 'percent' && total > 0) {
+                usedData.push({ x: diskName, y: (used / total) * 100 });
+                freeData.push({ x: diskName, y: (free / total) * 100 });
+            } else {
+                usedData.push({ x: diskName, y: used });
+                freeData.push({ x: diskName, y: free });
+            }
+        });
+        
+        window._teamCompChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Used',
+                        data: usedData,
+                        backgroundColor: '#f43f5e',
+                        stack: 'Stack 0',
+                        barPercentage: 0.7,
+                    },
+                    {
+                        label: 'Free',
+                        data: freeData,
+                        backgroundColor: '#10b981',
+                        stack: 'Stack 0',
+                        barPercentage: 0.7,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const dsLabel = context.dataset.label;
+                                const idx = context.dataIndex;
+                                const abs = absoluteData[idx];
+                                const rawVal = abs[dsLabel.toLowerCase()];
+                                const formatted = fmt(rawVal);
+                                if (mode === 'percent') {
+                                    return `${dsLabel}: ${context.parsed.y.toFixed(1)}% (${formatted})`;
+                                }
+                                return `${dsLabel}: ${formatted}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        grid: { display: false, color: 'rgba(255,255,255,0.05)' },
+                        ticks: {
+                            autoSkip: false,
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    },
+                    y: {
+                        stacked: true,
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: {
+                            callback: function(value) {
+                                if (mode === 'percent') return value + '%';
+                                return fmt(value); // dynamic capacity formatting
+                            }
+                        },
+                        max: mode === 'percent' ? 100 : undefined
+                    }
+                }
+            }
+        });
+        
+        // --- Populate Team Insights Grid ---
+        const insightsGrid = document.getElementById('team-comparison-insights');
+        if (insightsGrid) {
+            let count30 = 0, count50 = 0, count70 = 0, count90 = 0;
+            
+            data.forEach(d => {
+                const sys = d.general_system || {};
+                const t = sys.total || 0;
+                const u = sys.used || 0;
+                const ratio = t > 0 ? (u / t) : 0;
+                
+                if (ratio > 0.3) count30++;
+                if (ratio > 0.5) count50++;
+                if (ratio > 0.7) count70++;
+                if (ratio > 0.9) count90++;
+            });
+            
+            insightsGrid.innerHTML = `
+                <div class="stat-card" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.03);">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Disks > 30% Used</div>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: #10b981;">${count30}</div>
+                </div>
+                <div class="stat-card" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.03);">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Disks > 50% Used</div>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: #3b82f6;">${count50}</div>
+                </div>
+                <div class="stat-card" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.03);">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Disks > 70% Used</div>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: #f59e0b;">${count70}</div>
+                </div>
+                <div class="stat-card" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.03);">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Disks > 90% Used</div>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: #f43f5e;">${count90}</div>
+                </div>
+            `;
+        }
     }
 
     async _initDiskSelector() {
@@ -423,6 +715,8 @@ class DataFetcher {
                 grid.innerHTML = '<div class="glass-panel" style="padding:20px; color:var(--text-secondary);">No disk usage reports available for this team.</div>';
                 return;
             }
+            
+            this._lastTeamData = result.data;
 
             let totalBytes = 0;
             let usedBytes = 0;
@@ -462,7 +756,7 @@ class DataFetcher {
 
                 const freePct = Math.max(0, 100 - usedPct).toFixed(1);
 
-                cardsHTML += `<div class="team-disk-card" data-id="${diskId}" onclick="document.querySelector('.disk-list-item[data-id=\\'${diskId}\\']')?.click()" data-tooltip="${tooltipText}" data-tooltip-pos="top">
+                cardsHTML += `<div class="team-disk-card" data-id="${diskId}" data-name="${diskName.toLowerCase().replace(/"/g, '&quot;')}" data-used-pct="${usedPct}" data-free-bytes="${free}" onclick="document.querySelector('.disk-list-item[data-id=\\'${diskId}\\']')?.click()" data-tooltip="${tooltipText}" data-tooltip-pos="top">
                     <div class="card-content-wrapper">
                         <div class="card-left">
                             <div class="card-header" style="display: flex; flex-direction: column; gap: 6px; width: 100%; align-items: flex-start; margin-bottom: 0;">
@@ -489,6 +783,11 @@ class DataFetcher {
             });
 
             grid.innerHTML = cardsHTML;
+            
+            // Apply sorting initially once cards are loaded
+            if (typeof this.applySort === 'function') {
+                this.applySort();
+            }
             
             // Team Disk Search Handler
             const teamSearch = document.getElementById('team-disk-search');
@@ -562,7 +861,17 @@ class DataFetcher {
             const overviewGrid = document.getElementById('overview-charts-grid');
             const overviewEmpty = document.getElementById('overview-empty-state');
             if (overviewGrid) overviewGrid.style.display = 'none';
-            if (overviewEmpty) overviewEmpty.style.display = 'flex';
+            if (overviewEmpty) {
+                overviewEmpty.style.display = 'flex';
+                // Render the comparison chart
+                if (this._lastTeamData && this._lastTeamData.length > 0) {
+                    const savedMode = localStorage.getItem('teamChartMode') || 'absolute';
+                    // Need a small timeout to allow display:flex to compute layout before Chart.js takes over
+                    setTimeout(() => {
+                        this._renderTeamComparisonChart(this._lastTeamData, savedMode);
+                    }, 50);
+                }
+            }
             
             const tabs = document.querySelector('.detail-tabs');
             if (tabs) tabs.style.display = 'none'; // hide tabs when no disk selected

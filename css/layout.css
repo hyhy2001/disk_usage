@@ -431,6 +431,14 @@
     background: rgba(0,0,0,0.06);
     color: #0f172a;
 }
+.active-sort-btn {
+    background: rgba(255,255,255,0.08);
+    color: #38bdf8 !important;
+}
+:root[data-theme='light'] .active-sort-btn {
+    background: rgba(0,0,0,0.06);
+    color: #0ea5e9 !important;
+}
 
 /* -- Edge Collapse Button (Desktop Only) -- */
 .sidebar-edge-collapse-btn {

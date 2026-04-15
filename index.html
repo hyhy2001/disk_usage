@@ -173,9 +173,37 @@
     </div> <!-- Close section-header here -->
     
     <div class="team-disk-dropdown-content" style="display: flex; flex-direction: column; flex: 1; min-height: 0; padding-bottom: 16px;">
-            <div class="team-overview-search-container" style="position:relative; width:100%; padding: 0 16px;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="position:absolute; left:28px; top:50%; transform:translateY(-50%); color:var(--text-muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                <input type="text" id="team-disk-search" class="sidebar-text-input" placeholder="Search disks...">
+            <div class="team-overview-search-container" style="position:relative; width:100%; padding: 0 16px; display: flex; gap: 6px; align-items: stretch;">
+                <div style="position:relative; flex:1;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="team-disk-search" class="sidebar-text-input" placeholder="Search disks..." style="width: 100%;">
+                </div>
+                <!-- Disk Sort Actions -->
+                <div class="disk-sort-actions" style="display: flex; gap: 4px; align-items: stretch;">
+                    <button id="btn-sort-alpha" class="settings-btn active-sort-btn" data-tooltip="Sort A-Z" style="width: 32px; border-radius: 6px; padding: 0; display: flex; align-items: center; justify-content: center; height: auto;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="icon-sort-alpha" style="pointer-events:none;">
+                            <path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M20 8h-5"/><path d="M15 10V6.5a2.5 2.5 0 0 1 5 0V10"/><path d="M15 14h5l-5 6h5"/>
+                        </svg>
+                    </button>
+                    <div style="position: relative; display: flex;">
+                        <button id="btn-sort-disk-more" class="settings-btn" data-tooltip="More Sort Options" style="width: 32px; border-radius: 6px; padding: 0; display: flex; align-items: center; justify-content: center; height: auto;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;">
+                                <line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>
+                            </svg>
+                        </button>
+                        <div id="disk-sort-dropdown" class="settings-dropdown" style="display:none; width: max-content; right: 0; left: auto;">
+                            <div style="font-size:0.7rem; font-weight:600; color:var(--text-muted); padding:4px 8px 6px; text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid rgba(255,255,255,0.06); margin-bottom:4px;">Sort By</div>
+                            <button class="dropdown-item sort-item" data-sort="usage-desc" style="display:flex; align-items:center; gap:8px; padding:8px 10px; width:100%; cursor:pointer; background:transparent; border:none; color:var(--text-primary); border-radius:6px; font-weight:500; font-size:13px; text-align:left;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+                                <span>Used Capacity (%)</span>
+                            </button>
+                            <button class="dropdown-item sort-item" data-sort="free-desc" style="display:flex; align-items:center; gap:8px; padding:8px 10px; width:100%; cursor:pointer; background:transparent; border:none; color:var(--text-primary); border-radius:6px; font-weight:500; font-size:13px; text-align:left;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                                <span>Free Space (TB)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div class="team-disk-list-scrollable" id="team-disk-grid" style="flex:1; overflow-y:auto; padding: 12px 16px 16px 16px; display: flex; flex-direction: column; gap: 10px;">
@@ -315,18 +343,33 @@
         </header>
 
             <!-- ===== OVERVIEW PAGE ===== -->
-            <section id="page-overview" class="page-section page-hidden">
+            <section id="page-overview" class="page-section page-hidden" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
 
             <!-- Charts Level -->
             <!-- EMPTY STATE (No Disk Selected) -->
-            <div id="overview-empty-state" class="empty-state" style="display:none; margin-top: 20vh;">
-                <div class="empty-state-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
-                    </svg>
+            <!-- TEAM COMPARISON STATE (No Disk Selected) -->
+            <div id="overview-empty-state" class="team-comparison-view glass-panel" style="display:none; flex: 1; flex-direction:column; padding:24px; width: 100%; min-height:0;">
+                <div class="panel-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+                    <div>
+                        <h2 style="font-size:1.1rem; font-weight:600; color:var(--text-primary);">Team Disk Comparison</h2>
+                        <div style="font-size:0.85rem; color:var(--text-secondary); margin-top:4px;">Capacity breakdown for all disks in this team.</div>
+                    </div>
+                    <div class="chart-toggles" style="display:flex; gap:8px;">
+                        <button id="btn-chart-norm" class="settings-btn" data-tooltip="Toggle Chart Mode" style="width:auto; padding:6px 12px; gap:8px; border: 1px solid rgba(255,255,255,0.06);">
+                            <svg id="icon-chart-norm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+                            <span style="font-size:0.8rem; font-weight:600;" id="lbl-chart-norm">Absolute</span>
+                        </button>
+                    </div>
                 </div>
-                <h3>No Disk Selected</h3>
-                <p>Please select a disk from the list to view its metrics overview.</p>
+                <!-- Horizontal scroll container -->
+                <div style="flex:1; display:flex; flex-direction:column; width:100%; overflow-x:auto; overflow-y:hidden; padding-bottom:8px;">
+                    <div id="team-comparison-canvas-wrapper" style="position:relative; flex:1; min-height:300px; width: 100%;">
+                        <canvas id="teamComparisonChart"></canvas>
+                    </div>
+                </div>
+                <!-- Team Insights Grid -->
+                <div id="team-comparison-insights" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 24px;">
+                </div>
             </div>
             <div class="charts-grid" id="overview-charts-grid">
                 <!-- Main Timeline Chart -->
