@@ -1618,6 +1618,41 @@
     }
 }
 
+/* Inode Stat responsive layout */
+.inode-panel {
+    padding: 24px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+.inode-chart-wrapper {
+    flex: 1;
+    position: relative;
+    width: 100%;
+    margin-top: 10px;
+    min-height: 220px;
+}
+
+@media (min-width: 1001px) {
+    .inode-panel.inode-sys {
+        height: calc(100vh - 320px);
+    }
+    .inode-panel.inode-users {
+        max-height: calc(100vh - 320px);
+    }
+}
+
+@media (max-width: 1000px) {
+    .inode-panel.inode-sys,
+    .inode-panel.inode-users {
+        height: auto !important;
+        max-height: none !important;
+    }
+    #inode-user-grid {
+        max-height: 50vh;
+    }
+}
 
 /* -----------------------------------------
    Unknown / Inaccessible Section
@@ -2842,8 +2877,8 @@
 /* -- ② History Charts Row -------------------------------------------------- */
 .history-charts-row {
     display: grid;
-    /* 2 columns by default -- stacks to 1 column below breakpoint */
-    grid-template-columns: 1fr 1fr;
+    /* 1 column since the second chart was removed */
+    grid-template-columns: 1fr;
     gap: 14px;
     min-width: 0;
     width: 100%;
@@ -5413,6 +5448,12 @@
     -webkit-backdrop-filter: blur(16px);
 }
 
+:root[data-theme='light'] .team-disk-card {
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-color: rgba(15, 23, 42, 0.08);
+}
+
 /* Base override for sidebar disk card */
 .team-disk-sidebar .team-disk-card {
     padding: 12px 16px;
@@ -5850,4 +5891,53 @@
     .header-disk-name {
         font-size: 1.1rem;
     }
+}
+
+/* ── Inode Stat Cards ────────────────────────────────────────────────────────── */
+.inode-stat-card {
+    padding: 12px 16px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+}
+:root[data-theme='light'] .inode-stat-card {
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-color: rgba(15, 23, 42, 0.08);
+}
+
+.inode-user-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    transition: background 0.2s, border-color 0.2s;
+}
+.inode-user-card:hover {
+    background: rgba(255,255,255,0.07);
+}
+
+:root[data-theme='light'] .inode-user-card {
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-color: rgba(15, 23, 42, 0.08);
+}
+:root[data-theme='light'] .inode-user-card:hover {
+    background: #f8fafc;
+    border-color: rgba(0,0,0,0.15);
+}
+
+.inode-free-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid var(--glass-border);
+}
+:root[data-theme='light'] .inode-free-dot {
+    background: rgba(0,0,0,0.12);
+    border: none;
 }

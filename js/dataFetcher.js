@@ -990,6 +990,9 @@ class DataFetcher {
             UINodes.statusText.textContent = "Aggregating metrics...";
             
             this.dataStore.processChunk(jsonResponse.data);
+            if (jsonResponse.inodes) {
+                this.dataStore.setLatestInodes(jsonResponse.inodes);
+            }
             
             AppState.filesProcessed = AppState.filesTotal;
             UINodes.progressBar.style.width = `100%`;

@@ -2,6 +2,7 @@
 import { AppState } from './main.js';
 import { fmt, fmtDate } from './formatters.js';
 import { saveFilters, loadFilters } from './filterStorage.js';
+import { renderInodesTab } from './inodeRenderer.js';
 
 let _store = null;
 
@@ -156,10 +157,7 @@ function readFilters() {
     const selected = Array.from(document.querySelectorAll('#user-chips .user-filter-item.selected'))
         .map(el => el.dataset.user).filter(Boolean);
     const allNames = _store.getAllUserNames();
-    // null = all users (auto-sort); [] = none selected; array = explicit
-    const selectedUsers = (selected.length > 0 && selected.length < allNames.length)
-        ? selected
-        : (selected.length === 0 ? [] : null);
+    const selectedUsers = selected.length > 0 ? selected : null;
 
     const userSortMode = document.getElementById('filter-user-sort')?.value || 'total';
     return { startMs, endMs, selectedUsers, userSortMode };
@@ -321,8 +319,7 @@ export function applyFilters() {
             chartMgr.renderHistoryTotalChart(filtered);
         }
 
-        const growers = _store.getTopUsersByGrowth(f.startMs, f.endMs).slice(0, 10);
-        chartMgr.renderTopGrowersChart(growers);
+        // Growers chart removed by user request
     }
 
     // Data Table removed — charts are sufficient
@@ -428,6 +425,9 @@ export function renderDetailTables(dataStore) {
 
     // History tab init
     initHistoryTab();
+
+    // Inodes tab init
+    renderInodesTab(_store.getLatestInodes(), AppState.chartManagerInstance);
 }
 
 // Helper: remove empty overlays injected by resetDashboardToEmpty
@@ -503,6 +503,20 @@ export function resetDashboardToEmpty(chartMgr) {
     if (userChips) userChips.innerHTML = '';
     const historyUserCount = document.getElementById('history-user-count');
     if (historyUserCount) historyUserCount.textContent = '0 / 0';
+
+    // 7. Inodes tab - show empty state
+    const inodesBody = document.getElementById('inodes-body');
+    if (inodesBody) {
+        inodesBody.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                </div>
+                <h3>No Inode Data</h3>
+                <p>Inode tracking information is not available for this disk yet.</p>
+            </div>
+        `;
+    }
 
     // Clear chart stat text labels
     const growersStatEl = document.getElementById('history-growers-stat');

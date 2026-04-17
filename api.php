@@ -204,6 +204,7 @@ if ($type === 'team') {
             $fl = strtolower($f);
             if (strpos($fl, 'permission_issue') !== false) continue;
             if (strpos($fl, 'detail_report')    !== false) continue;
+            if (strpos($fl, 'inode_usage')      !== false) continue;
             
             $is_report = strpos($fl, 'disk_usage_report') !== false
                       || strpos($fl, 'usage_report')       !== false
@@ -707,6 +708,7 @@ while ($dh && ($f = readdir($dh)) !== false) {
     // Exclude non-report files
     if (strpos($fl, 'permission_issue') !== false) continue;
     if (strpos($fl, 'detail_report')    !== false) continue;
+    if (strpos($fl, 'inode_usage')      !== false) continue;
     // Match: *disk_usage_report*, *report_*, *usage_report* (wildcard-style)
     $is_report = strpos($fl, 'disk_usage_report') !== false
               || strpos($fl, 'usage_report')       !== false
@@ -726,10 +728,16 @@ usort($files, function($a, $b) use ($file_dates) {
     return $file_dates[$a] - $file_dates[$b];
 });
 
+$inode_file = find_file_by_pattern($disk_path, '/.*inode_usage_report.*\.json$/i');
+$inode_json = "null";
+if ($inode_file && is_file($inode_file)) {
+    $inode_json = file_get_contents($inode_file);
+}
+
 header('Cache-Control: public, max-age=60');
 header('Content-Type: application/json; charset=utf-8');
 
-echo '{"status":"success","total_files":' . count($files) . ',"data":[';
+echo '{"status":"success","total_files":' . count($files) . ',"inodes":' . ($inode_json ?: "null") . ',"data":[';
 $first = true;
 foreach ($files as $file) {
     if (!$first) echo ',';

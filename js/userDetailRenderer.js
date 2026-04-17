@@ -259,9 +259,9 @@ function _renderFilterBar() {
                     </div>
                     <svg class="ud-dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
-                <div class="ud-dropdown-list" id="ud-dropdown-list" role="listbox" style="top: calc(100% + 4px); background: var(--bg-surface); border: 1px solid var(--border-color); box-shadow: 0 10px 40px rgba(0,0,0,0.5); backdrop-filter: none;">
-                    <input class="ud-dropdown-search" id="ud-dropdown-search" placeholder="Search user..." autocomplete="off" style="background: var(--bg-surface); color: var(--text-primary);">
-                    <div id="ud-dropdown-options" style="background: var(--bg-surface);">${opts}</div>
+                <div class="ud-dropdown-list" id="ud-dropdown-list" role="listbox" style="top: calc(100% + 4px); background-color: var(--bg-base); background-image: linear-gradient(var(--bg-surface-elevated, #1e293b), var(--bg-surface-elevated, #1e293b)); border: 1px solid var(--border-color); box-shadow: 0 12px 40px rgba(0,0,0,0.7); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 1000;">
+                    <input class="ud-dropdown-search" id="ud-dropdown-search" placeholder="Search user..." autocomplete="off" style="background: transparent; color: var(--text-primary);">
+                    <div id="ud-dropdown-options" style="background: transparent;">${opts}</div>
                 </div>
             </div>
         </div>
@@ -283,7 +283,7 @@ function _renderFilterBar() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
                 Filters ${badgeHtml}
             </button>
-            <div id="ud-filter-options-dropdown" style="display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 260px; padding: 16px; flex-direction: column; gap: 16px; z-index: 100; box-shadow: 0 10px 40px rgba(0,0,0,0.5); border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-surface); backdrop-filter: none;">
+            <div id="ud-filter-options-dropdown" style="display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 260px; padding: 16px; flex-direction: column; gap: 16px; z-index: 1000; box-shadow: 0 12px 40px rgba(0,0,0,0.7); border: 1px solid var(--border-color); border-radius: 10px; background-color: var(--bg-base); background-image: linear-gradient(var(--bg-surface-elevated, #1e293b), var(--bg-surface-elevated, #1e293b)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);">
                 
                 <div style="display: flex; flex-direction: column; gap: 6px;">
                     <label style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">File Extension</label>
@@ -762,7 +762,7 @@ function _attachContentEvents(contentEl, root) {
                 const path = pathNameEl.getAttribute('title');
                 if (path) {
                     navigator.clipboard.writeText(path).then(() => {
-                        showToast('Path Copied', `Copied "${path}" to clipboard`, 'success', 2500);
+                        showToast('Path Copied', `Successfully copied to clipboard.`, 'success', 2500);
                     }).catch(err => {
                         showToast('Failed to copy', err.message, 'error', 2500);
                     });

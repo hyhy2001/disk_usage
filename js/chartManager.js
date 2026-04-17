@@ -1,4 +1,4 @@
-import { smartFmt, smartFmtTick, pickUnit } from './formatters.js';
+import { smartFmt, smartFmtTick, pickUnit, fmt } from './formatters.js';
 
 /** Chart theme — returns appropriate colors based on current light/dark mode */
 function ct() {
@@ -22,13 +22,10 @@ export class ChartManager {
         this.teamChart = null;
         this.usersChart = null;
         this._histTotalChart   = null;
-        this._histGrowersChart = null;
-        // Scale states for the two horizontal bar charts
+        this._inodePieChart    = null;
         this._usersLogScale   = false;
-        this._growersLogScale = false;
         // Cached datasets for theme-change re-renders
         this._usersData   = null;
-        this._growersData = null;
         this._teamData    = null;
         this._teamTotal   = 0;
 
@@ -483,7 +480,7 @@ export class ChartManager {
                         borderWidth: 1.5,
                         fill: true,
                         tension: 0,
-                        pointRadius: 0,
+                        pointRadius: labels.length === 1 ? 4 : 0,
                         pointHitRadius: 12,
                         order: 1
                     },
@@ -496,7 +493,7 @@ export class ChartManager {
                         borderDash: [4, 3],
                         fill: false,
                         tension: 0,
-                        pointRadius: 0,
+                        pointRadius: labels.length === 1 ? 4 : 0,
                         pointHitRadius: 8,
                         order: 2
                     },
@@ -509,7 +506,7 @@ export class ChartManager {
                         borderDash: [6, 4],
                         fill: false,
                         tension: 0,
-                        pointRadius: 0,
+                        pointRadius: labels.length === 1 ? 4 : 0,
                         order: 3
                     }                ]
             },
@@ -797,7 +794,7 @@ export class ChartManager {
         const labels  = userData.map(u => u.name);
         const bytes   = userData.map(u => u.used);
         const { divisor, unit } = pickUnit(bytes);
-        const data    = bytes.map(b => +(b / divisor).toFixed(3));
+        const data    = bytes; // use raw bytes
 
         if (this.usersChart) this.usersChart.destroy();
 
@@ -812,14 +809,14 @@ export class ChartManager {
                     callback: v => {
                         if (v <= 0) return null;
                         const log = Math.log10(v);
-                        if (Math.abs(log - Math.round(log)) < 1e-9) return smartFmtTick(v * divisor);
+                        if (Math.abs(log - Math.round(log)) < 1e-9) return smartFmtTick(v);
                         const mantissa = Math.round(v / Math.pow(10, Math.floor(log)));
-                        if (mantissa === 2 || mantissa === 5) return smartFmtTick(v * divisor);
+                        if (mantissa === 2 || mantissa === 5) return smartFmtTick(v);
                         return null;
                     }
                 }
               }
-            : { type: 'linear', grid: { color: ct().grid }, ticks: { autoSkip: true, maxRotation: 0, maxTicksLimit: 6, callback: v => smartFmtTick(v * divisor) } };
+            : { type: 'linear', grid: { color: ct().grid }, ticks: { autoSkip: true, maxRotation: 0, maxTicksLimit: 6, callback: v => smartFmtTick(v) } };
 
         // Cache for theme re-render
         this._usersData = userData;
@@ -834,7 +831,7 @@ export class ChartManager {
                     tooltip: {
                         backgroundColor: ct().tipBg, titleColor: ct().tipBody, bodyColor: ct().tipBody,
                         borderColor: ct().tipBdr, borderWidth: 1,
-                        callbacks: { label: c => ` ${smartFmt(bytes[c.dataIndex])}` }
+                        callbacks: { label: c => ` ${smartFmt(c.raw)}` }
                     }
                 },
                 scales: {
@@ -887,7 +884,7 @@ export class ChartManager {
             type: 'line',
             data: { labels, datasets: [{
                 data: usedData, borderColor: '#fbbf24', backgroundColor: grad,
-                borderWidth: 1.5, fill: true, tension: 0.3, pointRadius: 0, pointHitRadius: 12
+                borderWidth: 1.5, fill: true, tension: 0.3, pointRadius: labels.length === 1 ? 4 : 0, pointHitRadius: 12
             }]},
             options: {
                 responsive: true, maintainAspectRatio: false,
@@ -897,12 +894,12 @@ export class ChartManager {
                     tooltip: {
                         backgroundColor: ct().tipBg, titleColor: ct().tipTitle,
                         bodyColor: ct().tipBody, borderColor: ct().tipBdr, borderWidth: 1, padding: 10,
-                        callbacks: { label: i => ` ${smartFmt(i.raw * 1e12)}` }
+                        callbacks: { label: i => ` ${fmt(i.raw * 1e12)}` }
                     }
                 },
                 scales: {
                     x: { grid: { color: ct().gridXs }, ticks: { maxTicksLimit: 6, color: ct().tick, font: { size: 12, weight: 500 } } },
-                    y: { position: 'right', grid: { color: ct().gridSm }, ticks: { autoSkip: true, maxRotation: 0, color: ct().tick, font: { size: 12, weight: 500 }, callback: v => smartFmtTick(v * 1e12) } }
+                    y: { position: 'right', grid: { color: ct().gridSm }, ticks: { autoSkip: true, maxRotation: 0, color: ct().tick, font: { size: 12, weight: 500 }, callback: v => fmt(v * 1e12) } }
                 }
             }
         });
@@ -919,84 +916,6 @@ export class ChartManager {
                 chart.update('none');
             }
         });
-    }
-    renderTopGrowersChart(growersData, logScale = false) {
-        const el = document.getElementById('historyGrowersChart');
-        if (!el) return;
-        const ctx = el.getContext('2d');
-
-        const labels     = growersData.map(u => u.name);
-        const growBytes  = growersData.map(u => u.growth || 0);
-        const { divisor, unit } = pickUnit(growBytes);
-        const deltas = growBytes.map(b => +(b / divisor).toFixed(3));
-        const colors = deltas.map(d => d >= 0 ? 'rgba(52,211,153,0.7)' : 'rgba(251,113,133,0.7)');
-
-        const el2 = document.getElementById('history-growers-stat');
-        if (el2 && growersData[0]) {
-            const top = growersData[0];
-            el2.textContent = `${top.name}: +${smartFmt(top.growth || 0, 1)}`;
-        }
-
-        // For log scale: use absolute values (negatives can't be logged)
-        const hasNegative = deltas.some(d => d < 0);
-        const useLog = logScale && !hasNegative;
-
-        const xScaleCfg = useLog
-            ? {
-                type: 'logarithmic',
-                grid: { color: ct().gridXs },
-                ticks: {
-                    color: ct().tickDim, font: { size: 12, weight: 500 },
-                    autoSkip: true,
-                    maxTicksLimit: 6,
-                    maxRotation: 0,
-                    callback: v => {
-                        if (v <= 0) return null;
-                        const log = Math.log10(v);
-                        const str = smartFmtTick(v * divisor);
-                        if (Math.abs(log - Math.round(log)) < 1e-9) return `+${str}`;
-                        const mantissa = Math.round(v / Math.pow(10, Math.floor(log)));
-                        if (mantissa === 2 || mantissa === 5) return `+${str}`;
-                        return null;
-                    }
-                }
-              }
-            : { type: 'linear', grid: { color: ct().gridSm }, ticks: { autoSkip: true, maxRotation: 0, maxTicksLimit: 6, color: ct().tick, font: { size: 12, weight: 500 }, callback: v => `${v>0?'+':''}${smartFmtTick(v * divisor)}` } };
-
-        if (this._histGrowersChart) this._histGrowersChart.destroy();
-        this._histGrowersChart = new Chart(ctx, {
-            type: 'bar',
-            data: { labels, datasets: [{ data: deltas, backgroundColor: colors, borderRadius: 4 }] },
-            options: {
-                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: ct().tipBg, titleColor: ct().tipBody,
-                        bodyColor: ct().tipBody, borderWidth: 0, padding: 10,
-                        callbacks: { label: i => ` ${i.raw >= 0 ? '+' : ''}${smartFmt(i.raw * divisor)}` }
-                    }
-                },
-                scales: {
-                    x: xScaleCfg,
-                    y: { grid: { display: false }, ticks: { color: ct().tickDim, font: { size: 12, weight: 500 } } }
-                }
-            }
-        });
-
-        // Wire toggle button
-        const btn = document.getElementById('growers-scale-btn');
-        if (btn) {
-            const effective = useLog;
-            btn.classList.toggle('active', effective);
-            btn.title = hasNegative && logScale ? 'Log unavailable (negative values)' : 'Toggle log/linear scale';
-            btn.onclick = () => {
-                this._growersLogScale = !this._growersLogScale;
-                this.renderTopGrowersChart(growersData, this._growersLogScale);
-            };
-        }
-
-        this._watchResize(el, this._histGrowersChart);
     }
     renderUserTrendChart(userTimelineMap, selectedUsers, startMs, endMs, logScale = false) {
         const el = document.getElementById('historyTotalChart');
@@ -1017,12 +936,12 @@ export class ChartManager {
             const points = new Map((userTimelineMap.get(name) || []).map(p => [p.timestamp, p.used]));
             return {
                 label: name,
-                data: sortedTs.map(ts => points.has(ts) ? +(points.get(ts) / 1e9).toFixed(2) : null),
+                data: sortedTs.map(ts => points.has(ts) ? Math.max(0.1, points.get(ts)) : null),
                 borderColor: PALETTE[i % PALETTE.length],
                 backgroundColor: 'transparent',
                 borderWidth: 1.5,
                 tension: 0.3,
-                pointRadius: 0,
+                pointRadius: sortedTs.length === 1 ? 4 : 0,
                 pointHitRadius: 10,
                 spanGaps: true
             };
@@ -1046,7 +965,7 @@ export class ChartManager {
                     tooltip: {
                         backgroundColor: ct().tipBg, titleColor: ct().tipBody,
                         bodyColor: ct().tipBody, borderColor: ct().tipBdr, borderWidth: 1, padding: 10,
-                        callbacks: { label: i => ` ${i.dataset.label}: ${i.raw?.toFixed(2) ?? '—'} GB` }
+                        callbacks: { label: i => ` ${i.dataset.label}: ${i.raw !== null ? fmt(i.raw) : '—'}` }
                     }
                 },
                 scales: {
@@ -1060,20 +979,86 @@ export class ChartManager {
                             font: { size: 12, weight: 500 }, 
                             callback: v => {
                                 if (v <= 0) return null;
-                                if (!logScale) return `${v}GB`;
+                                if (!logScale) return fmt(v);
                                 const log = Math.log10(v);
-                                if (Math.abs(log - Math.round(log)) < 1e-9) return `${v}GB`;
+                                if (Math.abs(log - Math.round(log)) < 1e-9) return fmt(v);
                                 const mantissa = Math.round(v / Math.pow(10, Math.floor(log)));
-                                if (mantissa === 2 || mantissa === 5) return `${v}GB`;
+                                if (mantissa === 2 || mantissa === 5) return fmt(v);
                                 return null;
                             }
-                        },
-                        ...(logScale ? { min: 0.01 } : {})
+                        }
                     }
                 }
             }
         });
 
         this._watchResize(el, this._histTotalChart);
+    }
+    
+    renderInodePieChart(inodes_total, inodes_used, inodes_scanned, inodes_free) {
+        const el = document.getElementById('inodePieChart');
+        if (!el) return;
+        const ctx = el.getContext('2d');
+        
+        // Ensure values are numbers
+        const total = inodes_total || 1; // prevent div by zero
+        const scanned = inodes_scanned || 0;
+        const gap = Math.max(0, (inodes_used || 0) - scanned);
+        const free = inodes_free || 0;
+        
+        const data = [scanned, gap, free];
+        const labels = ['Scanned', 'Unscanned (Permissions/Other)', 'Free'];
+        const colors = ['rgba(52, 211, 153, 0.75)', 'rgba(244, 63, 94, 0.75)', 'rgba(56, 189, 248, 0.15)'];
+        const borderColors = ['#10b981', '#f43f5e', '#0ea5e9'];
+        
+        if (this._inodePieChart) this._inodePieChart.destroy();
+        this._inodePieChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: colors,
+                    borderColor: borderColors,
+                    borderWidth: 1,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: ct().tickDim,
+                            font: { size: 12, family: "'Inter', sans-serif" },
+                            usePointStyle: true,
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: ct().tipBg,
+                        titleColor: ct().tipBody,
+                        bodyColor: ct().tipBody,
+                        borderWidth: 0,
+                        padding: 12,
+                        callbacks: {
+                            label: function(context) {
+                                if (context.raw !== null) {
+                                    const val = context.raw;
+                                    const pct = ((val / total) * 100).toFixed(1);
+                                    return val.toLocaleString() + ' inodes (' + pct + '%)';
+                                }
+                                return '';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        this._watchResize(el, this._inodePieChart);
     }
 }

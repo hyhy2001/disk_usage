@@ -59,7 +59,7 @@ function _renderItem(item) {
     return `<div class="perm-item">
         <span class="perm-item-icon">${icon}</span>
         ${badge}
-        <span class="perm-item-path" title="${escHtml(item.path)}">${escHtml(item.path)}</span>
+        <span class="perm-item-path" title="${escHtml(item.path)}" style="cursor: pointer;">${escHtml(item.path)}</span>
         <span class="perm-item-type">${escHtml(item.type ?? '')}</span>
         <span class="perm-item-error">${escHtml(item.error ?? '')}</span>
     </div>`;
@@ -231,6 +231,23 @@ function renderPermissions(data, diskId) {
             <p>No permission issues file found for this disk.</p>
         </div>`;
         return;
+    }
+
+    if (!body._hasCopyEvent) {
+        body.addEventListener('click', e => {
+            const pathEl = e.target.closest('.perm-item-path');
+            if (pathEl) {
+                const path = pathEl.getAttribute('title');
+                if (path) {
+                    navigator.clipboard.writeText(path).then(() => {
+                        showToast('Path Copied', `Successfully copied to clipboard.`, 'success', 2500);
+                    }).catch(err => {
+                        showToast('Failed to copy', err.message, 'error', 2500);
+                    });
+                }
+            }
+        });
+        body._hasCopyEvent = true;
     }
 
     // Reset all state

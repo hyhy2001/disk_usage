@@ -24,6 +24,7 @@ export class DataStore {
         this.latestSnapshot = null;
         this._latestTs = -Infinity;
         this.permissionIssues = null;
+        this.latestInodes = null;
 
         this.latestStats = {
             total: 0,
@@ -133,6 +134,9 @@ export class DataStore {
     // Returns the full latest snapshot object
     getLatestSnapshot() { return this.latestSnapshot; }
 
+    setLatestInodes(inodesData) { this.latestInodes = inodesData; }
+    getLatestInodes() { return this.latestInodes; }
+
     // ── Pivot table queries ───────────────────────────────────────────
 
     // Top N users by total usage (last known value in range)
@@ -156,7 +160,7 @@ export class DataStore {
                 const last = inRange.length ? inRange[inRange.length - 1].used : 0;
                 return { name, used: last, growth: last - first };
             })
-            .filter(u => u.growth > 0)
+            .filter(u => u.growth !== 0 || this.userTimelineMap.size <= 10) // Show all if <=10 users, else filter out 0 growth
             .sort((a, b) => b.growth - a.growth)
             .slice(0, limit);
     }
