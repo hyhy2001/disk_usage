@@ -28,6 +28,7 @@ class DataFetcher {
         this.dataStore = new DataStore();
         this._activeDisk = null;
         this._permissionsLoaded = false;
+        this._aggregateCacheByDisk = new Map(); // disk_id -> { latestDate, payload }
 
         // Initialize charts
         AppState.chartManagerInstance = new ChartManager();
@@ -119,6 +120,50 @@ class DataFetcher {
 
         // Load disk list (auto-fetch is triggered inherently by disk click simulation inside)
         this._initDiskSelector();
+    }
+
+    async _fetchDiskMeta(diskId) {
+        try {
+            const res = await fetch(`api.php?id=${encodeURIComponent(diskId)}&type=meta`);
+            if (!res.ok) return null;
+            const json = await res.json();
+            if (json?.status !== 'success' || !json?.data) return null;
+            return json.data;
+        } catch (_err) {
+            return null;
+        }
+    }
+
+    _applyAggregatePayload(jsonResponse, { fromCache = false } = {}) {
+        UINodes.statusText.textContent = fromCache ? "Using cached payload..." : "Loading payload...";
+        AppState.filesTotal = jsonResponse.total_files;
+        UINodes.filesProcessed.textContent = `0/${AppState.filesTotal} files`;
+
+        this.dataStore = new DataStore();
+        UINodes.statusText.textContent = "Aggregating metrics...";
+
+        this.dataStore.processChunk(jsonResponse.data);
+        if (jsonResponse.inodes) {
+            this.dataStore.setLatestInodes(jsonResponse.inodes);
+        }
+
+        AppState.filesProcessed = AppState.filesTotal;
+        UINodes.progressBar.style.width = `100%`;
+        UINodes.filesProcessed.textContent = `${AppState.filesTotal}/${AppState.filesTotal} files`;
+
+        const now = new Date();
+        const dStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const tStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const syncEl = document.getElementById('last-sync-time');
+        if (syncEl) syncEl.textContent = `${dStr} ${tStr}`;
+
+        this.handleComplete();
+
+        if (fromCache) {
+            showToast('Data is up to date', 'No changes detected. Reused cached aggregate payload.', 'success');
+        } else {
+            showToast('Data synced successfully', `Loaded ${jsonResponse.total_files} snapshot${jsonResponse.total_files !== 1 ? 's' : ''}`, 'success');
+        }
     }
 
     _initSortUI() {
@@ -952,7 +997,8 @@ class DataFetcher {
 
     async startServerSync() {
         if (AppState.isProcessing) return;
-        if (!this._activeDisk) {
+        const diskId = this._activeDisk;
+        if (!diskId) {
             UINodes.statusText.textContent = "No valid disk to scan.";
             return;
         }
@@ -960,9 +1006,17 @@ class DataFetcher {
         try {
             this.setProcessingState(true);
 
+            UINodes.statusText.textContent = "Checking metadata...";
+            const meta = await this._fetchDiskMeta(diskId);
+            const cached = this._aggregateCacheByDisk.get(diskId);
+
+            if (meta && cached && Number(cached.latestDate) === Number(meta.latest_date)) {
+                this._applyAggregatePayload(cached.payload, { fromCache: true });
+                return;
+            }
+
             UINodes.statusText.textContent = "Connecting to API...";
-            // Get disk path from disksConfig
-            const response = await fetch(`api.php?id=${encodeURIComponent(this._activeDisk)}`);
+            const response = await fetch(`api.php?id=${encodeURIComponent(diskId)}`);
             if (!response.ok) throw new Error(`HTTP error ${response.status} from api.php.`);
             const jsonResponse = await response.json();
             
@@ -981,33 +1035,17 @@ class DataFetcher {
                 return;
             }
 
-            UINodes.statusText.textContent = "Loading payload...";
-            AppState.filesTotal = jsonResponse.total_files;
-            UINodes.filesProcessed.textContent = `0/${AppState.filesTotal} files`;
-            
-            this.dataStore = new DataStore();
-            
-            UINodes.statusText.textContent = "Aggregating metrics...";
-            
-            this.dataStore.processChunk(jsonResponse.data);
-            if (jsonResponse.inodes) {
-                this.dataStore.setLatestInodes(jsonResponse.inodes);
-            }
-            
-            AppState.filesProcessed = AppState.filesTotal;
-            UINodes.progressBar.style.width = `100%`;
-            UINodes.filesProcessed.textContent = `${AppState.filesTotal}/${AppState.filesTotal} files`;
+            const payloadLatestDate = Number(
+                meta?.latest_date ??
+                jsonResponse?.data?.[jsonResponse.data.length - 1]?.date ??
+                0
+            ) || 0;
+            this._aggregateCacheByDisk.set(diskId, {
+                latestDate: payloadLatestDate,
+                payload: jsonResponse,
+            });
 
-            const now = new Date();
-            const dStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            const tStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            const syncEl = document.getElementById('last-sync-time');
-            if (syncEl) syncEl.textContent = `${dStr} ${tStr}`;
-
-            this.handleComplete();
-            // TASK-06: Toast on successful sync
-            const snapshots = this.dataStore._rawData?.length ?? 0;
-            showToast('Data synced successfully', `Loaded ${jsonResponse.total_files} snapshot${jsonResponse.total_files !== 1 ? 's' : ''}`, 'success');
+            this._applyAggregatePayload(jsonResponse, { fromCache: false });
             
         } catch (error) {
             console.error("Server API Sync Failed:", error);
@@ -1220,4 +1258,3 @@ document.addEventListener('DOMContentLoaded', () => {
     initMobileSidebar();
     window.appFetcher = new DataFetcher();
 });
-
