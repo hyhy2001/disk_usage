@@ -64,11 +64,35 @@ export function bytesToTB(bytes) {
 // ── TASK-06: Toast Notification System ────────────────────────────────────────
 
 const TOAST_ICONS = {
-    success: '✓',
-    error:   '✕',
-    warning: '⚠',
-    info:    'ℹ',
+    success: `
+<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle>
+    <path d="M8 12.5l2.5 2.5L16 9.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>`,
+    error: `
+<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle>
+    <path d="M9 9l6 6M15 9l-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path>
+</svg>`,
+    warning: `
+<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 4l9 16H3L12 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
+    <path d="M12 9v5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path>
+    <circle cx="12" cy="17" r="1.2" fill="currentColor"></circle>
+</svg>`,
+    info: `
+<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle>
+    <path d="M12 10v6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path>
+    <circle cx="12" cy="7.5" r="1.1" fill="currentColor"></circle>
+</svg>`,
 };
+
+const LOADING_SPINNER_SVG = `
+<svg class="toast-spinner-svg" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2" opacity="0.25"></circle>
+    <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path>
+</svg>`;
 
 /**
  * Show a toast notification.
@@ -85,7 +109,7 @@ export function showToast(title, desc = '', type = 'success', duration = 3200) {
     toast.className = `toast${type !== 'success' ? ` toast-${type}` : ''}`;
     toast.setAttribute('role', 'alert');
     toast.innerHTML = `
-        <span class="toast-icon">${TOAST_ICONS[type] ?? '✓'}</span>
+        <span class="toast-icon">${TOAST_ICONS[type] ?? TOAST_ICONS.success}</span>
         <div class="toast-body">
             <span class="toast-title">${title}</span>
             ${desc ? `<span class="toast-desc">${desc}</span>` : ''}
@@ -122,7 +146,7 @@ export function showProgressToast(id, title) {
         toast.style.minWidth = '280px';
         toast.innerHTML = `
             <div style="display:flex; align-items:center; gap: 8px; margin-bottom: 8px;">
-                <span class="toast-icon">⏳</span>
+                <span class="toast-icon toast-icon-spinner">${LOADING_SPINNER_SVG}</span>
                 <span class="toast-title" style="flex:1;">${title}</span>
                 <span class="toast-desc" id="${id}-desc" style="font-variant-numeric:tabular-nums; font-size: 0.75rem; color: var(--text-secondary);">0%</span>
             </div>
@@ -154,4 +178,3 @@ export function closeProgressToast(id) {
         setTimeout(() => toast.remove(), 280);
     }
 }
-

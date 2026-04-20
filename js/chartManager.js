@@ -28,6 +28,10 @@ export class ChartManager {
         this._usersData   = null;
         this._teamData    = null;
         this._teamTotal   = 0;
+        this._timelineFingerprint = null;
+        this._teamFingerprint = null;
+        this._usersFingerprint = null;
+        this._rangeBtnsBound = false;
 
         // Brand Colors
         this.colors = {
@@ -236,6 +240,8 @@ export class ChartManager {
     }
 
     _bindRangeBtns() {
+        if (this._rangeBtnsBound) return;
+        this._rangeBtnsBound = true;
         document.querySelectorAll('.range-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
@@ -251,6 +257,48 @@ export class ChartManager {
                 }
             });
         });
+    }
+
+    _buildTimelineFingerprint(timelineData) {
+        if (!Array.isArray(timelineData) || timelineData.length === 0) return 'timeline:empty';
+        const first = timelineData[0];
+        const last = timelineData[timelineData.length - 1];
+        let sumUsed = 0;
+        let sumTotal = 0;
+        let sumScanned = 0;
+        for (let i = 0; i < timelineData.length; i++) {
+            const row = timelineData[i] || {};
+            sumUsed += Number(row.used || 0);
+            sumTotal += Number(row.total || 0);
+            sumScanned += Number(row.scanned || 0);
+        }
+        return [
+            'timeline',
+            timelineData.length,
+            first.timestamp || 0,
+            first.used || 0,
+            first.total || 0,
+            first.scanned || 0,
+            last.timestamp || 0,
+            last.used || 0,
+            last.total || 0,
+            last.scanned || 0,
+            sumUsed,
+            sumTotal,
+            sumScanned,
+        ].join('|');
+    }
+
+    _buildTeamFingerprint(teamData, totalUsed) {
+        if (!Array.isArray(teamData) || teamData.length === 0) return `team:empty:${totalUsed || 0}`;
+        const compact = teamData.map(t => `${t.name || ''}:${t.used || 0}:${t.team_id || ''}`).join(',');
+        return `team:${teamData.length}:${totalUsed || 0}:${compact}`;
+    }
+
+    _buildUsersFingerprint(userData, logScale) {
+        if (!Array.isArray(userData) || userData.length === 0) return `users:empty:${logScale ? 1 : 0}`;
+        const compact = userData.map(u => `${u.name || ''}:${u.used || 0}`).join(',');
+        return `users:${logScale ? 1 : 0}:${userData.length}:${compact}`;
     }
 
 
@@ -313,6 +361,10 @@ export class ChartManager {
     }
 
     renderTimeline(timelineData) {
+        const nextFp = this._buildTimelineFingerprint(timelineData);
+        if (this.timelineChart && this._timelineFingerprint === nextFp) return;
+        this._timelineFingerprint = nextFp;
+
         const ctx = document.getElementById('timelineChart').getContext('2d');
 
         // Gradient fill under the Used line — more opaque in light mode for visibility
@@ -575,6 +627,10 @@ export class ChartManager {
 
 
     renderTeamChart(teamData, totalUsed = 0, dataStore = null) {
+        const nextFp = this._buildTeamFingerprint(teamData, totalUsed);
+        if (this.teamChart && this._teamFingerprint === nextFp) return;
+        this._teamFingerprint = nextFp;
+
         const ctx = document.getElementById('teamChart').getContext('2d');
         // Cache for theme re-render
         this._teamData  = teamData;
@@ -789,6 +845,14 @@ export class ChartManager {
     }
 
     renderUsersChart(userData, logScale = false) {
+        const nextFp = this._buildUsersFingerprint(userData, logScale);
+        if (this.usersChart && this._usersFingerprint === nextFp) {
+            const btn = document.getElementById('users-scale-btn');
+            if (btn) btn.classList.toggle('active', logScale);
+            return;
+        }
+        this._usersFingerprint = nextFp;
+
         this._hideNoDataOverlay(); // clear any empty-state overlay first
         const ctx = document.getElementById('usersChart').getContext('2d');
         const labels  = userData.map(u => u.name);
@@ -979,11 +1043,12 @@ export class ChartManager {
                             font: { size: 12, weight: 500 }, 
                             callback: v => {
                                 if (v <= 0) return null;
-                                if (!logScale) return fmt(v);
+                                if (!logScale) return smartFmtTick(v);
                                 const log = Math.log10(v);
-                                if (Math.abs(log - Math.round(log)) < 1e-9) return fmt(v);
+                                // Only show ticks for 1x, 2x, 5x to avoid label overlap in log scale
+                                if (Math.abs(log - Math.round(log)) < 1e-9) return smartFmtTick(v);
                                 const mantissa = Math.round(v / Math.pow(10, Math.floor(log)));
-                                if (mantissa === 2 || mantissa === 5) return fmt(v);
+                                if (mantissa === 2 || mantissa === 5) return smartFmtTick(v);
                                 return null;
                             }
                         }

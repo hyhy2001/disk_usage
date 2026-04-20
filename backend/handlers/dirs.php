@@ -1,5 +1,14 @@
 <?php
 
+function api_dirs_normalize_row($obj) {
+    if (!is_array($obj)) return array('path' => '', 'used' => 0);
+    $path = isset($obj['path']) ? $obj['path'] : (isset($obj['n']) ? $obj['n'] : '');
+    $used = isset($obj['used']) ? $obj['used'] : (isset($obj['s']) ? $obj['s'] : 0);
+    $obj['path'] = $path;
+    $obj['used'] = (int)$used;
+    return $obj;
+}
+
 function api_handle_dirs_ndjson($file_path, $who, $offset, $limit, $filter_min, $filter_max, $path_matches, $has_filters) {
     $fh = @fopen($file_path, 'r');
     if (!$fh) b64_error('Unable to open NDJSON directory report for user: ' . $who, 500);
@@ -28,6 +37,19 @@ function api_handle_dirs_ndjson($file_path, $who, $offset, $limit, $filter_min, 
             if (isset($meta['user'])) $user_name = $meta['user'];
             if (isset($meta['total_dirs'])) $total_dirs_meta = (int)$meta['total_dirs'];
             if (isset($meta['total_used'])) $total_used = (int)$meta['total_used'];
+            if (!$has_filters && $total_dirs_meta > 0 && $offset >= $total_dirs_meta) {
+                fclose($fh);
+                b64_success(array('dir' => array(
+                    'date'        => $date,
+                    'user'        => $user_name,
+                    'total_dirs'  => $total_dirs_meta,
+                    'total_used'  => $total_used,
+                    'offset'      => $offset,
+                    'limit'       => $limit,
+                    'has_more'    => false,
+                    'dirs'        => array(),
+                )));
+            }
             continue;
         }
 
@@ -39,7 +61,7 @@ function api_handle_dirs_ndjson($file_path, $who, $offset, $limit, $filter_min, 
         if ($filter_max > 0 && $usedBytes > $filter_max) continue;
         if (!$path_matches($pathName, $pathNameLc)) continue;
 
-        if ($filtered_total >= $offset && count($collected) < $limit) $collected[] = $obj;
+        if ($filtered_total >= $offset && count($collected) < $limit) $collected[] = api_dirs_normalize_row($obj);
         $filtered_total++;
 
         if (!$has_filters && $total_dirs_meta > 0 && $filtered_total >= ($offset + $limit)) break;
@@ -124,7 +146,8 @@ function api_handle_dirs($disk_path) {
                 if (!$has_filters) {
                     $total_dirs = isset($payload['total_dirs']) ? (int)$payload['total_dirs'] : count($source);
                     if ($total_dirs < count($source)) $total_dirs = count($source);
-                    $collected = array_slice($source, $offset, $limit);
+                    $slice = array_slice($source, $offset, $limit);
+                    foreach ($slice as $obj) $collected[] = api_dirs_normalize_row($obj);
                 } else {
                     $filtered_total = 0;
                     foreach ($source as $obj) {
@@ -139,7 +162,7 @@ function api_handle_dirs($disk_path) {
                         if (!$path_matches($pathName, $pathNameLc)) continue;
 
                         if ($filtered_total >= $offset && count($collected) < $limit) {
-                            $collected[] = $obj;
+                            $collected[] = api_dirs_normalize_row($obj);
                         }
                         $filtered_total++;
                     }
@@ -172,6 +195,20 @@ function api_handle_dirs($disk_path) {
         elseif  (preg_match('/"total_dirs"\\s*:\\s*(\\d+)/',  $ln, $m)) $total_dirs  = (int)$m[1];
         elseif  (preg_match('/"total_used"\\s*:\\s*(\\d+)/',  $ln, $m)) $total_used  = (int)$m[1];
         if (strpos($ln, '"dirs"') !== false && strpos($ln, '[') !== false) break;
+    }
+
+    if (!$has_filters && $total_dirs > 0 && $offset >= $total_dirs) {
+        if ($fh) fclose($fh);
+        b64_success(array('dir' => array(
+            'date'        => $date,
+            'user'        => $user_name,
+            'total_dirs'  => $total_dirs,
+            'total_used'  => $total_used,
+            'offset'      => $offset,
+            'limit'       => $limit,
+            'has_more'    => false,
+            'dirs'        => array(),
+        )));
     }
 
     if ($total_dirs === 0 && $fh) {
@@ -224,7 +261,7 @@ function api_handle_dirs($disk_path) {
 
                 if ($pass) {
                     if ($idx >= $offset && count($collected) < $limit) {
-                        $collected[] = $obj;
+                        $collected[] = api_dirs_normalize_row($obj);
                     }
                     $idx++;
                     $filtered_total++;

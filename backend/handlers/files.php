@@ -1,5 +1,16 @@
 <?php
 
+function api_files_normalize_row($obj) {
+    if (!is_array($obj)) return array('path' => '', 'size' => 0, 'xt' => '');
+    $path = isset($obj['path']) ? $obj['path'] : (isset($obj['n']) ? $obj['n'] : '');
+    $size = isset($obj['size']) ? $obj['size'] : (isset($obj['s']) ? $obj['s'] : 0);
+    $xt = isset($obj['xt']) ? $obj['xt'] : pathinfo($path, PATHINFO_EXTENSION);
+    $obj['path'] = $path;
+    $obj['size'] = (int)$size;
+    $obj['xt'] = strtolower((string)$xt);
+    return $obj;
+}
+
 function api_handle_files_ndjson($file_path, $who, $offset, $limit, $filter_min, $filter_max, $path_matches, $ext_lookup, $has_filters) {
     $fh = @fopen($file_path, 'r');
     if (!$fh) b64_error('Unable to open NDJSON file report for user: ' . $who, 500);
@@ -28,6 +39,19 @@ function api_handle_files_ndjson($file_path, $who, $offset, $limit, $filter_min,
             if (isset($meta['user'])) $user_name = $meta['user'];
             if (isset($meta['total_files'])) $total_files_meta = (int)$meta['total_files'];
             if (isset($meta['total_used'])) $total_used = (int)$meta['total_used'];
+            if (!$has_filters && $total_files_meta > 0 && $offset >= $total_files_meta) {
+                fclose($fh);
+                b64_success(array('file' => array(
+                    'date'        => $date,
+                    'user'        => $user_name,
+                    'total_files' => $total_files_meta,
+                    'total_used'  => $total_used,
+                    'offset'      => $offset,
+                    'limit'       => $limit,
+                    'has_more'    => false,
+                    'files'       => array(),
+                )));
+            }
             continue;
         }
 
@@ -43,7 +67,7 @@ function api_handle_files_ndjson($file_path, $who, $offset, $limit, $filter_min,
             if (!isset($ext_lookup[strtolower($ext)])) continue;
         }
 
-        if ($filtered_total >= $offset && count($collected) < $limit) $collected[] = $obj;
+        if ($filtered_total >= $offset && count($collected) < $limit) $collected[] = api_files_normalize_row($obj);
         $filtered_total++;
 
         if (!$has_filters && $total_files_meta > 0 && $filtered_total >= ($offset + $limit)) break;
@@ -134,7 +158,8 @@ function api_handle_files($disk_path) {
                 if (!$has_filters) {
                     $total_files = isset($payload['total_files']) ? (int)$payload['total_files'] : count($source);
                     if ($total_files < count($source)) $total_files = count($source);
-                    $collected = array_slice($source, $offset, $limit);
+                    $slice = array_slice($source, $offset, $limit);
+                    foreach ($slice as $obj) $collected[] = api_files_normalize_row($obj);
                 } else {
                     $filtered_total = 0;
                     foreach ($source as $obj) {
@@ -154,7 +179,7 @@ function api_handle_files($disk_path) {
                         }
 
                         if ($filtered_total >= $offset && count($collected) < $limit) {
-                            $collected[] = $obj;
+                            $collected[] = api_files_normalize_row($obj);
                         }
                         $filtered_total++;
                     }
@@ -187,6 +212,20 @@ function api_handle_files($disk_path) {
         elseif  (preg_match('/"total_files"\\s*:\\s*(\\d+)/', $ln, $m)) $total_files = (int)$m[1];
         elseif  (preg_match('/"total_used"\\s*:\\s*(\\d+)/',  $ln, $m)) $total_used  = (int)$m[1];
         if (strpos($ln, '"files"') !== false && strpos($ln, '[') !== false) break;
+    }
+
+    if (!$has_filters && $total_files > 0 && $offset >= $total_files) {
+        if ($fh) fclose($fh);
+        b64_success(array('file' => array(
+            'date'        => $date,
+            'user'        => $user_name,
+            'total_files' => $total_files,
+            'total_used'  => $total_used,
+            'offset'      => $offset,
+            'limit'       => $limit,
+            'has_more'    => false,
+            'files'       => array(),
+        )));
     }
 
     $idx = 0; $collected = array(); $buf = ''; $depth = 0;
@@ -235,7 +274,7 @@ function api_handle_files($disk_path) {
 
                 if ($pass) {
                     if ($idx >= $offset && count($collected) < $limit) {
-                        $collected[] = $obj;
+                        $collected[] = api_files_normalize_row($obj);
                     }
                     $idx++;
                     $filtered_total++;

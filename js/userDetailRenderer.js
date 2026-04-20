@@ -1016,13 +1016,20 @@ function _attachBannerEvents(root) {
 
 
 // ── CSV Export ────────────────────────────────────────────────────────────────
+const UD_BTN_SPINNER_SVG = `
+<span class="btn-inline-spinner" aria-hidden="true">
+    <svg width="13" height="13" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2" opacity="0.28"></circle>
+        <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path>
+    </svg>
+</span>`;
 
 async function _udExportDirs() {
     if (!_currentDisk || !_selectedUser) return;
     const btn = document.querySelector('#ud-export-dirs-user');
     
     const originalBtnHTML = btn ? btn.innerHTML : '';
-    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = UD_BTN_SPINNER_SVG; }
 
     try {
         const headers = ['User', 'Path', 'Used (bytes)'];
@@ -1078,7 +1085,7 @@ async function _udExportFiles() {
     const btn = document.querySelector('#ud-export-files-user');
 
     const originalBtnHTML = btn ? btn.innerHTML : '';
-    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = UD_BTN_SPINNER_SVG; }
 
     try {
         const headers = ['User', 'Path', 'Size (bytes)'];

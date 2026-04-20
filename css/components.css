@@ -4347,9 +4347,15 @@
 .toast.toast-error {
     border-left-color: var(--rose-500);
 }
+.toast.toast-error .toast-icon {
+    color: var(--rose-500);
+}
 
 .toast.toast-warning {
     border-left-color: #f59e0b;
+}
+.toast.toast-warning .toast-icon {
+    color: #f59e0b;
 }
 
 .toast.toast-exiting {
@@ -4358,9 +4364,16 @@
 }
 
 .toast-icon {
-    font-size: 1.1rem;
+    color: var(--emerald-500);
     flex-shrink: 0;
     margin-top: 1px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toast-icon svg {
+    display: block;
 }
 
 .toast-body {
@@ -4623,7 +4636,7 @@
 .ud-export-btn {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     padding: 3px 9px;
     border-radius: 5px;
     border: 1px solid rgba(255,255,255,0.1);
@@ -4654,7 +4667,7 @@
 .perm-export-btn {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     padding: 4px 10px;
     border-radius: 6px;
     border: 1px solid rgba(255,255,255,0.1);
@@ -4686,6 +4699,26 @@
     background: rgba(5,150,105,0.10);
     border-color: rgba(5,150,105,0.3);
     color: #059669;
+}
+
+/* ── Loading Spinner (toast + export buttons) ─────────────────────────────── */
+.toast-icon-spinner,
+.btn-inline-spinner {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toast-icon-spinner svg,
+.btn-inline-spinner svg {
+    display: block;
+    animation: spin-360 0.9s linear infinite;
+    transform-origin: center;
+}
+
+@keyframes spin-360 {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 /* Path list */

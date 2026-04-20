@@ -4,7 +4,7 @@ import { ChartManager } from './chartManager.js';
 import { initRouter, navigateTo } from './router.js';
 import { renderDetailTables, initScaleToggle, resetDashboardToEmpty } from './detailRenderer.js';
 import { initUserDetailTab, resetUserDetailTab } from './userDetailRenderer.js';
-import { fmt } from './formatters.js';
+import { fmt, smartFmtTick } from './formatters.js';
 import { saveFilters, loadFilters } from './filterStorage.js';
 
 // ── Sidebar live clock ────────────────────────────────────────────────────────
@@ -29,6 +29,10 @@ class DataFetcher {
         this._activeDisk = null;
         this._permissionsLoaded = false;
         this._aggregateCacheByDisk = new Map(); // disk_id -> { latestDate, payload }
+        this._inflightSyncByDisk = new Map(); // disk_id -> Promise
+        this._syncSequence = 0;
+        this._activeSyncController = null;
+        this._toastHistory = new Map(); // toastKey -> lastShownAtMs
 
         // Initialize charts
         AppState.chartManagerInstance = new ChartManager();
@@ -81,24 +85,24 @@ class DataFetcher {
         const viewToggleBtns = document.querySelectorAll('#team-view-toggle .view-toggle-btn');
         if (viewToggleBtns.length > 0) {
             const savedView = localStorage.getItem('teamViewMode') || 'grid';
-            
+
             // Initial state application
             const teamDiskGrid = document.getElementById('team-disk-grid');
             if (savedView === 'list' && teamDiskGrid) {
                 teamDiskGrid.classList.add('list-view');
             }
-            
+
             viewToggleBtns.forEach(btn => {
                 if (btn.dataset.view === savedView) {
                     viewToggleBtns.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                 }
-                
+
                 btn.addEventListener('click', () => {
                     const viewType = btn.dataset.view;
                     viewToggleBtns.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
-                    
+
                     if (teamDiskGrid) {
                         if (viewType === 'list') {
                             teamDiskGrid.classList.add('list-view');
@@ -122,11 +126,24 @@ class DataFetcher {
         this._initDiskSelector();
     }
 
-    async _fetchDiskMeta(diskId) {
+    // Avoid spamming identical toast messages when users click rapidly.
+    _toastOnce(key, title, message, variant = 'info', cooldownMs = 2500) {
+        const now = Date.now();
+        const last = this._toastHistory.get(key) || 0;
+        if ((now - last) < cooldownMs) return;
+        this._toastHistory.set(key, now);
+        showToast(title, message, variant);
+    }
+
+    async _fetchJson(url, { signal } = {}) {
+        const res = await fetch(url, { signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
+        return res.json();
+    }
+
+    async _fetchDiskMeta(diskId, signal) {
         try {
-            const res = await fetch(`api.php?id=${encodeURIComponent(diskId)}&type=meta`);
-            if (!res.ok) return null;
-            const json = await res.json();
+            const json = await this._fetchJson(`api.php?id=${encodeURIComponent(diskId)}&type=meta`, { signal });
             if (json?.status !== 'success' || !json?.data) return null;
             return json.data;
         } catch (_err) {
@@ -160,9 +177,9 @@ class DataFetcher {
         this.handleComplete();
 
         if (fromCache) {
-            showToast('Data is up to date', 'No changes detected. Reused cached aggregate payload.', 'success');
+            this._toastOnce('sync-cache-hit', 'Data is up to date', 'No changes detected. Reused cached aggregate payload.', 'success');
         } else {
-            showToast('Data synced successfully', `Loaded ${jsonResponse.total_files} snapshot${jsonResponse.total_files !== 1 ? 's' : ''}`, 'success');
+            this._toastOnce('sync-success', 'Data synced successfully', `Loaded ${jsonResponse.total_files} snapshot${jsonResponse.total_files !== 1 ? 's' : ''}`, 'success');
         }
     }
 
@@ -172,18 +189,18 @@ class DataFetcher {
         const sortDropdown = document.getElementById('disk-sort-dropdown');
         const dropdownItems = document.querySelectorAll('.sort-item');
         const iconSortAlpha = document.getElementById('icon-sort-alpha');
-        
+
         let currentSort = localStorage.getItem('teamDiskSort') || 'alpha-asc';
-        
+
         const PATH_AZ = '<path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M20 8h-5"/><path d="M15 10V6.5a2.5 2.5 0 0 1 5 0V10"/><path d="M15 14h5l-5 6h5"/>';
         const PATH_ZA = '<path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="M20 8h-5"/><path d="M15 10V6.5a2.5 2.5 0 0 1 5 0V10"/><path d="M15 14h5l-5 6h5"/>';
-        
+
         const applySort = () => {
             const grid = document.getElementById('team-disk-grid');
             if (!grid) return;
             const cards = Array.from(grid.querySelectorAll('.team-disk-card'));
             if (cards.length === 0) return;
-            
+
             cards.sort((a, b) => {
                 const nameA = a.dataset.name || '';
                 const nameB = b.dataset.name || '';
@@ -191,16 +208,16 @@ class DataFetcher {
                 const usedB = parseFloat(b.dataset.usedPct) || 0;
                 const freeA = parseFloat(a.dataset.freeBytes) || 0;
                 const freeB = parseFloat(b.dataset.freeBytes) || 0;
-                
+
                 if (currentSort === 'alpha-asc') return nameA.localeCompare(nameB);
                 if (currentSort === 'alpha-desc') return nameB.localeCompare(nameA);
                 if (currentSort === 'usage-desc') return usedB - usedA;
                 if (currentSort === 'free-desc') return freeB - freeA;
                 return 0;
             });
-            
+
             cards.forEach(card => grid.appendChild(card));
-            
+
             if (btnAlpha && btnMore && iconSortAlpha) {
                 if (currentSort.startsWith('alpha')) {
                     btnAlpha.classList.add('active-sort-btn');
@@ -211,13 +228,13 @@ class DataFetcher {
                     btnMore.classList.add('active-sort-btn');
                 }
             }
-            
+
             if (this._lastTeamData) {
                 const storedMode = localStorage.getItem('teamChartViewMode') || 'absolute-linear';
                 let apiMode = 'linear';
                 if (storedMode === 'absolute-log') apiMode = 'logarithmic';
                 else if (storedMode === 'percent') apiMode = 'percent';
-                
+
                 // Add minor timeout to ensure DOM container is available over the race-condition sync flow
                 setTimeout(() => {
                     this._renderTeamComparisonChart(this._lastTeamData, apiMode);
@@ -226,7 +243,7 @@ class DataFetcher {
         };
 
         this.applySort = applySort;
-        
+
         if (btnAlpha) {
             btnAlpha.addEventListener('click', () => {
                 currentSort = currentSort === 'alpha-asc' ? 'alpha-desc' : 'alpha-asc';
@@ -234,19 +251,19 @@ class DataFetcher {
                 applySort();
             });
         }
-        
+
         if (btnMore && sortDropdown) {
             btnMore.addEventListener('click', (e) => {
                 e.stopPropagation();
                 sortDropdown.style.display = sortDropdown.style.display === 'none' ? 'block' : 'none';
             });
-            
+
             document.addEventListener('click', (e) => {
                 if (!btnMore.contains(e.target) && !sortDropdown.contains(e.target)) {
                     sortDropdown.style.display = 'none';
                 }
             });
-            
+
             dropdownItems.forEach(item => {
                 item.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -263,7 +280,7 @@ class DataFetcher {
         const btnSettings = document.getElementById('btn-chart-settings');
         const settingsDropdown = document.getElementById('chart-settings-dropdown');
         const modeItems = document.querySelectorAll('.chart-mode-item');
-        
+
         // Migrate old distinct settings to a unified setting if needed
         let currentMode = localStorage.getItem('teamChartViewMode');
         if (!currentMode) {
@@ -272,7 +289,7 @@ class DataFetcher {
             currentMode = isPercent ? 'percent' : (currentScale === 'logarithmic' ? 'absolute-log' : 'absolute-linear');
             localStorage.setItem('teamChartViewMode', currentMode);
         }
-        
+
         const updateUI = () => {
             modeItems.forEach(item => {
                 if (item.dataset.mode === currentMode) {
@@ -290,19 +307,19 @@ class DataFetcher {
             }
         };
         updateUI();
-        
+
         if (btnSettings && settingsDropdown) {
             btnSettings.addEventListener('click', (e) => {
                 e.stopPropagation();
                 settingsDropdown.style.display = settingsDropdown.style.display === 'none' ? 'block' : 'none';
             });
-            
+
             document.addEventListener('click', (e) => {
                 if (!btnSettings.contains(e.target) && !settingsDropdown.contains(e.target)) {
                     settingsDropdown.style.display = 'none';
                 }
             });
-            
+
             modeItems.forEach(item => {
                 item.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -310,7 +327,7 @@ class DataFetcher {
                     localStorage.setItem('teamChartViewMode', currentMode);
                     settingsDropdown.style.display = 'none';
                     updateUI();
-                    
+
                     if (this._lastTeamData && window._teamCompChart) {
                         let scale = 'linear';
                         if (currentMode === 'absolute-log') scale = 'logarithmic';
@@ -324,29 +341,27 @@ class DataFetcher {
 
     _renderTeamComparisonChart(data, mode) {
         const canvasWrapper = document.getElementById('team-comparison-canvas-wrapper');
-        const canvasGrid = document.getElementById('overview-empty-state');
-        if (!canvasGrid || canvasGrid.style.display === 'none') return;
-        
+
         if (window._teamCompChart) {
             window._teamCompChart.destroy();
         }
-        
+
         // Dynamically set width based on number of disks
         if (canvasWrapper) {
             const minW = Math.max(100, data.length * 60);
             canvasWrapper.style.width = `max(100%, ${minW}px)`;
         }
-        
+
         const ctx = document.getElementById('teamComparisonChart');
         if (!ctx) return;
-        
+
         const labels = [];
         const usedData = [];
         const freeData = [];
         const absoluteData = []; // for tooltips
-        
+
         const currentSort = localStorage.getItem('teamDiskSort') || 'alpha-asc';
-        
+
         const sortedData = [...data].sort((a, b) => {
             const nameA = (a._disk_name || '').toLowerCase();
             const nameB = (b._disk_name || '').toLowerCase();
@@ -358,7 +373,7 @@ class DataFetcher {
             const usedB = sysB.used || 0;
             const freeA = Math.max(0, totalA - usedA);
             const freeB = Math.max(0, totalB - usedB);
-            
+
             const usedPctA = totalA > 0 ? (usedA / totalA) * 100 : 0;
             const usedPctB = totalB > 0 ? (usedB / totalB) * 100 : 0;
 
@@ -368,26 +383,29 @@ class DataFetcher {
             if (currentSort === 'free-desc') return freeB - freeA;
             return 0;
         });
-        
+
         sortedData.forEach(d => {
             const sys = d.general_system || {};
             const total = sys.total || 0;
             const used = sys.used || 0;
             const free = Math.max(0, total - used);
             const diskName = d._disk_name || 'Disk';
-            
+
             labels.push(diskName);
-            absoluteData.push({total, used, free});
-            
+            absoluteData.push({ total, used, free });
+
             if (mode === 'percent' && total > 0) {
                 usedData.push({ x: diskName, y: (used / total) * 100 });
                 freeData.push({ x: diskName, y: (free / total) * 100 });
             } else {
-                usedData.push({ x: diskName, y: used });
-                freeData.push({ x: diskName, y: free });
+                // Logarithmic scale cannot handle 0 values, use a tiny positive floor
+                const valUsed = mode === 'logarithmic' ? Math.max(0.1, used) : used;
+                const valFree = mode === 'logarithmic' ? Math.max(0.1, free) : free;
+                usedData.push({ x: diskName, y: valUsed });
+                freeData.push({ x: diskName, y: valFree });
             }
         });
-        
+
         window._teamCompChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -416,7 +434,7 @@ class DataFetcher {
                     legend: { display: false },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 const dsLabel = context.dataset.label;
                                 const idx = context.dataIndex;
                                 const abs = absoluteData[idx];
@@ -445,9 +463,9 @@ class DataFetcher {
                         stacked: mode !== 'logarithmic',
                         grid: { color: 'rgba(255,255,255,0.05)' },
                         ticks: {
-                            callback: function(value) {
+                            callback: function (value) {
                                 if (mode === 'percent') return value + '%';
-                                return fmt(value); // dynamic capacity formatting
+                                return fmt(value);
                             }
                         },
                         max: mode === 'percent' ? 100 : undefined
@@ -455,39 +473,39 @@ class DataFetcher {
                 }
             }
         });
-        
+
         // --- Populate Team Insights Grid ---
         const insightsGrid = document.getElementById('team-comparison-insights');
         if (insightsGrid) {
             let count30 = 0, count50 = 0, count70 = 0, count90 = 0;
-            
+
             data.forEach(d => {
                 const sys = d.general_system || {};
                 const t = sys.total || 0;
                 const u = sys.used || 0;
                 const ratio = t > 0 ? (u / t) : 0;
-                
-                if (ratio > 0.3) count30++;
-                if (ratio > 0.5) count50++;
-                if (ratio > 0.7) count70++;
-                if (ratio > 0.9) count90++;
+
+                if (ratio >= 0.3 && ratio < 0.5) count30++;
+                else if (ratio >= 0.5 && ratio < 0.7) count50++;
+                else if (ratio >= 0.7 && ratio < 0.9) count70++;
+                else if (ratio >= 0.9) count90++;
             });
-            
+
             insightsGrid.innerHTML = `
                 <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 12px; border: var(--glass-border);">
-                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Disks > 30% Used</div>
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Stable: 30-50%</div>
                     <div style="font-size: 1.5rem; font-weight: 600; color: var(--emerald-500, #10b981);">${count30}</div>
                 </div>
                 <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 12px; border: var(--glass-border);">
-                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Disks > 50% Used</div>
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Attention: 50-70%</div>
                     <div style="font-size: 1.5rem; font-weight: 600; color: var(--sky-500, #3b82f6);">${count50}</div>
                 </div>
                 <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 12px; border: var(--glass-border);">
-                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Disks > 70% Used</div>
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Warning: 70-90%</div>
                     <div style="font-size: 1.5rem; font-weight: 600; color: var(--amber-500, #f59e0b);">${count70}</div>
                 </div>
                 <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 12px; border: var(--glass-border);">
-                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Disks > 90% Used</div>
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Critical: > 90%</div>
                     <div style="font-size: 1.5rem; font-weight: 600; color: var(--rose-500, #f43f5e);">${count90}</div>
                 </div>
             `;
@@ -504,9 +522,9 @@ class DataFetcher {
                 list.innerHTML = skeletonHTML;
             }
             // Fetch configuration securely via api.php (path hidden)
-            const res = await fetch('api.php?type=disks');
-            const rawDisks = await res.json();
-            
+            const rawDisks = await this._fetchJson('api.php?type=disks');
+            if (!Array.isArray(rawDisks)) throw new Error('Invalid disks payload');
+
             // Flatten the disks for internal application logic
             const flatDisks = [];
             rawDisks.forEach((team, tIdx) => {
@@ -530,7 +548,7 @@ class DataFetcher {
                     const target = list.querySelector(`.disk-list-item[data-id="${id}"]`);
                     if (target) target.classList.add('active');
                 }
-                
+
                 // Highlight the card in the middle column
                 const grid = document.getElementById('team-disk-grid');
                 if (grid) {
@@ -538,7 +556,7 @@ class DataFetcher {
                     const card = grid.querySelector(`.team-disk-card[data-id="${id}"]`);
                     if (card) card.classList.add('selected');
                 }
-                
+
                 this._activeDisk = id;
                 saveFilters({ activeDisk: id });
 
@@ -580,7 +598,7 @@ class DataFetcher {
                 }
 
                 if (typeof resetUserDetailTab === 'function') resetUserDetailTab();
-                
+
                 // Restore nav tabs and sync button if we came from team view
                 const workspaceHeader = document.querySelector('.workspace-header');
                 if (workspaceHeader) workspaceHeader.style.display = 'flex';
@@ -595,7 +613,7 @@ class DataFetcher {
                 const sharedHeader = document.getElementById('shared-header');
                 if (sharedHeader) sharedHeader.style.display = '';
 
-                
+
                 const activeTabBtn = document.querySelector('.tab-btn.active');
                 if (activeTabBtn && activeTabBtn.id === 'nav-detail') {
                     navigateTo('detail');
@@ -640,7 +658,7 @@ class DataFetcher {
                         });
                     });
                 }
-                
+
                 // Removed standalone specific dropdown chevron logic
             };
 
@@ -650,9 +668,9 @@ class DataFetcher {
             const projectSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right: 6px; opacity: 0.6;"><rect width="16" height="16" x="4" y="4" rx="2"></rect><rect width="6" height="6" x="9" y="9" rx="1"></rect><path d="M15 2v2"></path><path d="M15 20v2"></path><path d="M2 15h2"></path><path d="M2 9h2"></path><path d="M20 15h2"></path><path d="M20 9h2"></path><path d="M9 2v2"></path><path d="M9 20v2"></path></svg>`;
             const teamSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right: 6px; opacity: 0.6;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`;
             let phtml = '';
-            
+
             const rawD = rawDisks;
-            
+
             rawD.forEach((team, tIdx) => {
                 if (team.name && team.disks) {
                     phtml += `<div class="disk-project-group" style="margin-bottom: 8px;">
@@ -671,7 +689,7 @@ class DataFetcher {
                 sidebarSearch.addEventListener('input', (e) => {
                     const term = e.target.value.toLowerCase().trim();
                     const groupNodes = projectContainer.querySelectorAll('.disk-project-group');
-                    
+
                     groupNodes.forEach(group => {
                         const team = group.querySelector('.disk-team-group');
                         if (team) {
@@ -686,14 +704,6 @@ class DataFetcher {
                 });
             }
 
-            projectContainer.querySelectorAll('.disk-project-header').forEach(header => {
-                header.style.cursor = 'pointer';
-                header.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    header.parentElement.classList.toggle('collapsed');
-                });
-            });
-
             projectContainer.querySelectorAll('.disk-team-group').forEach(teamGroup => {
                 teamGroup.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -701,10 +711,10 @@ class DataFetcher {
                         g.classList.remove('active-team');
                     });
                     teamGroup.classList.add('active-team');
-                    
+
                     const tIdx = parseInt(teamGroup.dataset.tidx);
                     const teamNode = rawD[tIdx];
-                    
+
                     this._activeDisk = null;
                     saveFilters({ activeDisk: null, activeTeamTIdx: tIdx });
                     const list = document.getElementById('disk-list');
@@ -714,7 +724,7 @@ class DataFetcher {
                     this.renderTeamContext(teamNode, teamNode.name);
 
                     if (!window._isRestoringDisk) {
-                         this.loadTeamOverview(teamNode.name);
+                        this.loadTeamOverview(teamNode.name);
                     }
                 });
             });
@@ -722,14 +732,14 @@ class DataFetcher {
             const savedFilters = loadFilters();
             const savedDisk = savedFilters.activeDisk;
             const savedTIdx = savedFilters.activeTeamTIdx;
-            
+
             if (savedDisk) {
                 let foundTeamEl = null;
                 let foundTIdx = null;
                 rawD.forEach((team, tIdx) => {
                     if (team.name && team.disks?.find(d => d.id === savedDisk)) {
-                         foundTeamEl = projectContainer.querySelector(`.disk-team-group[data-tidx="${tIdx}"]`);
-                         foundTIdx = tIdx;
+                        foundTeamEl = projectContainer.querySelector(`.disk-team-group[data-tidx="${tIdx}"]`);
+                        foundTIdx = tIdx;
                     }
                 });
                 if (foundTeamEl) {
@@ -737,13 +747,13 @@ class DataFetcher {
                         g.classList.remove('active-team');
                     });
                     foundTeamEl.classList.add('active-team');
-                    
+
                     const teamNode = rawD[foundTIdx];
                     this.renderTeamContext(teamNode, teamNode.name);
                     this.loadTeamOverview(teamNode.name, savedDisk);
                 } else {
-                   const firstTeam = projectContainer.querySelector('.disk-team-group');
-                   if (firstTeam) firstTeam.click();
+                    const firstTeam = projectContainer.querySelector('.disk-team-group');
+                    if (firstTeam) firstTeam.click();
                 }
             } else if (savedTIdx !== undefined && savedTIdx !== null) {
                 const teamEl = projectContainer.querySelector(`.disk-team-group[data-tidx="${savedTIdx}"]`);
@@ -759,6 +769,7 @@ class DataFetcher {
             }
         } catch (e) {
             console.error('Error in fetchDisksList:', e);
+            this._toastOnce('load-disks-failed', 'Failed to load disks', e.message || 'Please check API connectivity.', 'error');
         }
     }
 
@@ -772,33 +783,31 @@ class DataFetcher {
         if (titleEl) titleEl.textContent = teamName + ' Overview';
         const pathEl = document.getElementById('header-disk-path');
         if (pathEl) pathEl.textContent = 'Aggregated usage';
-        
+
         const teamTitleEl = document.getElementById('team-overview-title-text');
         if (teamTitleEl) teamTitleEl.textContent = teamName ? teamName : 'All Teams';
-        
+
         // Reset dropdown label
         const titleText = document.getElementById('disk-title-text');
         if (titleText) titleText.textContent = "Select a disk...";
-        
+
         // Switch to Team Overview Page
         // Switch to Team Overview Page via Router
         // navigateTo('team'); // Removed because we now have a 3-column layout where team disks are in the sidebar
 
         const grid = document.getElementById('team-disk-grid');
         if (!grid) return;
-        
+
         grid.innerHTML = '<div class="glass-panel" style="padding:20px;"><div class="spinner"></div> Loading team data...</div>';
 
         try {
-            const res = await fetch(`api.php?type=team&name=${encodeURIComponent(teamName)}`);
-            if (!res.ok) throw new Error('API fetching failed');
-            const result = await res.json();
-            
+            const result = await this._fetchJson(`api.php?type=team&name=${encodeURIComponent(teamName)}`);
+
             if (result.status !== 'success' || !result.data || result.data.length === 0) {
                 grid.innerHTML = '<div class="glass-panel" style="padding:20px; color:var(--text-secondary);">No disk usage reports available for this team.</div>';
                 return;
             }
-            
+
             this._lastTeamData = result.data;
 
             let totalBytes = 0;
@@ -816,19 +825,19 @@ class DataFetcher {
 
                 totalBytes += total;
                 usedBytes += used;
-                
+
                 const scannedPct = total > 0 ? ((scanned / total) * 100).toFixed(1) : 0;
                 const unknownPct = total > 0 ? ((unknown / total) * 100).toFixed(1) : 0;
                 const usedPct = total > 0 ? ((used / total) * 100).toFixed(1) : 0;
-                
+
                 const diskName = d._disk_name || 'Disk';
                 const diskId = d._disk_id || '';
                 const dirPath = d.directory || sys.directory || d._disk_path || 'Unknown path';
-                
+
                 let usedClass = 'usage-pill-success';
                 if (usedPct >= 85) usedClass = 'usage-pill-danger';
                 else if (usedPct >= 70) usedClass = 'usage-pill-warning';
-                
+
                 const free = Math.max(0, total - used);
                 const tooltipText = `<div style='display:grid; grid-template-columns: auto 1fr; gap: 4px 16px; text-align: left;'>
                     <div style='color:var(--text-secondary)'>Total:</div><div style='text-align:right; font-weight:600; font-variant-numeric: tabular-nums;'>${fmt(total)}</div>
@@ -866,12 +875,12 @@ class DataFetcher {
             });
 
             grid.innerHTML = cardsHTML;
-            
+
             // Apply sorting initially once cards are loaded
             if (typeof this.applySort === 'function') {
                 this.applySort();
             }
-            
+
             // Team Disk Search Handler
             const teamSearch = document.getElementById('team-disk-search');
             if (teamSearch) {
@@ -891,10 +900,10 @@ class DataFetcher {
                 // Trigger a re-filter just in case
                 teamSearch.dispatchEvent(new Event('input'));
             }
-            
+
             const txtTotal = document.getElementById('team-stat-total');
             const txtUsed = document.getElementById('team-stat-used');
-            
+
             if (txtTotal) txtTotal.textContent = bytesToTB(totalBytes);
             if (txtUsed) txtUsed.textContent = bytesToTB(usedBytes);
 
@@ -917,9 +926,11 @@ class DataFetcher {
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { legend: { display: false }, tooltip: {
-                            callbacks: { label: (ctx) => ' ' + fmt(ctx.raw) }
-                        }},
+                        plugins: {
+                            legend: { display: false }, tooltip: {
+                                callbacks: { label: (ctx) => ' ' + fmt(ctx.raw) }
+                            }
+                        },
                         cutout: '75%'
                     }
                 });
@@ -927,6 +938,7 @@ class DataFetcher {
         } catch (e) {
             console.error("Team load error:", e);
             grid.innerHTML = '<div class="glass-panel" style="padding:20px; color:#f43f5e;">Failed to load team aggregated data. Please check connection.</div>';
+            this._toastOnce(`team-overview-failed:${teamName}`, 'Team overview failed', e.message || 'Could not fetch team aggregate data.', 'error');
         }
 
         // Do not auto-select the disk unless restoring previous session
@@ -935,10 +947,10 @@ class DataFetcher {
 
             const sharedHeader = document.getElementById('shared-header');
             if (sharedHeader) sharedHeader.style.display = 'none';
-            
+
             // Clean global charts since no specific disk is active
             resetDashboardToEmpty(AppState.chartManagerInstance);
-            
+
             // Toggle overview states
             const overviewGrid = document.getElementById('overview-charts-grid');
             const overviewEmpty = document.getElementById('overview-empty-state');
@@ -962,18 +974,18 @@ class DataFetcher {
                     }, 50);
                 }
             }
-            
+
             const tabs = document.querySelector('.detail-tabs');
             if (tabs) tabs.style.display = 'none'; // hide tabs when no disk selected
-            
+
             const detailViewArea = document.getElementById('detail-view-area');
             if (detailViewArea) detailViewArea.innerHTML = '';
-            
+
             // Switch tabs to snapshot natively
             document.querySelectorAll('.detail-tab-pane').forEach(p => p.classList.remove('active'));
             const snapPane = document.getElementById('tab-pane-snapshot');
             if (snapPane) snapPane.classList.add('active');
-            
+
             const snapBody = document.getElementById('tab-snapshot-body');
             if (snapBody) {
                 snapBody.innerHTML = `
@@ -996,69 +1008,94 @@ class DataFetcher {
     }
 
     async startServerSync() {
-        if (AppState.isProcessing) return;
         const diskId = this._activeDisk;
         if (!diskId) {
             UINodes.statusText.textContent = "No valid disk to scan.";
             return;
         }
-        
-        try {
-            this.setProcessingState(true);
 
-            UINodes.statusText.textContent = "Checking metadata...";
-            const meta = await this._fetchDiskMeta(diskId);
-            const cached = this._aggregateCacheByDisk.get(diskId);
-
-            if (meta && cached && Number(cached.latestDate) === Number(meta.latest_date)) {
-                this._applyAggregatePayload(cached.payload, { fromCache: true });
-                return;
-            }
-
-            UINodes.statusText.textContent = "Connecting to API...";
-            const response = await fetch(`api.php?id=${encodeURIComponent(diskId)}`);
-            if (!response.ok) throw new Error(`HTTP error ${response.status} from api.php.`);
-            const jsonResponse = await response.json();
-            
-            if ((jsonResponse.status && jsonResponse.status !== 'success') || !jsonResponse.data || jsonResponse.data.length === 0) {
-                this.setProcessingState(false);
-                const isEmpty = jsonResponse.data && jsonResponse.data.length === 0;
-                if (isEmpty) {
-                    showToast('No reports found', 'This disk has no JSON reports yet.', 'warning');
-                    UINodes.statusText.textContent = 'No data — disk is empty.';
-                } else {
-                    showToast('API returned an error', jsonResponse.message || 'Could not load disk data.', 'error');
-                    UINodes.statusText.textContent = 'API error.';
-                }
-                // Reset all dashboard UI to empty state
-                resetDashboardToEmpty(AppState.chartManagerInstance);
-                return;
-            }
-
-            const payloadLatestDate = Number(
-                meta?.latest_date ??
-                jsonResponse?.data?.[jsonResponse.data.length - 1]?.date ??
-                0
-            ) || 0;
-            this._aggregateCacheByDisk.set(diskId, {
-                latestDate: payloadLatestDate,
-                payload: jsonResponse,
-            });
-
-            this._applyAggregatePayload(jsonResponse, { fromCache: false });
-            
-        } catch (error) {
-            console.error("Server API Sync Failed:", error);
-            this.setProcessingState(false);
-            UINodes.statusText.textContent = "Error: " + error.message;
-            UINodes.statusDot.classList.remove('scanning');
-            UINodes.statusDot.style.backgroundColor = 'var(--rose-500)';
-            // TASK-06: Toast on sync error
-            showToast('Sync failed', error.message || 'Check connection and try again', 'error');
+        const inflight = this._inflightSyncByDisk.get(diskId);
+        if (inflight) {
+            UINodes.statusText.textContent = "Sync already running...";
+            return inflight;
         }
+
+        const syncId = ++this._syncSequence;
+        if (this._activeSyncController) this._activeSyncController.abort();
+        const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        const signal = controller ? controller.signal : undefined;
+        this._activeSyncController = controller;
+        const isStale = () => syncId !== this._syncSequence || diskId !== this._activeDisk;
+
+        const runSync = (async () => {
+            try {
+                this.setProcessingState(true);
+
+                UINodes.statusText.textContent = "Checking metadata...";
+                const meta = await this._fetchDiskMeta(diskId, signal);
+                if (isStale()) return;
+
+                const cached = this._aggregateCacheByDisk.get(diskId);
+                if (meta && cached && Number(cached.latestDate) === Number(meta.latest_date)) {
+                    this._applyAggregatePayload(cached.payload, { fromCache: true });
+                    return;
+                }
+
+                UINodes.statusText.textContent = "Connecting to API...";
+                const jsonResponse = await this._fetchJson(`api.php?id=${encodeURIComponent(diskId)}`, { signal });
+                if (isStale()) return;
+
+                if ((jsonResponse.status && jsonResponse.status !== 'success') || !jsonResponse.data || jsonResponse.data.length === 0) {
+                    this.setProcessingState(false);
+                    const isEmpty = jsonResponse.data && jsonResponse.data.length === 0;
+                    if (isEmpty) {
+                        this._toastOnce('sync-empty-data', 'No reports found', 'This disk has no JSON reports yet.', 'warning');
+                        UINodes.statusText.textContent = 'No data — disk is empty.';
+                    } else {
+                        this._toastOnce('sync-api-error', 'API returned an error', jsonResponse.message || 'Could not load disk data.', 'error');
+                        UINodes.statusText.textContent = 'API error.';
+                    }
+                    // Reset all dashboard UI to empty state
+                    resetDashboardToEmpty(AppState.chartManagerInstance);
+                    return;
+                }
+
+                const payloadLatestDate = Number(
+                    meta?.latest_date ??
+                    jsonResponse?.data?.[jsonResponse.data.length - 1]?.date ??
+                    0
+                ) || 0;
+                this._aggregateCacheByDisk.set(diskId, {
+                    latestDate: payloadLatestDate,
+                    payload: jsonResponse,
+                });
+
+                this._applyAggregatePayload(jsonResponse, { fromCache: false });
+            } catch (error) {
+                if (error?.name === 'AbortError') return;
+                if (isStale()) return;
+                console.error("Server API Sync Failed:", error);
+                this.setProcessingState(false);
+                UINodes.statusText.textContent = "Error: " + error.message;
+                UINodes.statusDot.classList.remove('scanning');
+                UINodes.statusDot.style.backgroundColor = 'var(--rose-500)';
+                // TASK-06: Toast on sync error
+                this._toastOnce('sync-failed', 'Sync failed', error.message || 'Check connection and try again', 'error');
+            } finally {
+                this._inflightSyncByDisk.delete(diskId);
+                if (this._activeSyncController === controller) {
+                    this._activeSyncController = null;
+                }
+            }
+        })();
+
+        this._inflightSyncByDisk.set(diskId, runSync);
+        return runSync;
     }
 
     async _fetchPermissions() {
+        const diskId = this._activeDisk;
+        if (!diskId) return;
         const permBody = document.getElementById('permissions-body');
         // TASK-05: Loading state with styled empty-state
         if (permBody) {
@@ -1074,14 +1111,15 @@ class DataFetcher {
                 </div>`;
         }
         try {
-            const res = await fetch(`api.php?id=${encodeURIComponent(this._activeDisk)}&type=permissions`);
+            const res = await fetch(`api.php?id=${encodeURIComponent(diskId)}&type=permissions`);
+            if (!res.ok) throw new Error(`HTTP ${res.status} from permissions API`);
             const text = await res.text();
             let json;
-            try { 
-                json = JSON.parse(text); 
-            } catch (err1) { 
+            try {
+                json = JSON.parse(text);
+            } catch (err1) {
                 try {
-                    json = JSON.parse(atob(text)); 
+                    json = JSON.parse(atob(text));
                 } catch (err2) {
                     console.error("API response was neither valid JSON nor Base64.", { text_preview: text.substring(0, 100) });
                     throw new Error(`Invalid API Response: ${text.substring(0, 100)}`);
@@ -1089,11 +1127,13 @@ class DataFetcher {
             }
 
             if (json?.status === 'success') {
+                if (this._activeDisk !== diskId) return;
                 this._permissionsLoaded = true;
                 document.dispatchEvent(new CustomEvent('permissionsLoaded', {
-                    detail: json.data ? { diskId: this._activeDisk, ...json.data } : { diskId: this._activeDisk },
+                    detail: json.data ? { diskId, ...json.data } : { diskId },
                 }));
             } else {
+                if (this._activeDisk !== diskId) return;
                 if (permBody) {
                     permBody.innerHTML = `
                         <div class="empty-state">
@@ -1109,6 +1149,7 @@ class DataFetcher {
             }
         } catch (e) {
             console.warn('Could not load permission issues:', e);
+            this._toastOnce('permissions-fetch-failed', 'Permission scan failed', e.message || 'Could not fetch permission data.', 'warning');
             if (permBody) {
                 permBody.innerHTML = `
                     <div class="empty-state variant-rose">
@@ -1128,35 +1169,34 @@ class DataFetcher {
     handleComplete() {
         this.setProcessingState(false);
         UINodes.statusText.textContent = "System Optimized";
-        
+
         // Restore overview charts grid
         const overviewGrid = document.getElementById('overview-charts-grid');
         const overviewEmpty = document.getElementById('overview-empty-state');
         if (overviewGrid) overviewGrid.style.display = '';
         if (overviewEmpty) overviewEmpty.style.display = 'none';
-        
+
         this.dataStore.finalizeProcessing();
         this.updateMetricCards();
         AppState.chartManagerInstance.render(this.dataStore);
         renderDetailTables(this.dataStore);
     }
-    
+
     updateMetricCards() {
         const stats = this.dataStore.latestStats;
 
-        const totalTB     = bytesToTB(stats.total);
-        const usedTB      = bytesToTB(stats.used);
+        const totalTB = bytesToTB(stats.total);
+        const usedTB = bytesToTB(stats.used);
         const availableTB = bytesToTB(stats.available);
         const scannedBytes = (this.dataStore.latestSnapshot?.teams || []).reduce((s, t) => s + (t.used || 0), 0);
-        const scannedTB    = bytesToTB(scannedBytes);
-        const usagePct     = stats.total ? ((stats.used / stats.total) * 100) : 0;
+        const scannedTB = bytesToTB(scannedBytes);
+        const usagePct = stats.total ? ((stats.used / stats.total) * 100) : 0;
 
-        const setText = (el, val) => { if (el) el.textContent = val; };
         const animateEl = (el, prev, next) => { if (el) animateValue(el, prev, next, 1200); };
 
-        animateEl(UINodes.valTotal,   parseFloat(UINodes.valTotal?.textContent)   || 0, totalTB);
-        animateEl(UINodes.valUsed,    parseFloat(UINodes.valUsed?.textContent)    || 0, usedTB);
-        animateEl(UINodes.valFree,    parseFloat(UINodes.valFree?.textContent)    || 0, availableTB);
+        animateEl(UINodes.valTotal, parseFloat(UINodes.valTotal?.textContent) || 0, totalTB);
+        animateEl(UINodes.valUsed, parseFloat(UINodes.valUsed?.textContent) || 0, usedTB);
+        animateEl(UINodes.valFree, parseFloat(UINodes.valFree?.textContent) || 0, availableTB);
         animateEl(UINodes.valScanned, parseFloat(UINodes.valScanned?.textContent) || 0, scannedTB);
 
         // Usage % (formatted separately — not TB)
@@ -1186,16 +1226,16 @@ class DataFetcher {
 
         // ── Scan Summary Bar ──────────────────────────────────────────
         const gapBytes = Math.max(0, stats.used - scannedBytes);
-        const gapPct   = stats.used ? ((gapBytes / stats.used) * 100).toFixed(1) : '0.0';
+        const gapPct = stats.used ? ((gapBytes / stats.used) * 100).toFixed(1) : '0.0';
         const getEl = id => document.getElementById(id);
         const ssbScan = getEl('ssb-scan-val');
         const ssbFill = getEl('ssb-gap-fill');
-        const ssbPct  = getEl('ssb-gap-pct');
+        const ssbPct = getEl('ssb-gap-pct');
         const ssbGVal = getEl('ssb-gap-val');
         if (ssbScan) ssbScan.textContent = fmt(scannedBytes, 1);
         if (ssbFill) ssbFill.style.width = `${gapPct}%`;
-        if (ssbPct)  ssbPct.textContent  = `${gapPct}%`;
-        if (ssbGVal) ssbGVal.textContent  = fmt(gapBytes, 1);
+        if (ssbPct) ssbPct.textContent = `${gapPct}%`;
+        if (ssbGVal) ssbGVal.textContent = fmt(gapBytes, 1);
 
         if (stats.date) {
             const d = new Date(stats.date * 1000);
@@ -1206,7 +1246,7 @@ class DataFetcher {
     setProcessingState(isProcessing) {
         AppState.isProcessing = isProcessing;
         UINodes.btnFetch.disabled = isProcessing;
-        
+
         if (isProcessing) {
             UINodes.statusDot.classList.add('scanning');
             UINodes.statusDot.style.backgroundColor = '';
@@ -1225,13 +1265,13 @@ class DataFetcher {
 
 // ── Mobile sidebar toggle ──────────────────────────────────────────────
 function initMobileSidebar() {
-    const sidebar   = document.querySelector('.sidebar');
-    const backdrop  = document.getElementById('sidebar-backdrop');
+    const sidebar = document.querySelector('.sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
     const hamburgers = document.querySelectorAll('.hamburger-btn');
-    const closeBtn  = document.getElementById('btn-sidebar-close');
+    const closeBtn = document.getElementById('btn-sidebar-close');
     if (!sidebar || !backdrop || hamburgers.length === 0) return;
 
-    const open  = () => { sidebar.classList.add('open');    backdrop.classList.add('visible');    document.body.style.overflow = 'hidden'; };
+    const open = () => { sidebar.classList.add('open'); backdrop.classList.add('visible'); document.body.style.overflow = 'hidden'; };
     const close = () => { sidebar.classList.remove('open'); backdrop.classList.remove('visible'); document.body.style.overflow = ''; };
     const toggle = () => sidebar.classList.contains('open') ? close() : open();
 
@@ -1244,13 +1284,12 @@ function initMobileSidebar() {
         el.addEventListener('click', () => { if (window.innerWidth <= 640) close(); })
     );
     // Auto-close sidebar when disk is selected on mobile (PF-03)
-    document.addEventListener('diskSelected', () => { 
-        if (window.innerWidth <= 640) close(); 
+    document.addEventListener('diskSelected', () => {
+        if (window.innerWidth <= 640) close();
         const teamSidebar = document.getElementById('team-disk-sidebar');
         if (teamSidebar) teamSidebar.classList.remove('expanded');
     });
 }
-
 // Bootstrap
 document.addEventListener('DOMContentLoaded', () => {
     initRouter();

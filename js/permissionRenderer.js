@@ -389,12 +389,19 @@ window._permSetType = function(val) {
 
 // ── CSV Export ────────────────────────────────────────────────────────────────
 const PERM_CSV_HEADERS = ['User', 'Path', 'Type', 'Error'];
+const BTN_SPINNER_SVG = `
+<span class="btn-inline-spinner" aria-hidden="true">
+    <svg width="13" height="13" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2" opacity="0.28"></circle>
+        <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path>
+    </svg>
+</span>`;
 
 async function _exportCsv(useFilters, btn) {
     if (!_diskId) return;
-    const orig = btn.textContent;
+    const orig = btn.innerHTML;
     btn.disabled   = true;
-    btn.textContent = '⏳ Loading…';
+    btn.innerHTML = `${BTN_SPINNER_SVG}<span>Loading…</span>`;
 
     try {
         let offset = 0;
@@ -435,7 +442,7 @@ async function _exportCsv(useFilters, btn) {
                 
                 // We don't have total_count, so we render a generic progress
                 updateProgressToast(progId, 100, `${totalLoaded} items exported`);
-                btn.textContent = `⏳ ${totalLoaded}`;
+                btn.innerHTML = `${BTN_SPINNER_SVG}<span>${totalLoaded}</span>`;
                 
                 offset += limit;
                 return { rows: items, isLast: (!json.data.has_more || items.length === 0) };
@@ -505,7 +512,7 @@ async function _exportCsv(useFilters, btn) {
         }
         
         if (zipFiles.length > 0) {
-            btn.textContent = '⏳ Compressing...';
+            btn.innerHTML = `${BTN_SPINNER_SVG}<span>Compressing...</span>`;
             updateProgressToast(progId, 0, 'Zipping chunks...');
             await new Promise(r => setTimeout(r, 50)); // let UI render
             await downloadZip(`${suggestedName}.zip`, zipFiles, (pct) => {
@@ -518,7 +525,7 @@ async function _exportCsv(useFilters, btn) {
         alert('Export failed: ' + err.message);
     } finally {
         btn.disabled    = false;
-        btn.textContent = orig;
+        btn.innerHTML = orig;
     }
 }
 
