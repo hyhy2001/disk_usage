@@ -9,6 +9,196 @@ function api_dirs_normalize_row($obj) {
     return $obj;
 }
 
+function api_dirs_db_like_from_wildcard($pattern) {
+    $out = '';
+    $len = strlen($pattern);
+    for ($i = 0; $i < $len; $i++) {
+        $ch = $pattern[$i];
+        if ($ch === '*') $out .= '%';
+        else $out .= strtolower($ch);
+    }
+    return $out;
+}
+
+function api_dirs_db_table_columns($db, $table) {
+    $cols = array();
+    $rs = @$db->query("PRAGMA table_info(" . $table . ")");
+    while ($rs && ($row = $rs->fetchArray(SQLITE3_ASSOC)) !== false) {
+        if (isset($row['name'])) $cols[$row['name']] = true;
+    }
+    if ($rs) $rs->finalize();
+    return $cols;
+}
+
+function api_dirs_db_bind_all($stmt, $binds) {
+    foreach ($binds as $k => $v) {
+        $stmt->bindValue($k, $v[0], $v[1]);
+    }
+}
+
+function api_handle_dirs_db($file_path, $who, $offset, $limit, $filter_min, $filter_max, $q_array, $has_filters) {
+    if (!class_exists('SQLite3')) b64_error('SQLite3 extension is required for .db detail report.', 500);
+
+    try {
+        if (defined('SQLITE3_OPEN_READONLY')) {
+            $db = new SQLite3($file_path, SQLITE3_OPEN_READONLY);
+        } else {
+            $db = new SQLite3($file_path);
+        }
+    } catch (Exception $e) {
+        b64_error('Unable to open SQLite directory report for user: ' . $who, 500);
+    }
+
+    $date = 0;
+    $user_name = $who;
+    $total_dirs_meta = 0;
+    $total_used = 0;
+
+    $meta_rs = @$db->query('SELECT date, user, total_items, total_used FROM meta LIMIT 1');
+    if ($meta_rs) {
+        $row = $meta_rs->fetchArray(SQLITE3_ASSOC);
+        if (is_array($row)) {
+            if (isset($row['date'])) $date = (int)$row['date'];
+            if (isset($row['user'])) $user_name = $row['user'];
+            if (isset($row['total_items'])) $total_dirs_meta = (int)$row['total_items'];
+            if (isset($row['total_used'])) $total_used = (int)$row['total_used'];
+        }
+        $meta_rs->finalize();
+    }
+
+    $cols = api_dirs_db_table_columns($db, 'dirs');
+    $path_expr = isset($cols['path_lc']) ? 'path_lc' : 'LOWER(path)';
+    $name_expr = isset($cols['name_lc']) ? 'name_lc' : 'LOWER(path)';
+
+    if (!$has_filters) {
+        if ($total_dirs_meta > 0 && $offset >= $total_dirs_meta) {
+            $db->close();
+            b64_success(array('dir' => array(
+                'date'        => $date,
+                'user'        => $user_name,
+                'total_dirs'  => $total_dirs_meta,
+                'total_used'  => $total_used,
+                'offset'      => $offset,
+                'limit'       => $limit,
+                'has_more'    => false,
+                'dirs'        => array(),
+            )));
+        }
+
+        $collected = array();
+        $sql = 'SELECT path, used FROM dirs ORDER BY used DESC LIMIT ' . (int)$limit . ' OFFSET ' . (int)$offset;
+        $rs = @$db->query($sql);
+        while ($rs && ($row = $rs->fetchArray(SQLITE3_ASSOC)) !== false) {
+            $collected[] = api_dirs_normalize_row($row);
+        }
+        if ($rs) $rs->finalize();
+
+        $total_dirs = $total_dirs_meta > 0 ? $total_dirs_meta : ($offset + count($collected));
+        $has_more = ($offset + count($collected) < $total_dirs);
+        $db->close();
+
+        b64_success(array('dir' => array(
+            'date'        => $date,
+            'user'        => $user_name,
+            'total_dirs'  => $total_dirs,
+            'total_used'  => $total_used,
+            'offset'      => $offset,
+            'limit'       => $limit,
+            'has_more'    => $has_more,
+            'dirs'        => $collected,
+        )));
+    }
+
+    $conds = array();
+    $binds = array();
+    $qidx = 0;
+
+    if ($filter_min > 0) {
+        $conds[] = 'used >= :min_size';
+        $binds[':min_size'] = array((int)$filter_min, SQLITE3_INTEGER);
+    }
+    if ($filter_max > 0) {
+        $conds[] = 'used <= :max_size';
+        $binds[':max_size'] = array((int)$filter_max, SQLITE3_INTEGER);
+    }
+    if (!empty($q_array)) {
+        $qConds = array();
+        foreach ($q_array as $q) {
+            $k = ':q_' . $qidx++;
+            $q = trim($q);
+            if ($q === '') continue;
+            if (strpos($q, '*') === false) {
+                $qConds[] = '(' . $path_expr . ' LIKE ' . $k . ' OR ' . $name_expr . ' LIKE ' . $k . ')';
+                $binds[$k] = array('%' . strtolower($q) . '%', SQLITE3_TEXT);
+            } else {
+                $qConds[] = '(' . $path_expr . ' LIKE ' . $k . ' OR ' . $name_expr . ' LIKE ' . $k . ')';
+                $binds[$k] = array(api_dirs_db_like_from_wildcard($q), SQLITE3_TEXT);
+            }
+        }
+        if (!empty($qConds)) $conds[] = '(' . implode(' OR ', $qConds) . ')';
+    }
+    $where_sql = empty($conds) ? '' : (' WHERE ' . implode(' AND ', $conds));
+
+    $count_stmt = @$db->prepare('SELECT COUNT(1) AS c FROM dirs' . $where_sql);
+    if (!$count_stmt) {
+        $db->close();
+        b64_error('Unable to prepare count query for directory report.', 500);
+    }
+    api_dirs_db_bind_all($count_stmt, $binds);
+    $count_rs = @$count_stmt->execute();
+    $count_row = $count_rs ? $count_rs->fetchArray(SQLITE3_ASSOC) : false;
+    $total_dirs = ($count_row && isset($count_row['c'])) ? (int)$count_row['c'] : 0;
+    if ($count_rs) $count_rs->finalize();
+    $count_stmt->close();
+
+    if ($offset >= $total_dirs) {
+        $db->close();
+        b64_success(array('dir' => array(
+            'date'        => $date,
+            'user'        => $user_name,
+            'total_dirs'  => $total_dirs,
+            'total_used'  => $total_used,
+            'offset'      => $offset,
+            'limit'       => $limit,
+            'has_more'    => false,
+            'dirs'        => array(),
+        )));
+    }
+
+    $data_stmt = @$db->prepare(
+        'SELECT path, used FROM dirs' . $where_sql . ' ORDER BY used DESC LIMIT :lim OFFSET :off'
+    );
+    if (!$data_stmt) {
+        $db->close();
+        b64_error('Unable to prepare data query for directory report.', 500);
+    }
+    api_dirs_db_bind_all($data_stmt, $binds);
+    $data_stmt->bindValue(':lim', (int)$limit, SQLITE3_INTEGER);
+    $data_stmt->bindValue(':off', (int)$offset, SQLITE3_INTEGER);
+
+    $collected = array();
+    $data_rs = @$data_stmt->execute();
+    while ($data_rs && ($row = $data_rs->fetchArray(SQLITE3_ASSOC)) !== false) {
+        $collected[] = api_dirs_normalize_row($row);
+    }
+    if ($data_rs) $data_rs->finalize();
+    $data_stmt->close();
+    $db->close();
+
+    $has_more = ($offset + count($collected) < $total_dirs);
+
+    b64_success(array('dir' => array(
+        'date'        => $date,
+        'user'        => $user_name,
+        'total_dirs'  => $total_dirs,
+        'total_used'  => $total_used,
+        'offset'      => $offset,
+        'limit'       => $limit,
+        'has_more'    => $has_more,
+        'dirs'        => $collected,
+    )));
+}
+
 function api_handle_dirs_ndjson($file_path, $who, $offset, $limit, $filter_min, $filter_max, $path_matches, $has_filters) {
     $fh = @fopen($file_path, 'r');
     if (!$fh) b64_error('Unable to open NDJSON directory report for user: ' . $who, 500);
@@ -92,7 +282,7 @@ function api_handle_dirs($disk_path) {
     $filter_max = get_int('filter_max_size', 0, 0, PHP_INT_MAX);
     $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
 
-    $pattern = '/(?:.*_)?detail_report_dirs?_' . preg_quote($who, '/') . '\\.(?:json|ndjson)$/i';
+    $pattern = '/(?:.*_)?detail_report_dirs?_' . preg_quote($who, '/') . '\\.(?:db|json|ndjson)$/i';
     $file_path = find_file_by_pattern($detail_dir, $pattern);
 
     if (!$file_path || !is_file($file_path)) {
@@ -133,6 +323,10 @@ function api_handle_dirs($disk_path) {
         }
         return false;
     };
+
+    if (preg_match('/\\.db$/i', $file_path)) {
+        api_handle_dirs_db($file_path, $who, $offset, $limit, $filter_min, $filter_max, $q_array, $has_filters);
+    }
 
     if (preg_match('/\\.ndjson$/i', $file_path)) {
         api_handle_dirs_ndjson($file_path, $who, $offset, $limit, $filter_min, $filter_max, $path_matches, $has_filters);

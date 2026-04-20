@@ -374,6 +374,8 @@ function renderList(node) {
         moreWrap.appendChild(moreBtn);
         list.appendChild(moreWrap);
     }
+
+    syncTableHeadGutter();
 }
 
 function renderGlobalSearchList() {
@@ -443,6 +445,17 @@ function renderGlobalSearchList() {
         moreWrap.appendChild(moreBtn);
         list.appendChild(moreWrap);
     }
+
+    syncTableHeadGutter();
+}
+
+function syncTableHeadGutter() {
+    const wrap = document.querySelector('.tmx-wrap');
+    const list = document.getElementById('tmx-list');
+    if (!wrap || !list) return;
+
+    const scrollbarWidth = Math.max(0, list.offsetWidth - list.clientWidth);
+    wrap.style.setProperty('--tmx-list-scrollbar', scrollbarWidth + 'px');
 }
 
 async function renderCurrentNode() {
@@ -581,6 +594,12 @@ function renderExplorer(rootNode, meta) {
     }
 
     renderCurrentNode();
+    syncTableHeadGutter();
+
+    if (window && !window.__tmxGutterBound) {
+        window.addEventListener('resize', syncTableHeadGutter);
+        window.__tmxGutterBound = true;
+    }
 }
 
 document.addEventListener('treemapLoaded', function(e) {

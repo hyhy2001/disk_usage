@@ -11,6 +11,209 @@ function api_files_normalize_row($obj) {
     return $obj;
 }
 
+function api_files_db_like_from_wildcard($pattern) {
+    $out = '';
+    $len = strlen($pattern);
+    for ($i = 0; $i < $len; $i++) {
+        $ch = $pattern[$i];
+        if ($ch === '*') $out .= '%';
+        else $out .= strtolower($ch);
+    }
+    return $out;
+}
+
+function api_files_db_table_columns($db, $table) {
+    $cols = array();
+    $rs = @$db->query("PRAGMA table_info(" . $table . ")");
+    while ($rs && ($row = $rs->fetchArray(SQLITE3_ASSOC)) !== false) {
+        if (isset($row['name'])) $cols[$row['name']] = true;
+    }
+    if ($rs) $rs->finalize();
+    return $cols;
+}
+
+function api_files_db_bind_all($stmt, $binds) {
+    foreach ($binds as $k => $v) {
+        $stmt->bindValue($k, $v[0], $v[1]);
+    }
+}
+
+function api_handle_files_db($file_path, $who, $offset, $limit, $filter_min, $filter_max, $q_array, $ext_lookup, $has_filters) {
+    if (!class_exists('SQLite3')) b64_error('SQLite3 extension is required for .db detail report.', 500);
+
+    try {
+        if (defined('SQLITE3_OPEN_READONLY')) {
+            $db = new SQLite3($file_path, SQLITE3_OPEN_READONLY);
+        } else {
+            $db = new SQLite3($file_path);
+        }
+    } catch (Exception $e) {
+        b64_error('Unable to open SQLite file report for user: ' . $who, 500);
+    }
+
+    $date = 0;
+    $user_name = $who;
+    $total_files_meta = 0;
+    $total_used = 0;
+
+    $meta_rs = @$db->query('SELECT date, user, total_items, total_used FROM meta LIMIT 1');
+    if ($meta_rs) {
+        $row = $meta_rs->fetchArray(SQLITE3_ASSOC);
+        if (is_array($row)) {
+            if (isset($row['date'])) $date = (int)$row['date'];
+            if (isset($row['user'])) $user_name = $row['user'];
+            if (isset($row['total_items'])) $total_files_meta = (int)$row['total_items'];
+            if (isset($row['total_used'])) $total_used = (int)$row['total_used'];
+        }
+        $meta_rs->finalize();
+    }
+
+    $cols = api_files_db_table_columns($db, 'files');
+    $path_expr = isset($cols['path_lc']) ? 'path_lc' : 'LOWER(path)';
+    $name_expr = isset($cols['name_lc']) ? 'name_lc' : 'LOWER(path)';
+    // New slim .db stores `xt` already lowercased; legacy DB may still have `xt_lc`.
+    $ext_expr  = isset($cols['xt_lc']) ? 'xt_lc' : 'xt';
+
+    if (!$has_filters) {
+        if ($total_files_meta > 0 && $offset >= $total_files_meta) {
+            $db->close();
+            b64_success(array('file' => array(
+                'date'        => $date,
+                'user'        => $user_name,
+                'total_files' => $total_files_meta,
+                'total_used'  => $total_used,
+                'offset'      => $offset,
+                'limit'       => $limit,
+                'has_more'    => false,
+                'files'       => array(),
+            )));
+        }
+
+        $collected = array();
+        $sql = 'SELECT path, size, xt FROM files ORDER BY size DESC LIMIT ' . (int)$limit . ' OFFSET ' . (int)$offset;
+        $rs = @$db->query($sql);
+        while ($rs && ($row = $rs->fetchArray(SQLITE3_ASSOC)) !== false) {
+            $collected[] = api_files_normalize_row($row);
+        }
+        if ($rs) $rs->finalize();
+
+        $total_files = $total_files_meta > 0 ? $total_files_meta : ($offset + count($collected));
+        $has_more = ($offset + count($collected) < $total_files);
+        $db->close();
+
+        b64_success(array('file' => array(
+            'date'        => $date,
+            'user'        => $user_name,
+            'total_files' => $total_files,
+            'total_used'  => $total_used,
+            'offset'      => $offset,
+            'limit'       => $limit,
+            'has_more'    => $has_more,
+            'files'       => $collected,
+        )));
+    }
+
+    $conds = array();
+    $binds = array();
+    $qidx = 0;
+    $eidx = 0;
+
+    if ($filter_min > 0) {
+        $conds[] = 'size >= :min_size';
+        $binds[':min_size'] = array((int)$filter_min, SQLITE3_INTEGER);
+    }
+    if ($filter_max > 0) {
+        $conds[] = 'size <= :max_size';
+        $binds[':max_size'] = array((int)$filter_max, SQLITE3_INTEGER);
+    }
+    if (!empty($ext_lookup)) {
+        $extConds = array();
+        foreach ($ext_lookup as $ext => $_v) {
+            $k = ':ext_' . $eidx++;
+            $extConds[] = $ext_expr . ' = ' . $k;
+            $binds[$k] = array(strtolower($ext), SQLITE3_TEXT);
+        }
+        if (!empty($extConds)) $conds[] = '(' . implode(' OR ', $extConds) . ')';
+    }
+    if (!empty($q_array)) {
+        $qConds = array();
+        foreach ($q_array as $q) {
+            $k = ':q_' . $qidx++;
+            $q = trim($q);
+            if ($q === '') continue;
+            if (strpos($q, '*') === false) {
+                $qConds[] = '(' . $path_expr . ' LIKE ' . $k . ' OR ' . $name_expr . ' LIKE ' . $k . ')';
+                $binds[$k] = array('%' . strtolower($q) . '%', SQLITE3_TEXT);
+            } else {
+                $qConds[] = '(' . $path_expr . ' LIKE ' . $k . ' OR ' . $name_expr . ' LIKE ' . $k . ')';
+                $binds[$k] = array(api_files_db_like_from_wildcard($q), SQLITE3_TEXT);
+            }
+        }
+        if (!empty($qConds)) $conds[] = '(' . implode(' OR ', $qConds) . ')';
+    }
+
+    $where_sql = empty($conds) ? '' : (' WHERE ' . implode(' AND ', $conds));
+
+    $count_stmt = @$db->prepare('SELECT COUNT(1) AS c FROM files' . $where_sql);
+    if (!$count_stmt) {
+        $db->close();
+        b64_error('Unable to prepare count query for file report.', 500);
+    }
+    api_files_db_bind_all($count_stmt, $binds);
+    $count_rs = @$count_stmt->execute();
+    $count_row = $count_rs ? $count_rs->fetchArray(SQLITE3_ASSOC) : false;
+    $total_files = ($count_row && isset($count_row['c'])) ? (int)$count_row['c'] : 0;
+    if ($count_rs) $count_rs->finalize();
+    $count_stmt->close();
+
+    if ($offset >= $total_files) {
+        $db->close();
+        b64_success(array('file' => array(
+            'date'        => $date,
+            'user'        => $user_name,
+            'total_files' => $total_files,
+            'total_used'  => $total_used,
+            'offset'      => $offset,
+            'limit'       => $limit,
+            'has_more'    => false,
+            'files'       => array(),
+        )));
+    }
+
+    $data_stmt = @$db->prepare(
+        'SELECT path, size, xt FROM files' . $where_sql . ' ORDER BY size DESC LIMIT :lim OFFSET :off'
+    );
+    if (!$data_stmt) {
+        $db->close();
+        b64_error('Unable to prepare data query for file report.', 500);
+    }
+    api_files_db_bind_all($data_stmt, $binds);
+    $data_stmt->bindValue(':lim', (int)$limit, SQLITE3_INTEGER);
+    $data_stmt->bindValue(':off', (int)$offset, SQLITE3_INTEGER);
+
+    $collected = array();
+    $data_rs = @$data_stmt->execute();
+    while ($data_rs && ($row = $data_rs->fetchArray(SQLITE3_ASSOC)) !== false) {
+        $collected[] = api_files_normalize_row($row);
+    }
+    if ($data_rs) $data_rs->finalize();
+    $data_stmt->close();
+    $db->close();
+
+    $has_more = ($offset + count($collected) < $total_files);
+
+    b64_success(array('file' => array(
+        'date'        => $date,
+        'user'        => $user_name,
+        'total_files' => $total_files,
+        'total_used'  => $total_used,
+        'offset'      => $offset,
+        'limit'       => $limit,
+        'has_more'    => $has_more,
+        'files'       => $collected,
+    )));
+}
+
 function api_handle_files_ndjson($file_path, $who, $offset, $limit, $filter_min, $filter_max, $path_matches, $ext_lookup, $has_filters) {
     $fh = @fopen($file_path, 'r');
     if (!$fh) b64_error('Unable to open NDJSON file report for user: ' . $who, 500);
@@ -99,7 +302,7 @@ function api_handle_files($disk_path) {
     $filter_max = get_int('filter_max_size', 0, 0, PHP_INT_MAX);
     $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
 
-    $pattern = '/(?:.*_)?detail_report_files?_' . preg_quote($who, '/') . '\\.(?:json|ndjson)$/i';
+    $pattern = '/(?:.*_)?detail_report_files?_' . preg_quote($who, '/') . '\\.(?:db|json|ndjson)$/i';
     $file_path = find_file_by_pattern($detail_dir, $pattern);
 
     if (!$file_path || !is_file($file_path)) {
@@ -145,6 +348,10 @@ function api_handle_files($disk_path) {
         }
         return false;
     };
+
+    if (preg_match('/\\.db$/i', $file_path)) {
+        api_handle_files_db($file_path, $who, $offset, $limit, $filter_min, $filter_max, $q_array, $ext_lookup, $has_filters);
+    }
 
     if (preg_match('/\\.ndjson$/i', $file_path)) {
         api_handle_files_ndjson($file_path, $who, $offset, $limit, $filter_min, $filter_max, $path_matches, $ext_lookup, $has_filters);

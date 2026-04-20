@@ -283,7 +283,7 @@ function _renderFilterBar() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
                 Filters ${badgeHtml}
             </button>
-            <div id="ud-filter-options-dropdown" style="display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 260px; padding: 16px; flex-direction: column; gap: 16px; z-index: 1000; box-shadow: 0 12px 40px rgba(0,0,0,0.7); border: 1px solid var(--border-color); border-radius: 10px; background-color: var(--bg-base); background-image: linear-gradient(var(--bg-surface-elevated, #1e293b), var(--bg-surface-elevated, #1e293b)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);">
+            <div id="ud-filter-options-dropdown" style="display: none; position: absolute; top: calc(100% + 8px); right: 0; width: min(260px, calc(100vw - 24px)); max-width: calc(100vw - 16px); box-sizing: border-box; padding: 16px; flex-direction: column; gap: 16px; z-index: 1000; box-shadow: 0 12px 40px rgba(0,0,0,0.7); border: 1px solid var(--border-color); border-radius: 10px; background-color: var(--bg-base); background-image: linear-gradient(var(--bg-surface-elevated, #1e293b), var(--bg-surface-elevated, #1e293b)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);">
                 
                 <div style="display: flex; flex-direction: column; gap: 6px;">
                     <label style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">File Extension</label>
@@ -474,11 +474,47 @@ function _attachFilterEvents(contentEl, root) {
     setupBadgeInput('ud-filter-ext-container', 'ud-filter-ext-input', 'ud-filter-ext');
 
     if (optionsBtn && optionsDropdown) {
+        const positionOptionsDropdown = () => {
+            const vw = window.innerWidth || document.documentElement.clientWidth || 360;
+            const maxWidth = Math.max(220, vw - 24);
+            const targetWidth = Math.min(260, maxWidth);
+
+            optionsDropdown.style.width = targetWidth + 'px';
+            optionsDropdown.style.maxWidth = (vw - 16) + 'px';
+            optionsDropdown.style.left = 'auto';
+            optionsDropdown.style.right = '0';
+
+            // First try right-aligned (desktop/default).
+            let rect = optionsDropdown.getBoundingClientRect();
+
+            // If left side overflows, pin to left edge of trigger container.
+            if (rect.left < 8) {
+                optionsDropdown.style.left = '0';
+                optionsDropdown.style.right = 'auto';
+                rect = optionsDropdown.getBoundingClientRect();
+            }
+
+            // If still overflows on the right, force full available width.
+            if (rect.right > (vw - 8)) {
+                optionsDropdown.style.left = '0';
+                optionsDropdown.style.right = 'auto';
+                optionsDropdown.style.width = Math.max(200, vw - 16) + 'px';
+                optionsDropdown.style.maxWidth = (vw - 16) + 'px';
+            }
+        };
+
         optionsBtn.addEventListener('click', (e) => {
-            optionsDropdown.style.display = optionsDropdown.style.display === 'none' ? 'flex' : 'none';
+            const opening = optionsDropdown.style.display === 'none';
+            optionsDropdown.style.display = opening ? 'flex' : 'none';
+            if (opening) positionOptionsDropdown();
             e.stopPropagation();
         });
         optionsDropdown.addEventListener('click', e => e.stopPropagation());
+
+        // Keep it inside viewport when orientation/viewport changes.
+        window.addEventListener('resize', () => {
+            if (optionsDropdown.style.display !== 'none') positionOptionsDropdown();
+        });
     }
 
     // click outside to close dropdowns
