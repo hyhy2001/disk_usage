@@ -103,7 +103,16 @@ function api_handle_files($disk_path) {
     $file_path = find_file_by_pattern($detail_dir, $pattern);
 
     if (!$file_path || !is_file($file_path)) {
-        b64_error('No file report for user: ' . $who, 404);
+        b64_success(array('file' => array(
+            'date'        => 0,
+            'user'        => $who,
+            'total_files' => 0,
+            'total_used'  => 0,
+            'offset'      => $offset,
+            'limit'       => $limit,
+            'has_more'    => false,
+            'files'       => array(),
+        )));
     }
 
     $q_array = $filter_q !== '' ? array_values(array_filter(array_map('trim', explode(',', $filter_q)), 'strlen')) : array();

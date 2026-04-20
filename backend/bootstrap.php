@@ -10,8 +10,10 @@ require_once __DIR__ . '/lib/cache.php';
 
 require_once __DIR__ . '/handlers/disks.php';
 require_once __DIR__ . '/handlers/team.php';
+require_once __DIR__ . '/handlers/health.php';
 require_once __DIR__ . '/handlers/meta.php';
 require_once __DIR__ . '/handlers/permissions.php';
+require_once __DIR__ . '/handlers/treemap.php';
 require_once __DIR__ . '/handlers/users.php';
 require_once __DIR__ . '/handlers/dirs.php';
 require_once __DIR__ . '/handlers/files.php';

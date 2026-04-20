@@ -98,3 +98,34 @@ function api_collect_main_report_files($disk_path) {
     if ($dh) closedir($dh);
     return $files;
 }
+
+function api_get_latest_main_report_info($disk_path) {
+    $dh = @opendir($disk_path);
+    $count = 0;
+    $latest_file = false;
+    $latest_mtime = -1;
+
+    while ($dh && ($f = readdir($dh)) !== false) {
+        if (!api_is_main_report_json_filename($f)) continue;
+        $count++;
+        $fp = $disk_path . DIRECTORY_SEPARATOR . $f;
+        $mt = @filemtime($fp);
+        if (!is_int($mt)) $mt = 0;
+        if (!$latest_file || $mt > $latest_mtime) {
+            $latest_file = $fp;
+            $latest_mtime = $mt;
+        }
+    }
+    if ($dh) closedir($dh);
+
+    $latest_date = 0;
+    if ($latest_file && is_file($latest_file)) {
+        $latest_date = (int)get_json_date($latest_file);
+    }
+
+    return array(
+        'report_files_count' => $count,
+        'latest_file' => $latest_file,
+        'latest_date' => $latest_date,
+    );
+}

@@ -384,16 +384,12 @@ export class ChartManager {
            deltaData.push((usedData[i] - usedData[i-1]));
         }
 
-        const formatBytesDynamically = (tb) => {
-            if (tb === 0) return '0 B';
-            const b = tb * 1e12;
-            const num = Math.abs(b);
-            if (num >= 1e12) return (b / 1e12).toFixed(2) + ' TB';
-            if (num >= 1e9)  return (b / 1e9).toFixed(2) + ' GB';
-            if (num >= 1e6)  return (b / 1e6).toFixed(2) + ' MB';
-            if (num >= 1e3)  return (b / 1e3).toFixed(2) + ' KB';
-            return b.toFixed(2) + ' B';
-        };
+        // Keep one consistent unit across Y-axis + labels in this chart.
+        const allBytes = timelineData.flatMap(d => [d.used || 0, d.scanned || 0, d.total || 0]);
+        const chartUnit = pickUnit(allBytes);
+        const toUnitValue = (tbVal) => (tbVal * 1e12) / chartUnit.divisor;
+        const unitDecimals = chartUnit.unit === 'TB' ? 3 : (chartUnit.unit === 'GB' ? 2 : 1);
+        const formatChartUnit = (tbVal, decimals = unitDecimals) => `${toUnitValue(tbVal).toFixed(decimals)} ${chartUnit.unit}`;
 
 
         // ── Stats subheader ───────────────────────────────────────────────────
@@ -405,9 +401,9 @@ export class ChartManager {
         const statsEl = document.getElementById('timeline-stat-header');
         if (statsEl) {
             statsEl.innerHTML = `
-                <span class="tsh-value">${last.toFixed(3)} TB</span>
+                <span class="tsh-value">${formatChartUnit(last)}</span>
                 <span class="tsh-delta ${up ? 'tsh-up' : 'tsh-down'}">
-                    ${up ? '▲' : '▼'} ${Math.abs(delta * 1000).toFixed(1)} GB &nbsp;(${up ? '+' : ''}${pctCh}%)
+                    ${up ? '▲' : '▼'} ${Math.abs(toUnitValue(delta)).toFixed(unitDecimals)} ${chartUnit.unit} &nbsp;(${up ? '+' : ''}${pctCh}%)
                 </span>`;
         }
 
@@ -427,7 +423,7 @@ export class ChartManager {
                 c.lineTo(right, yPx);
                 c.stroke();
                 // Pill label on right axis
-                const label  = `${last.toFixed(3)} TB`;
+                const label  = formatChartUnit(last);
                 c.setLineDash([]);
                 c.font = 'bold 11px Inter, sans-serif';
                 const lw = c.measureText(label).width + 14;
@@ -466,7 +462,7 @@ export class ChartManager {
                     c.beginPath(); c.moveTo(left, y); c.lineTo(right, y); c.stroke();
                     const yVal = scales.y.getValueForPixel(y);
                     if (yVal !== undefined) {
-                        const label = `${yVal.toFixed(3)} TB`;
+                        const label = formatChartUnit(yVal);
                         c.setLineDash([]);
                         c.font = 'bold 11px Inter, sans-serif';
                         const lw = c.measureText(label).width + 14;
@@ -581,10 +577,7 @@ export class ChartManager {
                         padding: 12,
                         callbacks: {
                             title: items => items[0]?.label ?? '',
-                            label: item => {
-                                const valStr = formatBytesDynamically(item.raw);
-                                return ` ${item.dataset.label}: ${valStr}`;
-                            }
+                            label: item => ` ${item.dataset.label}: ${formatChartUnit(item.raw)}`
                         }
                     }
                 },
@@ -602,7 +595,7 @@ export class ChartManager {
                         ticks: {
                             color: ct().tick,
                             font: { size: 12, weight: 500 },
-                            callback: v => formatBytesDynamically(v)
+                            callback: v => formatChartUnit(v)
                         }
                     }
 
@@ -1073,8 +1066,12 @@ export class ChartManager {
         
         const data = [scanned, gap, free];
         const labels = ['Scanned', 'Unscanned (Permissions/Other)', 'Free'];
-        const colors = ['rgba(52, 211, 153, 0.75)', 'rgba(244, 63, 94, 0.75)', 'rgba(56, 189, 248, 0.15)'];
-        const borderColors = ['#10b981', '#f43f5e', '#0ea5e9'];
+        const colors = [
+            'rgba(126, 201, 168, 0.82)', // Scanned (Grass)
+            'rgba(174, 182, 191, 0.34)', // Unscanned (Other)
+            'rgba(95, 168, 221, 0.78)',  // Free (Sky)
+        ];
+        const borderColors = ['#7ec9a8', '#aeb6bf', '#5fa8dd'];
         
         if (this._inodePieChart) this._inodePieChart.destroy();
         this._inodePieChart = new Chart(ctx, {

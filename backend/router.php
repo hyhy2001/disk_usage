@@ -12,6 +12,10 @@ function api_dispatch_request($root_dir) {
         api_handle_team($root_dir);
     }
 
+    if ($type === 'health') {
+        api_handle_health($root_dir);
+    }
+
     if ($req_id === '') {
         http_response_code(400);
         echo 'Missing disk id.';
@@ -40,6 +44,12 @@ function api_dispatch_request($root_dir) {
     $type = param('type', '');
     if ($type === 'permissions') {
         api_handle_permissions($disk_path);
+    }
+    if ($type === 'treemap') {
+        api_handle_treemap($disk_path);
+    }
+    if ($type === 'treemap_search') {
+        api_handle_treemap_search($disk_path);
     }
     if ($type === 'meta') {
         api_handle_meta($disk_path);

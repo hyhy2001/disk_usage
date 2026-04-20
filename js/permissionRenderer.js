@@ -6,7 +6,7 @@ import { downloadCsv, downloadZip, streamExportGzip, toCsv }   from './csvExport
 import { showProgressToast, updateProgressToast, closeProgressToast, showToast } from './main.js';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const PERM_PAGE    = 100;
+const PERM_PAGE     = 100;
 const SEARCH_DELAY = 350;  // debounce ms for path search
 
 // ── Module state ──────────────────────────────────────────────────────────────
@@ -21,6 +21,7 @@ let _pathSearch      = '';      // server-side path substring filter
 let _fetchInProgress = false;
 let _abortCtrl       = null;
 let _searchTimer     = null;    // debounce timer for path search
+let _resizeTimer     = null;
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const TYPE_ICON = {
@@ -74,14 +75,38 @@ function _updateDisplay() {
     const list   = body.querySelector('#perm-flat-list');
     const badge  = body.querySelector('#perm-total-badge');
     const pgWrap = body.querySelector('#perm-pg-wrap');
+    const content = body.querySelector('.history-content');
+    const hasSelection = (_activeUsers === null) || (_activeUsers && _activeUsers.size > 0);
 
-    if (list) list.innerHTML = _pageItems.length
-        ? _pageItems.map(_renderItem).join('')
-        : '<div class="perm-empty-filter">No items match current filters.</div>';
+    if (content) {
+        const oldHint = content.querySelector('#perm-select-user-hint');
+        if (oldHint) oldHint.remove();
+    }
+
+    if (!hasSelection) {
+        if (list) list.style.display = 'none';
+        if (pgWrap) pgWrap.style.display = 'none';
+        if (content) {
+            const hint = document.createElement('div');
+            hint.id = 'perm-select-user-hint';
+            hint.className = 'perm-empty-filter glass-panel';
+            hint.textContent = 'Select at least one user to view permission issues.';
+            content.insertBefore(hint, content.firstChild);
+        }
+    } else {
+        if (list) {
+            list.style.display = '';
+            list.innerHTML = _pageItems.length
+                ? _pageItems.map(_renderItem).join('')
+                : '<div class="perm-empty-filter">No items match current filters.</div>';
+            list.scrollTop = 0;
+        }
+        if (pgWrap) pgWrap.style.display = '';
+    }
 
     if (badge) badge.textContent = `Page ${_permPage} of ${totalPages} · ${_totalItems.toLocaleString()} items`;
 
-    if (pgWrap) {
+    if (pgWrap && hasSelection) {
         pgWrap.innerHTML = _renderPagination(_permPage, totalPages);
         _attachPagination(pgWrap);
     }
@@ -304,6 +329,17 @@ function renderPermissions(data, diskId) {
 
     _attachPagination(body.querySelector('#perm-pg-wrap'));
     _fetchPage(1);
+
+    if (!window._permResizeBound) {
+        window.addEventListener('resize', function() {
+            if (!_diskId) return;
+            clearTimeout(_resizeTimer);
+            _resizeTimer = setTimeout(function() {
+                _fetchPage(1);
+            }, 160);
+        });
+        window._permResizeBound = true;
+    }
 }
 
 // ── Pagination click events ───────────────────────────────────────────────────

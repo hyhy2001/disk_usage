@@ -721,6 +721,23 @@ async function _loadAndRender(user) {
             _fetchDir(_currentDisk, user, 0, FILE_PAGE),
             _fetchFilePage(_currentDisk, user, 0, FILE_PAGE),
         ]);
+
+        const otherUser = _otherUsers.find(o => o.name === user);
+        const noDirBreakdown = (dirData.total_dirs ?? dirData.dirs.length ?? 0) === 0 && (dirData.dirs?.length ?? 0) === 0;
+        const noFileBreakdown = (fileData.total_files ?? fileData.files.length ?? 0) === 0 && (fileData.files?.length ?? 0) === 0;
+        if (otherUser && noDirBreakdown && noFileBreakdown) {
+            if (contentBody) contentBody.innerHTML = `
+                <div class="ud-empty-state">
+                    <div class="ud-empty-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <h3>${user}</h3>
+                    <p>Total disk usage: <strong>${fmt(otherUser.used)}</strong></p>
+                    <p class="ud-no-report-hint">No detailed breakdown available for this user.</p>
+                </div>`;
+            return;
+        }
+
         _fileTotalPages = Math.max(1, Math.ceil((fileData.total_files ?? fileData.files.length) / FILE_PAGE));
         _dirTotalPages  = Math.max(1, Math.ceil((dirData.total_dirs ?? dirData.dirs.length) / FILE_PAGE));
 

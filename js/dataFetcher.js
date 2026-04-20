@@ -28,6 +28,8 @@ class DataFetcher {
         this.dataStore = new DataStore();
         this._activeDisk = null;
         this._permissionsLoaded = false;
+        this._treeMapLoaded = false;
+        this._inflightTreeMapByDisk = new Map(); // disk_id -> Promise
         this._aggregateCacheByDisk = new Map(); // disk_id -> { latestDate, payload }
         this._inflightSyncByDisk = new Map(); // disk_id -> Promise
         this._syncSequence = 0;
@@ -48,6 +50,16 @@ class DataFetcher {
             permTab.addEventListener('click', () => {
                 if (!this._permissionsLoaded && this._activeDisk) {
                     this._fetchPermissions();
+                }
+            });
+        }
+
+        // Lazy-load TreeMap on tab click
+        const treeMapTab = document.querySelector('.detail-tab-btn[data-tab="treemap"]');
+        if (treeMapTab) {
+            treeMapTab.addEventListener('click', () => {
+                if (!this._treeMapLoaded && this._activeDisk) {
+                    this._fetchTreeMap();
                 }
             });
         }
@@ -151,7 +163,7 @@ class DataFetcher {
         }
     }
 
-    _applyAggregatePayload(jsonResponse, { fromCache = false } = {}) {
+    _applyAggregatePayload(jsonResponse, { fromCache = false, silentToast = false } = {}) {
         UINodes.statusText.textContent = fromCache ? "Using cached payload..." : "Loading payload...";
         AppState.filesTotal = jsonResponse.total_files;
         UINodes.filesProcessed.textContent = `0/${AppState.filesTotal} files`;
@@ -176,10 +188,12 @@ class DataFetcher {
 
         this.handleComplete();
 
-        if (fromCache) {
-            this._toastOnce('sync-cache-hit', 'Data is up to date', 'No changes detected. Reused cached aggregate payload.', 'success');
-        } else {
-            this._toastOnce('sync-success', 'Data synced successfully', `Loaded ${jsonResponse.total_files} snapshot${jsonResponse.total_files !== 1 ? 's' : ''}`, 'success');
+        if (!silentToast) {
+            if (fromCache) {
+                this._toastOnce('sync-cache-hit', 'Data is up to date', 'No changes detected. Reused cached aggregate payload.', 'success');
+            } else {
+                this._toastOnce('sync-success', 'Data synced successfully', `Loaded ${jsonResponse.total_files} snapshot${jsonResponse.total_files !== 1 ? 's' : ''}`, 'success');
+            }
         }
     }
 
@@ -559,6 +573,7 @@ class DataFetcher {
 
                 this._activeDisk = id;
                 saveFilters({ activeDisk: id });
+                // Keep disk activation lightweight; user list loads on demand in detail tab.
 
                 // Hiding empty state constraints & show features
                 const currentTab = loadFilters().activePage || 'overview';
@@ -585,6 +600,7 @@ class DataFetcher {
                 }
 
                 this._permissionsLoaded = false;
+                this._treeMapLoaded = false;
                 const permBody = document.getElementById('permissions-body');
                 if (permBody) {
                     permBody.innerHTML = `
@@ -594,6 +610,20 @@ class DataFetcher {
                             </div>
                             <h3>Permission Analysis</h3>
                             <p>Click the <strong>Permission Issues</strong> tab to scan this disk.</p>
+                        </div>`;
+                }
+
+                const tmBody = document.getElementById('treemap-body');
+                if (tmBody) {
+                    tmBody.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="5"/><rect x="13" y="10" width="8" height="11"/><rect x="3" y="13" width="8" height="8"/>
+                                </svg>
+                            </div>
+                            <h3>TreeMap Analysis</h3>
+                            <p>Click the <strong>TreeMap</strong> tab to load folder visual map.</p>
                         </div>`;
                 }
 
@@ -1031,7 +1061,7 @@ class DataFetcher {
             try {
                 this.setProcessingState(true);
 
-                UINodes.statusText.textContent = "Checking metadata...";
+                UINodes.statusText.textContent = "Syncing summary...";
                 const meta = await this._fetchDiskMeta(diskId, signal);
                 if (isStale()) return;
 
@@ -1163,6 +1193,78 @@ class DataFetcher {
                     </div>`;
             }
         }
+    }
+
+    async _fetchTreeMap() {
+        const diskId = this._activeDisk;
+        if (!diskId) return;
+
+        const inflight = this._inflightTreeMapByDisk.get(diskId);
+        if (inflight) return inflight;
+
+        const body = document.getElementById('treemap-body');
+        if (body) {
+            body.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </div>
+                    <h3>Loading TreeMap...</h3>
+                    <p>Reading index and shard metadata for this disk.</p>
+                </div>`;
+        }
+
+        const run = (async () => {
+        try {
+            const res = await fetch(`api.php?id=${encodeURIComponent(diskId)}&type=treemap`);
+            if (!res.ok) throw new Error(`HTTP ${res.status} from treemap API`);
+
+            const text = await res.text();
+            let json;
+            try {
+                json = JSON.parse(text);
+            } catch (err1) {
+                try {
+                    json = JSON.parse(atob(text));
+                } catch (err2) {
+                    throw new Error(`Invalid API Response: ${text.substring(0, 100)}`);
+                }
+            }
+
+            if (json?.status === 'success') {
+                if (this._activeDisk !== diskId) return;
+                this._treeMapLoaded = true;
+                document.dispatchEvent(new CustomEvent('treemapLoaded', {
+                    detail: json.data ? { diskId, ...json.data } : { diskId },
+                }));
+                return;
+            }
+
+            throw new Error(json?.message || 'TreeMap API error');
+        } catch (e) {
+            if (this._activeDisk !== diskId) return;
+            this._toastOnce('treemap-fetch-failed', 'TreeMap load failed', e.message || 'Could not load treemap data.', 'warning');
+            if (body) {
+                body.innerHTML = `
+                    <div class="empty-state variant-rose">
+                        <div class="empty-state-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>
+                            </svg>
+                        </div>
+                        <h3>Failed to Load TreeMap</h3>
+                        <p>Could not load tree map data. Please check report files and try again.</p>
+                    </div>`;
+            }
+        } finally {
+            this._inflightTreeMapByDisk.delete(diskId);
+        }
+        })();
+
+        this._inflightTreeMapByDisk.set(diskId, run);
+        return run;
     }
 
 

@@ -17,9 +17,8 @@ function api_handle_aggregate($disk_path) {
         $inode_json = file_get_contents($inode_file);
     }
 
-    header('Cache-Control: public, max-age=60');
+    header('Cache-Control: no-store');
     header('Content-Type: application/json; charset=utf-8');
-
     echo '{"status":"success","total_files":' . count($files) . ',"inodes":' . ($inode_json ?: "null") . ',"data":[';
     $first = true;
     foreach ($files as $file) {
