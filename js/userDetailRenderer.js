@@ -15,6 +15,8 @@ let _filePage       = 1;    // current page (1-indexed)
 let _fileTotalPages = 1;    // total pages for file report
 let _dirPage        = 1;
 let _dirTotalPages  = 1;
+let _fileTotalExact = null; // exact total from lazy count (filtered mode)
+let _dirTotalExact  = null; // exact total from lazy count (filtered mode)
 const FILE_PAGE     = 500;  // rows per page
 let _currentFilters = JSON.parse(localStorage.getItem('ud_filters') || 'null') || { query: '', ext: '', minSize: 0, maxSize: 0 };
 let _allUserNames   = [];
@@ -728,6 +730,59 @@ async function _fetchUserList(diskId) {
     return json?.data?.users || [];
 }
 
+// Lazy count: fired in background after initial render to get the accurate total
+// for filtered queries. count_only=1 hits the same index path as the data query.
+async function _fetchDirCount(diskId, user) {
+    const b64User = btoa(unescape(encodeURIComponent(user)));
+    let url = `api.php?id=${encodeURIComponent(diskId)}&type=dirs&user_b64=${encodeURIComponent(b64User)}&count_only=1&offset=0&limit=1`;
+    if (_currentFilters.query)   url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
+    if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
+    if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
+    const res  = await fetch(url + `&_t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const text = await res.text();
+    let json;
+    try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { return null; } }
+    return (json?.status === 'success') ? (json.data.dir_count ?? null) : null;
+}
+
+async function _fetchFileCount(diskId, user) {
+    const b64User = btoa(unescape(encodeURIComponent(user)));
+    let url = `api.php?id=${encodeURIComponent(diskId)}&type=files&user_b64=${encodeURIComponent(b64User)}&count_only=1&offset=0&limit=1`;
+    if (_currentFilters.query)   url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
+    if (_currentFilters.ext)     url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
+    if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
+    if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
+    const res  = await fetch(url + `&_t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const text = await res.text();
+    let json;
+    try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { return null; } }
+    return (json?.status === 'success') ? (json.data.file_count ?? null) : null;
+}
+
+// Update badge + pagination in-place after accurate count arrives
+function _applyLazyCount(root, type, exactCount) {
+    if (!root || exactCount === null || exactCount === undefined) return;
+    const badge    = root.querySelector(`#ud-${type}-badge`);
+    const pgWrap   = root.querySelector(`#ud-pagination-${type}`);
+    const curPage  = type === 'dir' ? _dirPage : _filePage;
+    const label    = type === 'dir' ? 'dirs' : 'files';
+    const total    = Math.max(1, exactCount);
+    const pages    = Math.max(1, Math.ceil(total / FILE_PAGE));
+
+    if (type === 'dir') {
+        _dirTotalExact = total;
+        _dirTotalPages = pages;
+    } else {
+        _fileTotalExact = total;
+        _fileTotalPages = pages;
+    }
+
+    if (badge) badge.textContent = `Page ${curPage} of ${pages} · ${total.toLocaleString()} ${label}`;
+    if (pgWrap) pgWrap.outerHTML  = _renderPagination(curPage, pages, type);
+}
+
 
 // ── Core render ───────────────────────────────────────────────────────────────
 
@@ -742,6 +797,8 @@ async function _loadAndRender(user) {
     _fileTotalPages = 1;
     _dirPage        = 1;
     _dirTotalPages  = 1;
+    _fileTotalExact = null;
+    _dirTotalExact  = null;
 
     const toolbar = root.querySelector('#ud-unified-toolbar');
     if (toolbar) {
@@ -784,6 +841,32 @@ async function _loadAndRender(user) {
                     ${_renderFileCard(fileData)}
                 </div>`;
             _attachContentEvents(contentBody, root);
+        }
+
+        // Lazy count: if has_more and filters are active, accurate totals aren't
+        // known yet. Fire background count requests and patch badge + pagination.
+        const hasFilters = !!(Object.values(_currentFilters).some(v => v && v !== 0));
+        if (hasFilters) {
+            const capturedUser = user;
+            const capturedDisk = _currentDisk;
+            // Show spinner in badges while counting
+            const dirBadge  = root.querySelector('#ud-dir-badge');
+            const fileBadge = root.querySelector('#ud-file-badge');
+            if (dirBadge  && dirData.has_more)  dirBadge.textContent  += ' …';
+            if (fileBadge && fileData.has_more) fileBadge.textContent += ' …';
+
+            if (dirData.has_more) {
+                _fetchDirCount(capturedDisk, capturedUser).then(n => {
+                    if (n !== null && _selectedUser === capturedUser && _currentDisk === capturedDisk)
+                        _applyLazyCount(root, 'dir', n);
+                }).catch(() => {});
+            }
+            if (fileData.has_more) {
+                _fetchFileCount(capturedDisk, capturedUser).then(n => {
+                    if (n !== null && _selectedUser === capturedUser && _currentDisk === capturedDisk)
+                        _applyLazyCount(root, 'file', n);
+                }).catch(() => {});
+            }
         }
     } catch (err) {
         if (err.name === 'AbortError') return;
@@ -857,7 +940,9 @@ async function _goToPageFile(root, page) {
         const offset   = (page - 1) * FILE_PAGE;
         const fileData = await _fetchFilePage(_currentDisk, _selectedUser, offset, FILE_PAGE);
         _filePage      = page;
-        _fileTotalPages = Math.max(1, Math.ceil((fileData.total_files ?? fileData.files.length) / FILE_PAGE));
+        const fallbackTotal = fileData.total_files ?? fileData.files.length;
+        const totalFiles = _fileTotalExact ?? fallbackTotal;
+        _fileTotalPages = Math.max(1, Math.ceil(totalFiles / FILE_PAGE));
 
         // Re-render file card rows + pagination in-place
         if (list) {
@@ -880,7 +965,6 @@ async function _goToPageFile(root, page) {
         }
 
         // Update badge
-        const totalFiles = fileData.total_files ?? fileData.files.length;
         if (badge) badge.textContent = `Page ${page} of ${_fileTotalPages} · ${totalFiles.toLocaleString()} files`;
 
         // Re-render pagination
@@ -910,7 +994,9 @@ async function _goToPageDir(root, page) {
         const offset  = (page - 1) * FILE_PAGE;
         const dirData = await _fetchDir(_currentDisk, _selectedUser, offset, FILE_PAGE);
         _dirPage      = page;
-        _dirTotalPages = Math.max(1, Math.ceil((dirData.total_dirs ?? dirData.dirs.length) / FILE_PAGE));
+        const fallbackTotal = dirData.total_dirs ?? dirData.dirs.length;
+        const totalDirs = _dirTotalExact ?? fallbackTotal;
+        _dirTotalPages = Math.max(1, Math.ceil(totalDirs / FILE_PAGE));
 
         if (list) {
             const grandTotal = dirData.total_used || 1;
@@ -929,7 +1015,6 @@ async function _goToPageDir(root, page) {
             list.style.opacity = '';
         }
 
-        const totalDirs = dirData.total_dirs ?? dirData.dirs.length;
         if (badge) badge.textContent = `Page ${page} of ${_dirTotalPages} · ${totalDirs.toLocaleString()} dirs`;
 
         const pgWrap = root.querySelector('#ud-pagination-dir');
@@ -1090,34 +1175,29 @@ async function _udExportDirs() {
         const formatRow = (row, h) => ({ User: row.user, Path: row.path, 'Used (bytes)': row.used })[h] ?? '';
         
         let offset = 0;
-        const limit = 5000;
+        const limit = 10000;
         const b64User = btoa(unescape(encodeURIComponent(_selectedUser)));
-        let totalItems = 0;
+        let processedTotal = 0;
 
         const fetchChunk = async () => {
             const params = new URLSearchParams({ id: _currentDisk, type: 'dirs', user_b64: b64User, offset, limit, filter_query: _currentFilters.query, filter_min_size: _currentFilters.minSize, filter_max_size: _currentFilters.maxSize, filter_ext: _currentFilters.ext });
             const res = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            
+
             const text = await res.text();
             let json;
             try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { throw new Error('Invalid JSON response'); } }
             if (json?.status !== 'success') throw new Error(json?.message || 'API error');
-            
-            const dirs = json.data.dir.dirs || [];
-            if (offset === 0) totalItems = json.data.dir.total_dirs || 0;
-            
-            const rows = dirs.map(d => ({ user: _selectedUser, path: d.path, used: d.used }));
-            
+
+            const dirs    = json.data.dir.dirs || [];
+            const rows    = dirs.map(d => ({ user: _selectedUser, path: d.path, used: d.used }));
             const hasMore = json.data.dir.has_more && dirs.length > 0;
-            
-            const processed = offset + rows.length;
-            const limitStr = totalItems > 0 ? ` / ${totalItems.toLocaleString()}` : '';
-            const pct = totalItems > 0 ? Math.max(1, Math.round((processed / totalItems) * 100)) : Math.min(99, Math.max(1, Math.round((processed / (processed + limit)) * 100)));
-            updateProgressToast('export-dirs', pct, `Streaming directories: ${processed.toLocaleString()}${limitStr}`);
-            
-            offset += limit;
-            
+
+            offset         += limit;
+            processedTotal += rows.length;
+            // Show running count — avoids fake 100% from underestimated total_dirs
+            updateProgressToast('export-dirs', hasMore ? 50 : 99, `Streaming directories: ${processedTotal.toLocaleString()} rows${hasMore ? '...' : ''}`);
+
             return { rows, isLast: !hasMore };
         };
         
@@ -1146,34 +1226,29 @@ async function _udExportFiles() {
         const formatRow = (row, h) => ({ User: row.user, Path: row.path, 'Size (bytes)': row.size })[h] ?? '';
         
         let offset = 0;
-        const limit = 5000;
+        const limit = 10000;
         const b64User = btoa(unescape(encodeURIComponent(_selectedUser)));
-        let totalItems = 0;
+        let processedTotal = 0;
 
         const fetchChunk = async () => {
             const params = new URLSearchParams({ id: _currentDisk, type: 'files', user_b64: b64User, offset, limit, filter_query: _currentFilters.query, filter_ext: _currentFilters.ext, filter_min_size: _currentFilters.minSize });
             const res = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            
+
             const text = await res.text();
             let json;
             try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { throw new Error('Invalid JSON response'); } }
             if (json?.status !== 'success') throw new Error(json?.message || 'API error');
-            
-            const files = json.data.file.files || [];
-            if (offset === 0) totalItems = json.data.file.total_files || 0;
-            
-            const rows = files.map(f => ({ user: _selectedUser, path: f.path, size: f.size }));
-            
+
+            const files   = json.data.file.files || [];
+            const rows    = files.map(f => ({ user: _selectedUser, path: f.path, size: f.size }));
             const hasMore = json.data.file.has_more && files.length > 0;
-            
-            const processed = offset + rows.length;
-            const limitStr = totalItems > 0 ? ` / ${totalItems.toLocaleString()}` : '';
-            const pct = totalItems > 0 ? Math.max(1, Math.round((processed / totalItems) * 100)) : Math.min(99, Math.max(1, Math.round((processed / (processed + limit)) * 100)));
-            updateProgressToast('export-files', pct, `Streaming files: ${processed.toLocaleString()}${limitStr}`);
-            
-            offset += limit;
-            
+
+            offset         += limit;
+            processedTotal += rows.length;
+            // Show running count — avoids fake 100% from underestimated total_files
+            updateProgressToast('export-files', hasMore ? 50 : 99, `Streaming files: ${processedTotal.toLocaleString()} rows${hasMore ? '...' : ''}`);
+
             return { rows, isLast: !hasMore };
         };
         
@@ -1216,6 +1291,8 @@ export async function initUserDetailTab(diskId, otherUsers = []) {
 export function resetUserDetailTab() {
     _selectedUser = null;
     _currentDisk  = null;
+    _fileTotalExact = null;
+    _dirTotalExact  = null;
     if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null; }
     const root = _getRoot();
     if (root) root.innerHTML = '';

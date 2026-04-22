@@ -29,6 +29,19 @@ function api_treemap_load_json_file($file_path) {
     return is_array($json) ? $json : false;
 }
 
+/**
+ * Normalize a shard item from compact Rust format to frontend-expected format.
+ * Compact (new):  {id, name, size, owner, children_count}
+ * Expected (old): {shard_id, name, value, type, owner, has_children, path}
+ */
+function api_treemap_normalize_item_fields(&$item) {
+    if (!is_array($item)) return;
+    if (!isset($item['value']))       $item['value']       = isset($item['size'])          ? (float)$item['size']          : 0.0;
+    if (!isset($item['shard_id']))    $item['shard_id']    = isset($item['id'])            ? (string)$item['id']           : '';
+    if (!isset($item['has_children']))$item['has_children']= isset($item['children_count'])? ($item['children_count'] > 0)  : false;
+    if (!isset($item['type']))        $item['type']        = 'directory';
+}
+
 function api_treemap_read_shard_from_db($db_path, $shard_id) {
     if (!class_exists('SQLite3')) return false;
     if (!is_file($db_path)) return false;
@@ -41,7 +54,7 @@ function api_treemap_read_shard_from_db($db_path, $shard_id) {
             $db = new SQLite3($db_path);
         }
 
-        $stmt = $db->prepare('SELECT data FROM shards WHERE id = :id LIMIT 1');
+        $stmt = $db->prepare('SELECT path, data FROM shards WHERE id = :id LIMIT 1');
         if (!$stmt) {
             $db->close();
             return false;
@@ -64,8 +77,34 @@ function api_treemap_read_shard_from_db($db_path, $shard_id) {
         $db->close();
 
         if (!$row || !isset($row['data'])) return false;
-        $items = @json_decode($row['data'], true);
-        return is_array($items) ? $items : false;
+
+        // Decompress if BLOB (zlib magic byte 0x78), else use raw JSON.
+        $raw = $row['data'];
+        $json = (strlen($raw) > 0 && ord($raw[0]) === 0x78) ? @zlib_decode($raw) : $raw;
+        if ($json === false) return false;
+
+        $items = @json_decode($json, true);
+        if (!is_array($items)) return false;
+
+        // Reconstruct per-item 'path' from shard path + item name, then normalize fields.
+        if (isset($row['path'])) {
+            $base = rtrim($row['path'], '/');
+            foreach ($items as &$item) {
+                if (!isset($item['path'])) {
+                    $t = isset($item['type']) ? $item['type'] : '';
+                    $item['path'] = ($t === 'file_group')
+                        ? $base . '/__files__'
+                        : $base . '/' . (isset($item['name']) ? $item['name'] : '');
+                }
+                api_treemap_normalize_item_fields($item);
+            }
+            unset($item);
+        } else {
+            foreach ($items as &$item) { api_treemap_normalize_item_fields($item); }
+            unset($item);
+        }
+
+        return $items;
     } catch (Exception $e) {
         if ($db) $db->close();
         return false;
@@ -93,16 +132,17 @@ function api_treemap_match_query($node, $query_lc) {
 }
 
 function api_treemap_push_search_hit(&$hits, $node, $source, $parent_shard_id) {
+    // Support both old format (value/shard_id/has_children) and compact Rust format (size/id/children_count).
     $hits[] = array(
-        'name' => isset($node['name']) ? $node['name'] : '',
-        'path' => isset($node['path']) ? $node['path'] : '',
-        'value' => isset($node['value']) ? (float)$node['value'] : 0,
-        'type' => isset($node['type']) ? $node['type'] : 'directory',
-        'owner' => isset($node['owner']) ? $node['owner'] : '',
-        'has_children' => !empty($node['has_children']),
-        'shard_id' => isset($node['shard_id']) ? $node['shard_id'] : '',
+        'name'            => isset($node['name']) ? $node['name'] : '',
+        'path'            => isset($node['path']) ? $node['path'] : '',
+        'value'           => isset($node['value'])        ? (float)$node['value']  : (isset($node['size'])          ? (float)$node['size']          : 0),
+        'type'            => isset($node['type'])         ? $node['type']          : 'directory',
+        'owner'           => isset($node['owner'])        ? $node['owner']         : '',
+        'has_children'    => isset($node['has_children']) ? !empty($node['has_children']) : (isset($node['children_count']) ? ($node['children_count'] > 0) : false),
+        'shard_id'        => isset($node['shard_id'])     ? $node['shard_id']      : (isset($node['id']) ? (string)$node['id'] : ''),
         'parent_shard_id' => $parent_shard_id,
-        'source' => $source,
+        'source'          => $source,
     );
 }
 
@@ -135,20 +175,44 @@ function api_treemap_search_from_db($db_path, $query_lc, &$hits, &$seen) {
             $db = new SQLite3($db_path);
         }
 
-        $res = $db->query('SELECT id, data FROM shards');
+        $res = $db->query('SELECT id, path, data FROM shards');
         if (!$res) {
             $db->close();
             return false;
         }
 
         while (($row = $res->fetchArray(SQLITE3_ASSOC)) !== false) {
-            if (!isset($row['data']) || !is_string($row['data'])) continue;
+            if (!isset($row['data'])) continue;
 
-            // Cheap pre-filter before JSON decode.
-            if (strpos(strtolower($row['data']), $query_lc) === false) continue;
+            // Decompress if zlib BLOB (first byte 0x78), else use raw JSON text.
+            $raw = $row['data'];
+            $json = (strlen($raw) > 0 && ord($raw[0]) === 0x78) ? @zlib_decode($raw) : $raw;
+            if ($json === false || !is_string($json)) continue;
 
-            $nodes = @json_decode($row['data'], true);
+            // Cheap pre-filter on decompressed text before JSON decode.
+            if (strpos(strtolower($json), $query_lc) === false) continue;
+
+            $nodes = @json_decode($json, true);
             if (!is_array($nodes)) continue;
+
+            // Reconstruct item paths from shard path, then normalize compact fields.
+            $shard_path = isset($row['path']) ? $row['path'] : '';
+            if ($shard_path !== '') {
+                $base = rtrim($shard_path, '/');
+                foreach ($nodes as &$node) {
+                    if (!isset($node['path'])) {
+                        $t = isset($node['type']) ? $node['type'] : '';
+                        $node['path'] = ($t === 'file_group')
+                            ? $base . '/__files__'
+                            : $base . '/' . (isset($node['name']) ? $node['name'] : '');
+                    }
+                    api_treemap_normalize_item_fields($node);
+                }
+                unset($node);
+            } else {
+                foreach ($nodes as &$node) { api_treemap_normalize_item_fields($node); }
+                unset($node);
+            }
 
             $parent_shard_id = isset($row['id']) ? $row['id'] : '';
             api_treemap_collect_search_hits($nodes, $query_lc, $hits, 'sqlite_db', $parent_shard_id, $seen);

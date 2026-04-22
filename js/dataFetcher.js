@@ -35,6 +35,7 @@ class DataFetcher {
         this._syncSequence = 0;
         this._activeSyncController = null;
         this._toastHistory = new Map(); // toastKey -> lastShownAtMs
+        this._groupUserConfig = null;
 
         // Initialize charts
         AppState.chartManagerInstance = new ChartManager();
@@ -136,6 +137,14 @@ class DataFetcher {
 
         // Load disk list (auto-fetch is triggered inherently by disk click simulation inside)
         this._initDiskSelector();
+
+        // Receive grouping config updates from Group User modal and refresh dashboard immediately.
+        const onGroupConfigUpdated = (e) => {
+            this._groupUserConfig = e?.detail?.config || null;
+            this._applyGroupingAndRefresh();
+        };
+        document.addEventListener('groupUserConfigReady', onGroupConfigUpdated);
+        document.addEventListener('groupUserConfigChanged', onGroupConfigUpdated);
     }
 
     // Avoid spamming identical toast messages when users click rapidly.
@@ -169,6 +178,7 @@ class DataFetcher {
         UINodes.filesProcessed.textContent = `0/${AppState.filesTotal} files`;
 
         this.dataStore = new DataStore();
+        this.dataStore.setGroupingContext(this._groupUserConfig, this._activeDisk);
         UINodes.statusText.textContent = "Aggregating metrics...";
 
         this.dataStore.processChunk(jsonResponse.data);
@@ -195,6 +205,16 @@ class DataFetcher {
                 this._toastOnce('sync-success', 'Data synced successfully', `Loaded ${jsonResponse.total_files} snapshot${jsonResponse.total_files !== 1 ? 's' : ''}`, 'success');
             }
         }
+    }
+
+    _applyGroupingAndRefresh() {
+        if (!this.dataStore) return;
+        this.dataStore.setGroupingContext(this._groupUserConfig, this._activeDisk);
+        if (!this.dataStore.latestSnapshot) return;
+
+        AppState.chartManagerInstance.render(this.dataStore);
+        renderDetailTables(this.dataStore);
+        this.updateMetricCards();
     }
 
     _initSortUI() {

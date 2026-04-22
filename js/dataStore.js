@@ -25,6 +25,9 @@ export class DataStore {
         this._latestTs = -Infinity;
         this.permissionIssues = null;
         this.latestInodes = null;
+        this.groupConfig = null;
+        this.activeDiskId = null;
+        this.groupedView = null;
 
         this.latestStats = {
             total: 0,
@@ -116,6 +119,8 @@ export class DataStore {
                 });
             }
         });
+
+        this._rebuildGroupedView();
     }
 
     // Sort time series data before rendering
@@ -133,6 +138,144 @@ export class DataStore {
 
     // Returns the full latest snapshot object
     getLatestSnapshot() { return this.latestSnapshot; }
+
+    setGroupingContext(config, activeDiskId) {
+        this.groupConfig = this._normalizeGroupingConfig(config);
+        this.activeDiskId = activeDiskId ? String(activeDiskId) : null;
+        this._rebuildGroupedView();
+    }
+
+    _normalizeGroupingConfig(config) {
+        if (!config || typeof config !== 'object' || !Array.isArray(config.groups)) return null;
+        const groups = config.groups
+            .filter(g => g && typeof g === 'object')
+            .map((g, idx) => {
+                const id = String(g.id || `group_${idx + 1}`);
+                const name = String(g.name || `Group ${idx + 1}`).trim() || `Group ${idx + 1}`;
+                const diskUsers = {};
+                if (g.diskUsers && typeof g.diskUsers === 'object') {
+                    Object.keys(g.diskUsers).forEach(diskId => {
+                        const users = g.diskUsers[diskId];
+                        if (!Array.isArray(users)) return;
+                        diskUsers[String(diskId)] = [...new Set(users
+                            .map(u => String(u || '').trim())
+                            .filter(Boolean))]
+                            .sort((a, b) => a.localeCompare(b));
+                    });
+                }
+                return { id, name, diskUsers };
+            });
+
+        return {
+            schema_version: Number(config.schema_version || 1),
+            groups,
+        };
+    }
+
+    _rebuildGroupedView() {
+        this.groupedView = null;
+        if (!this.latestSnapshot || !this.groupConfig || !this.activeDiskId) {
+            if (this.latestSnapshot) this.latestSnapshot.grouped = null;
+            return;
+        }
+
+        const usageMap = new Map();
+        const addUsage = (arr) => {
+            (arr || []).forEach((u) => {
+                if (!u || !u.name) return;
+                const name = String(u.name);
+                const prev = usageMap.get(name) || 0;
+                const used = Number(u.used || 0);
+                if (used > prev) usageMap.set(name, used);
+            });
+        };
+
+        addUsage(this.latestSnapshot.users);
+        addUsage(this.latestSnapshot.other);
+
+        const assignedUsers = new Set();
+        const distribution = [];
+        const membersByGroup = new Map();
+        let hasActiveAssignments = false;
+
+        this.groupConfig.groups.forEach((group) => {
+            const list = Array.isArray(group.diskUsers?.[this.activeDiskId]) ? group.diskUsers[this.activeDiskId] : [];
+            if (list.length === 0) return;
+            hasActiveAssignments = true;
+            const members = [];
+            let sum = 0;
+
+            list.forEach((userName) => {
+                const used = usageMap.get(userName) || 0;
+                assignedUsers.add(userName);
+                members.push({ name: userName, used });
+                sum += used;
+            });
+
+            members.sort((a, b) => b.used - a.used);
+            const groupKey = `group:${group.id}`;
+            membersByGroup.set(groupKey, members);
+            distribution.push({
+                name: group.name,
+                used: sum,
+                team_id: groupKey,
+                is_group: true,
+            });
+        });
+
+        // No users assigned to any group for this disk:
+        // keep default (non-grouped) view to avoid showing synthetic legends.
+        if (!hasActiveAssignments) {
+            this.groupedView = null;
+            this.latestSnapshot.grouped = null;
+            return;
+        }
+
+        const ungroupedUsers = [];
+        usageMap.forEach((used, name) => {
+            if (!assignedUsers.has(name)) {
+                ungroupedUsers.push({ name, used });
+            }
+        });
+        ungroupedUsers.sort((a, b) => b.used - a.used);
+
+        const ungroupedSum = ungroupedUsers.reduce((s, u) => s + (u.used || 0), 0);
+        if (ungroupedSum > 0) {
+            const otherIdx = distribution.findIndex((g) => String(g?.name || '').trim().toLowerCase() === 'other');
+            if (otherIdx >= 0) {
+                const otherTeamId = distribution[otherIdx].team_id || 'group:__other__';
+                const existingMembers = membersByGroup.get(otherTeamId) || [];
+                membersByGroup.set(otherTeamId, existingMembers.concat(ungroupedUsers).sort((a, b) => b.used - a.used));
+                distribution[otherIdx].used = (distribution[otherIdx].used || 0) + ungroupedSum;
+            } else {
+                const otherKey = 'group:__other__';
+                membersByGroup.set(otherKey, ungroupedUsers.slice());
+                distribution.push({
+                    name: 'Other',
+                    used: ungroupedSum,
+                    team_id: otherKey,
+                    is_group: true,
+                });
+            }
+        }
+
+        distribution.sort((a, b) => b.used - a.used);
+        const topConsumers = distribution.slice();
+
+        this.groupedView = {
+            distribution,
+            membersByGroup,
+            ungroupedUsers,
+            topConsumers,
+        };
+
+        this.latestSnapshot.grouped = {
+            schema_version: this.groupConfig.schema_version || 1,
+            disk_id: this.activeDiskId,
+            groups: distribution.map(g => ({ name: g.name, used: g.used, team_id: g.team_id })),
+            ungrouped_users: ungroupedUsers.slice(),
+        };
+    }
 
     setLatestInodes(inodesData) { this.latestInodes = inodesData; }
     getLatestInodes() { return this.latestInodes; }
@@ -192,12 +335,18 @@ export class DataStore {
     }
 
     getTeamDistribution() {
+        if (this.groupedView?.distribution?.length) {
+            return this.groupedView.distribution.slice();
+        }
         if (!this.latestSnapshot || !this.latestSnapshot.teams) return [];
         return this.latestSnapshot.teams.slice().sort((a, b) => b.used - a.used);
     }
 
     /** Return only users belonging to a given team_id, sorted by usage desc */
     getUsersByTeamId(teamId) {
+        if (this.groupedView?.membersByGroup?.has(teamId)) {
+            return (this.groupedView.membersByGroup.get(teamId) || []).slice().sort((a, b) => b.used - a.used);
+        }
         if (!this.latestSnapshot || !this.latestSnapshot.users) return [];
         return this.latestSnapshot.users
             .filter(u => u.team_id === teamId)
@@ -207,8 +356,18 @@ export class DataStore {
 
     /** Return other_usage (system/unregistered users), sorted by usage desc */
     getOtherUsers() {
+        if (this.groupedView?.ungroupedUsers) {
+            return this.groupedView.ungroupedUsers.slice().sort((a, b) => b.used - a.used);
+        }
         if (!this.latestSnapshot || !this.latestSnapshot.other) return [];
         return this.latestSnapshot.other.slice().sort((a, b) => b.used - a.used);
+    }
+
+    getTopConsumers(limit = 10) {
+        if (this.groupedView?.topConsumers?.length) {
+            return this.groupedView.topConsumers.slice().sort((a, b) => b.used - a.used).slice(0, limit);
+        }
+        return this.getTopUsers(limit);
     }
 
     getTopUsers(limit = 10) {

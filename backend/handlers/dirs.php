@@ -54,21 +54,62 @@ function api_handle_dirs_db($file_path, $who, $offset, $limit, $filter_min, $fil
     $total_dirs_meta = 0;
     $total_used = 0;
 
-    $meta_rs = @$db->query('SELECT date, user, total_items, total_used FROM meta LIMIT 1');
-    if ($meta_rs) {
-        $row = $meta_rs->fetchArray(SQLITE3_ASSOC);
-        if (is_array($row)) {
-            if (isset($row['date'])) $date = (int)$row['date'];
-            if (isset($row['user'])) $user_name = $row['user'];
-            if (isset($row['total_items'])) $total_dirs_meta = (int)$row['total_items'];
-            if (isset($row['total_used'])) $total_used = (int)$row['total_used'];
-        }
-        $meta_rs->finalize();
+    $meta_rs = null;
+    $row = false;
+
+    // Prefer new split schema (dirs_data + dirs_index) — supports FTS4 and indexed ORDER BY.
+    // Fall back to legacy 'dirs' view/table for old report formats.
+    $split_check = @$db->query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='dirs_data' LIMIT 1");
+    $is_split = $split_check && ($split_check->fetchArray(SQLITE3_ASSOC) !== false);
+    if ($split_check) $split_check->finalize();
+
+    $has_dirs_view = false;
+    if (!$is_split) {
+        $dirs_check = @$db->query("SELECT 1 FROM sqlite_master WHERE type IN ('table','view') AND name='dirs' LIMIT 1");
+        $has_dirs_view = $dirs_check && ($dirs_check->fetchArray(SQLITE3_ASSOC) !== false);
+        if ($dirs_check) $dirs_check->finalize();
+    }
+    if (!$is_split && !$has_dirs_view) {
+        $db->close();
+        b64_success(array('dir' => array(
+            'date' => 0, 'user' => $who, 'total_dirs' => 0, 'total_used' => 0,
+            'offset' => $offset, 'limit' => $limit, 'has_more' => false, 'dirs' => array(),
+        )));
     }
 
-    $cols = api_dirs_db_table_columns($db, 'dirs');
-    $path_expr = isset($cols['path_lc']) ? 'path_lc' : 'LOWER(path)';
-    $name_expr = isset($cols['name_lc']) ? 'name_lc' : 'LOWER(path)';
+    // Try meta_dirs (combined schema) first, fall back to meta (old standalone).
+    $meta_rs = @$db->query('SELECT date, user, total_dirs AS total_items, total_used FROM meta_dirs LIMIT 1');
+    $row = $meta_rs ? $meta_rs->fetchArray(SQLITE3_ASSOC) : false;
+    if (!$row) {
+        if ($meta_rs) $meta_rs->finalize();
+        $meta_rs = @$db->query('SELECT date, user, total_items, total_used FROM meta LIMIT 1');
+        $row = $meta_rs ? $meta_rs->fetchArray(SQLITE3_ASSOC) : false;
+    }
+    if (is_array($row)) {
+        if (isset($row['date']))        $date           = (int)$row['date'];
+        if (isset($row['user']))        $user_name      = $row['user'];
+        if (isset($row['total_items'])) $total_dirs_meta = (int)$row['total_items'];
+        if (isset($row['total_used']))  $total_used     = (int)$row['total_used'];
+    }
+    if ($meta_rs) $meta_rs->finalize();
+
+    // Build query parts based on schema: new split (JOIN) vs classic 'dirs' table.
+    if ($is_split) {
+        $from_clause  = 'dirs_data dd JOIN dirs_index di ON dd.dir_id = di.id';
+        $select_cols  = 'di.path AS path, dd.used AS used';
+        $order_clause = 'dd.used DESC';
+        $where_used   = 'dd.used';
+        $path_expr    = 'LOWER(di.path)';
+        $name_expr    = 'LOWER(di.path)';
+    } else {
+        $cols = api_dirs_db_table_columns($db, 'dirs');
+        $from_clause  = 'dirs';
+        $select_cols  = 'path, used';
+        $order_clause = 'used DESC';
+        $where_used   = 'used';
+        $path_expr    = isset($cols['path_lc']) ? 'path_lc' : 'LOWER(path)';
+        $name_expr    = isset($cols['name_lc']) ? 'name_lc' : 'LOWER(path)';
+    }
 
     if (!$has_filters) {
         if ($total_dirs_meta > 0 && $offset >= $total_dirs_meta) {
@@ -86,7 +127,7 @@ function api_handle_dirs_db($file_path, $who, $offset, $limit, $filter_min, $fil
         }
 
         $collected = array();
-        $sql = 'SELECT path, used FROM dirs ORDER BY used DESC LIMIT ' . (int)$limit . ' OFFSET ' . (int)$offset;
+        $sql = 'SELECT ' . $select_cols . ' FROM ' . $from_clause . ' ORDER BY ' . $order_clause . ' LIMIT ' . (int)$limit . ' OFFSET ' . (int)$offset;
         $rs = @$db->query($sql);
         while ($rs && ($row = $rs->fetchArray(SQLITE3_ASSOC)) !== false) {
             $collected[] = api_dirs_normalize_row($row);
@@ -114,78 +155,110 @@ function api_handle_dirs_db($file_path, $who, $offset, $limit, $filter_min, $fil
     $qidx = 0;
 
     if ($filter_min > 0) {
-        $conds[] = 'used >= :min_size';
+        $conds[] = $where_used . ' >= :min_size';
         $binds[':min_size'] = array((int)$filter_min, SQLITE3_INTEGER);
     }
     if ($filter_max > 0) {
-        $conds[] = 'used <= :max_size';
+        $conds[] = $where_used . ' <= :max_size';
         $binds[':max_size'] = array((int)$filter_max, SQLITE3_INTEGER);
     }
     if (!empty($q_array)) {
-        $qConds = array();
+        // Prefer FTS4 for plain keyword searches (no glob wildcards).
+        // Splits on path/ext separators and adds prefix wildcard to each token.
+        $has_glob = false;
         foreach ($q_array as $q) {
-            $k = ':q_' . $qidx++;
-            $q = trim($q);
-            if ($q === '') continue;
-            if (strpos($q, '*') === false) {
-                $qConds[] = '(' . $path_expr . ' LIKE ' . $k . ' OR ' . $name_expr . ' LIKE ' . $k . ')';
-                $binds[$k] = array('%' . strtolower($q) . '%', SQLITE3_TEXT);
-            } else {
-                $qConds[] = '(' . $path_expr . ' LIKE ' . $k . ' OR ' . $name_expr . ' LIKE ' . $k . ')';
-                $binds[$k] = array(api_dirs_db_like_from_wildcard($q), SQLITE3_TEXT);
+            if (strpos(trim($q), '*') !== false) { $has_glob = true; break; }
+        }
+
+        $fts4_match = '';
+        if (!$has_glob && $is_split) {  // FTS4 uses dd.dir_id alias — only valid for split schema
+            $fts_parts = [];
+            foreach ($q_array as $q) {
+                foreach (preg_split('/[\/\.\s_-]+/', strtolower(trim($q)), -1, PREG_SPLIT_NO_EMPTY) as $t) {
+                    if ($t !== '') $fts_parts[] = $t . '*';
+                }
+            }
+            if (!empty($fts_parts)) {
+                // Check fts_dirs exists (present only in new-schema DBs with FTS4).
+                $fts_ok = @$db->querySingle(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='fts_dirs'"
+                );
+                if ($fts_ok !== null) {
+                    $fts4_match = implode(' ', $fts_parts);
+                }
             }
         }
-        if (!empty($qConds)) $conds[] = '(' . implode(' OR ', $qConds) . ')';
+
+        if ($fts4_match !== '') {
+            // FTS4 fast path: sub-select matching docids, O(k) where k = match count.
+            $conds[] = 'dd.dir_id IN (SELECT docid FROM fts_dirs WHERE fts_dirs MATCH :fts_q)';
+            $binds[':fts_q'] = array($fts4_match, SQLITE3_TEXT);
+        } else {
+            // LIKE fallback: glob wildcards used or fts_dirs table unavailable.
+            $qConds = array();
+            foreach ($q_array as $q) {
+                $k = ':q_' . $qidx++;
+                $q = trim($q);
+                if ($q === '') continue;
+                if (strpos($q, '*') === false) {
+                    $qConds[] = '(' . $path_expr . ' LIKE ' . $k . ' OR ' . $name_expr . ' LIKE ' . $k . ')';
+                    $binds[$k] = array('%' . strtolower($q) . '%', SQLITE3_TEXT);
+                } else {
+                    $qConds[] = '(' . $path_expr . ' LIKE ' . $k . ' OR ' . $name_expr . ' LIKE ' . $k . ')';
+                    $binds[$k] = array(api_dirs_db_like_from_wildcard($q), SQLITE3_TEXT);
+                }
+            }
+            if (!empty($qConds)) $conds[] = '(' . implode(' OR ', $qConds) . ')';
+        }
     }
     $where_sql = empty($conds) ? '' : (' WHERE ' . implode(' AND ', $conds));
 
-    $count_stmt = @$db->prepare('SELECT COUNT(1) AS c FROM dirs' . $where_sql);
-    if (!$count_stmt) {
+    // count_only=1: return just the filtered row count for lazy total computation.
+    // JS fires this in the background after initial page-1 render to get the accurate total.
+    if (param('count_only', '0') === '1') {
+        $cnt_sql  = 'SELECT COUNT(*) FROM ' . $from_clause . $where_sql;
+        $cnt_stmt = @$db->prepare($cnt_sql);
+        $n = 0;
+        if ($cnt_stmt) {
+            api_dirs_db_bind_all($cnt_stmt, $binds);
+            $cnt_rs = $cnt_stmt->execute();
+            if ($cnt_rs) {
+                $cnt_row = $cnt_rs->fetchArray(SQLITE3_NUM);
+                $n = $cnt_row ? (int)$cnt_row[0] : 0;
+                $cnt_rs->finalize();
+            }
+            $cnt_stmt->close();
+        }
         $db->close();
-        b64_error('Unable to prepare count query for directory report.', 500);
-    }
-    api_dirs_db_bind_all($count_stmt, $binds);
-    $count_rs = @$count_stmt->execute();
-    $count_row = $count_rs ? $count_rs->fetchArray(SQLITE3_ASSOC) : false;
-    $total_dirs = ($count_row && isset($count_row['c'])) ? (int)$count_row['c'] : 0;
-    if ($count_rs) $count_rs->finalize();
-    $count_stmt->close();
-
-    if ($offset >= $total_dirs) {
-        $db->close();
-        b64_success(array('dir' => array(
-            'date'        => $date,
-            'user'        => $user_name,
-            'total_dirs'  => $total_dirs,
-            'total_used'  => $total_used,
-            'offset'      => $offset,
-            'limit'       => $limit,
-            'has_more'    => false,
-            'dirs'        => array(),
-        )));
+        b64_success(array('dir_count' => $n));
     }
 
+    // Fetch limit+1 to detect has_more without a separate COUNT full-scan.
+    // total_dirs is exact when all results fit (<=limit), else a lower-bound estimate.
     $data_stmt = @$db->prepare(
-        'SELECT path, used FROM dirs' . $where_sql . ' ORDER BY used DESC LIMIT :lim OFFSET :off'
+        'SELECT ' . $select_cols . ' FROM ' . $from_clause . $where_sql . ' ORDER BY ' . $order_clause . ' LIMIT :lim OFFSET :off'
     );
     if (!$data_stmt) {
         $db->close();
         b64_error('Unable to prepare data query for directory report.', 500);
     }
     api_dirs_db_bind_all($data_stmt, $binds);
-    $data_stmt->bindValue(':lim', (int)$limit, SQLITE3_INTEGER);
+    $data_stmt->bindValue(':lim', (int)($limit + 1), SQLITE3_INTEGER);
     $data_stmt->bindValue(':off', (int)$offset, SQLITE3_INTEGER);
 
-    $collected = array();
+    $all_rows = array();
     $data_rs = @$data_stmt->execute();
     while ($data_rs && ($row = $data_rs->fetchArray(SQLITE3_ASSOC)) !== false) {
-        $collected[] = api_dirs_normalize_row($row);
+        $all_rows[] = api_dirs_normalize_row($row);
     }
     if ($data_rs) $data_rs->finalize();
     $data_stmt->close();
     $db->close();
 
-    $has_more = ($offset + count($collected) < $total_dirs);
+    $has_more   = count($all_rows) > $limit;
+    if ($has_more) array_pop($all_rows);
+    $collected  = $all_rows;
+    $total_dirs = $offset + count($collected) + ($has_more ? 1 : 0);
 
     b64_success(array('dir' => array(
         'date'        => $date,
@@ -284,6 +357,11 @@ function api_handle_dirs($disk_path) {
 
     $pattern = '/(?:.*_)?detail_report_dirs?_' . preg_quote($who, '/') . '\\.(?:db|json|ndjson)$/i';
     $file_path = find_file_by_pattern($detail_dir, $pattern);
+    // Fallback: combined file_db — new format has VIEW dirs appended inside it.
+    if (!$file_path || !is_file($file_path)) {
+        $combined_pattern = '/(?:.*_)?detail_report_files?_' . preg_quote($who, '/') . '\\.db$/i';
+        $file_path = find_file_by_pattern($detail_dir, $combined_pattern);
+    }
 
     if (!$file_path || !is_file($file_path)) {
         b64_success(array('dir' => array(

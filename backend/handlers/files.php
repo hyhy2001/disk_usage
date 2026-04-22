@@ -68,11 +68,44 @@ function api_handle_files_db($file_path, $who, $offset, $limit, $filter_min, $fi
         $meta_rs->finalize();
     }
 
-    $cols = api_files_db_table_columns($db, 'files');
-    $path_expr = isset($cols['path_lc']) ? 'path_lc' : 'LOWER(path)';
-    $name_expr = isset($cols['name_lc']) ? 'name_lc' : 'LOWER(path)';
-    // New slim .db stores `xt` already lowercased; legacy DB may still have `xt_lc`.
-    $ext_expr  = isset($cols['xt_lc']) ? 'xt_lc' : 'xt';
+    // Detect schema: new split (files_data + dirs_index) vs classic (files table).
+    $is_split = false;
+    $files_exists = false;
+    $files_chk = @$db->query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='files' LIMIT 1");
+    $files_exists = $files_chk && ($files_chk->fetchArray(SQLITE3_ASSOC) !== false);
+    if ($files_chk) $files_chk->finalize();
+    if (!$files_exists) {
+        $split_chk = @$db->query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='files_data' LIMIT 1");
+        $is_split = $split_chk && ($split_chk->fetchArray(SQLITE3_ASSOC) !== false);
+        if ($split_chk) $split_chk->finalize();
+    }
+    if (!$files_exists && !$is_split) {
+        $db->close();
+        b64_success(array('file' => array(
+            'date' => $date, 'user' => $user_name, 'total_files' => 0, 'total_used' => $total_used,
+            'offset' => $offset, 'limit' => $limit, 'has_more' => false, 'files' => array(),
+        )));
+    }
+    // Build query parts based on schema: split JOIN vs classic files table.
+    if ($is_split) {
+        $from_clause  = 'files_data fd JOIN dirs_index di ON fd.dir_id = di.id';
+        $select_cols  = "(di.path || '/' || fd.basename) AS path, fd.size AS size, fd.xt AS xt";
+        $order_clause = 'fd.size DESC';
+        $where_size   = 'fd.size';
+        $path_expr    = "LOWER(di.path || '/' || fd.basename)";
+        $name_expr    = 'LOWER(fd.basename)';
+        $ext_expr     = 'fd.xt';
+    } else {
+        $cols = api_files_db_table_columns($db, 'files');
+        $from_clause  = 'files';
+        $select_cols  = 'path, size, xt';
+        $order_clause = 'size DESC';
+        $where_size   = 'size';
+        $path_expr    = isset($cols['path_lc']) ? 'path_lc' : 'LOWER(path)';
+        $name_expr    = isset($cols['name_lc']) ? 'name_lc' : 'LOWER(path)';
+        // New slim .db stores `xt` already lowercased; legacy DB may still have `xt_lc`.
+        $ext_expr     = isset($cols['xt_lc']) ? 'xt_lc' : 'xt';
+    }
 
     if (!$has_filters) {
         if ($total_files_meta > 0 && $offset >= $total_files_meta) {
@@ -90,7 +123,7 @@ function api_handle_files_db($file_path, $who, $offset, $limit, $filter_min, $fi
         }
 
         $collected = array();
-        $sql = 'SELECT path, size, xt FROM files ORDER BY size DESC LIMIT ' . (int)$limit . ' OFFSET ' . (int)$offset;
+        $sql = 'SELECT ' . $select_cols . ' FROM ' . $from_clause . ' ORDER BY ' . $order_clause . ' LIMIT ' . (int)$limit . ' OFFSET ' . (int)$offset;
         $rs = @$db->query($sql);
         while ($rs && ($row = $rs->fetchArray(SQLITE3_ASSOC)) !== false) {
             $collected[] = api_files_normalize_row($row);
@@ -119,11 +152,11 @@ function api_handle_files_db($file_path, $who, $offset, $limit, $filter_min, $fi
     $eidx = 0;
 
     if ($filter_min > 0) {
-        $conds[] = 'size >= :min_size';
+        $conds[] = $where_size . ' >= :min_size';
         $binds[':min_size'] = array((int)$filter_min, SQLITE3_INTEGER);
     }
     if ($filter_max > 0) {
-        $conds[] = 'size <= :max_size';
+        $conds[] = $where_size . ' <= :max_size';
         $binds[':max_size'] = array((int)$filter_max, SQLITE3_INTEGER);
     }
     if (!empty($ext_lookup)) {
@@ -136,71 +169,100 @@ function api_handle_files_db($file_path, $who, $offset, $limit, $filter_min, $fi
         if (!empty($extConds)) $conds[] = '(' . implode(' OR ', $extConds) . ')';
     }
     if (!empty($q_array)) {
-        $qConds = array();
+        // Prefer FTS4 for plain keyword searches (no glob wildcards).
+        $has_glob = false;
         foreach ($q_array as $q) {
-            $k = ':q_' . $qidx++;
-            $q = trim($q);
-            if ($q === '') continue;
-            if (strpos($q, '*') === false) {
-                $qConds[] = '(' . $path_expr . ' LIKE ' . $k . ' OR ' . $name_expr . ' LIKE ' . $k . ')';
-                $binds[$k] = array('%' . strtolower($q) . '%', SQLITE3_TEXT);
-            } else {
-                $qConds[] = '(' . $path_expr . ' LIKE ' . $k . ' OR ' . $name_expr . ' LIKE ' . $k . ')';
-                $binds[$k] = array(api_files_db_like_from_wildcard($q), SQLITE3_TEXT);
+            if (strpos(trim($q), '*') !== false) { $has_glob = true; break; }
+        }
+
+        $fts4_match = '';
+        if (!$has_glob && $is_split) {  // FTS4 uses fd.id alias — only valid for split schema
+            $fts_parts = [];
+            foreach ($q_array as $q) {
+                foreach (preg_split('/[\/\.\s_-]+/', strtolower(trim($q)), -1, PREG_SPLIT_NO_EMPTY) as $t) {
+                    if ($t !== '') $fts_parts[] = $t . '*';
+                }
+            }
+            if (!empty($fts_parts)) {
+                $fts_ok = @$db->querySingle(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='fts_files'"
+                );
+                if ($fts_ok !== null) {
+                    $fts4_match = implode(' ', $fts_parts);
+                }
             }
         }
-        if (!empty($qConds)) $conds[] = '(' . implode(' OR ', $qConds) . ')';
+
+        if ($fts4_match !== '') {
+            // FTS4 fast path: fts_files stores fullpath (dir/basename), O(k) lookup.
+            $conds[] = 'fd.id IN (SELECT docid FROM fts_files WHERE fts_files MATCH :fts_q)';
+            $binds[':fts_q'] = array($fts4_match, SQLITE3_TEXT);
+        } else {
+            // LIKE fallback: glob wildcards used or fts_files table unavailable.
+            $qConds = array();
+            foreach ($q_array as $q) {
+                $k = ':q_' . $qidx++;
+                $q = trim($q);
+                if ($q === '') continue;
+                if (strpos($q, '*') === false) {
+                    $qConds[] = '(' . $path_expr . ' LIKE ' . $k . ' OR ' . $name_expr . ' LIKE ' . $k . ')';
+                    $binds[$k] = array('%' . strtolower($q) . '%', SQLITE3_TEXT);
+                } else {
+                    $qConds[] = '(' . $path_expr . ' LIKE ' . $k . ' OR ' . $name_expr . ' LIKE ' . $k . ')';
+                    $binds[$k] = array(api_files_db_like_from_wildcard($q), SQLITE3_TEXT);
+                }
+            }
+            if (!empty($qConds)) $conds[] = '(' . implode(' OR ', $qConds) . ')';
+        }
     }
 
     $where_sql = empty($conds) ? '' : (' WHERE ' . implode(' AND ', $conds));
 
-    $count_stmt = @$db->prepare('SELECT COUNT(1) AS c FROM files' . $where_sql);
-    if (!$count_stmt) {
+    // count_only=1: return just the filtered row count for lazy total computation.
+    if (param('count_only', '0') === '1') {
+        $cnt_sql  = 'SELECT COUNT(*) FROM ' . $from_clause . $where_sql;
+        $cnt_stmt = @$db->prepare($cnt_sql);
+        $n = 0;
+        if ($cnt_stmt) {
+            api_files_db_bind_all($cnt_stmt, $binds);
+            $cnt_rs = $cnt_stmt->execute();
+            if ($cnt_rs) {
+                $cnt_row = $cnt_rs->fetchArray(SQLITE3_NUM);
+                $n = $cnt_row ? (int)$cnt_row[0] : 0;
+                $cnt_rs->finalize();
+            }
+            $cnt_stmt->close();
+        }
         $db->close();
-        b64_error('Unable to prepare count query for file report.', 500);
-    }
-    api_files_db_bind_all($count_stmt, $binds);
-    $count_rs = @$count_stmt->execute();
-    $count_row = $count_rs ? $count_rs->fetchArray(SQLITE3_ASSOC) : false;
-    $total_files = ($count_row && isset($count_row['c'])) ? (int)$count_row['c'] : 0;
-    if ($count_rs) $count_rs->finalize();
-    $count_stmt->close();
-
-    if ($offset >= $total_files) {
-        $db->close();
-        b64_success(array('file' => array(
-            'date'        => $date,
-            'user'        => $user_name,
-            'total_files' => $total_files,
-            'total_used'  => $total_used,
-            'offset'      => $offset,
-            'limit'       => $limit,
-            'has_more'    => false,
-            'files'       => array(),
-        )));
+        b64_success(array('file_count' => $n));
     }
 
+    // Fetch limit+1 to detect has_more without a separate COUNT full-scan.
+    // total_files is exact when all results fit (<=limit), else a lower-bound estimate.
     $data_stmt = @$db->prepare(
-        'SELECT path, size, xt FROM files' . $where_sql . ' ORDER BY size DESC LIMIT :lim OFFSET :off'
+        'SELECT ' . $select_cols . ' FROM ' . $from_clause . $where_sql . ' ORDER BY ' . $order_clause . ' LIMIT :lim OFFSET :off'
     );
     if (!$data_stmt) {
         $db->close();
         b64_error('Unable to prepare data query for file report.', 500);
     }
     api_files_db_bind_all($data_stmt, $binds);
-    $data_stmt->bindValue(':lim', (int)$limit, SQLITE3_INTEGER);
+    $data_stmt->bindValue(':lim', (int)($limit + 1), SQLITE3_INTEGER);
     $data_stmt->bindValue(':off', (int)$offset, SQLITE3_INTEGER);
 
-    $collected = array();
+    $all_rows = array();
     $data_rs = @$data_stmt->execute();
     while ($data_rs && ($row = $data_rs->fetchArray(SQLITE3_ASSOC)) !== false) {
-        $collected[] = api_files_normalize_row($row);
+        $all_rows[] = api_files_normalize_row($row);
     }
     if ($data_rs) $data_rs->finalize();
     $data_stmt->close();
     $db->close();
 
-    $has_more = ($offset + count($collected) < $total_files);
+    $has_more    = count($all_rows) > $limit;
+    if ($has_more) array_pop($all_rows);
+    $collected   = $all_rows;
+    $total_files = $offset + count($collected) + ($has_more ? 1 : 0);
 
     b64_success(array('file' => array(
         'date'        => $date,

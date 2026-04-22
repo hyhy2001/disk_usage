@@ -2825,6 +2825,7 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
+    min-height: 0;
 }
 
 /* -- ① Time Range Bar ------------------------------------------------------- */
@@ -3228,11 +3229,70 @@
    keep filter/search panel and main chart/list fitting the screen height,
    and only scroll user lists when content exceeds available space. */
 @media (min-width: 1101px) {
-    #tab-pane-history .history-main-row,
+    #tab-pane-history.detail-tab-pane.active {
+        min-height: 0;
+        height: calc(100dvh - 330px);
+        max-height: calc(100dvh - 330px);
+        overflow: hidden;
+    }
+
+    #tab-pane-history .history-layout {
+        min-height: 0;
+        height: 100%;
+        max-height: 100%;
+        overflow: hidden;
+    }
+
+    #tab-pane-permissions.detail-tab-pane.active {
+        min-height: 0;
+        height: calc(100dvh - 330px);
+        max-height: calc(100dvh - 330px);
+        overflow: hidden;
+    }
+
+    #tab-pane-permissions #permissions-body {
+        min-height: 0;
+        height: 100%;
+        overflow: hidden;
+    }
+
+    #tab-pane-permissions .perm-meta,
+    #tab-pane-permissions .perm-summary-bar {
+        flex-shrink: 0;
+    }
+
+    #tab-pane-permissions .history-main-row {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto;
+    }
+
+    #tab-pane-permissions .history-main-row > .user-filter-box,
+    #tab-pane-permissions .history-main-row > .history-content {
+        min-height: 0;
+        height: 100%;
+    }
+
+    #tab-pane-history .history-main-row {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto;
+    }
+
+    #tab-pane-history .history-timerange {
+        flex-shrink: 0;
+    }
+
+    #tab-pane-history .history-main-row {
+        flex-wrap: nowrap;
+        align-items: stretch;
+        overflow: hidden;
+    }
+
     #tab-pane-permissions .history-main-row {
         flex-wrap: nowrap;
-        min-height: clamp(420px, calc(100dvh - 320px), 700px);
         align-items: stretch;
+        overflow: hidden;
     }
 
     #tab-pane-history .history-content,
@@ -3240,6 +3300,7 @@
         min-height: 0;
         display: flex;
         flex-direction: column;
+        overflow: hidden;
     }
 
     #tab-pane-history .user-filter-box,
@@ -3260,25 +3321,25 @@
     #tab-pane-history .history-chart-card {
         flex: 1 1 auto;
         min-height: 0;
+        height: 100%;
+        max-height: min(56dvh, calc(100dvh - 390px));
     }
 
     #tab-pane-history .history-chart-body {
-        height: clamp(320px, calc(100dvh - 470px), 520px);
-        min-height: 260px;
+        height: auto;
+        min-height: 180px;
+        flex: 1 1 auto;
     }
 
     #tab-pane-permissions .perm-flat-list {
         flex: 1 1 auto;
         min-height: 0;
+        height: 100%;
+        max-height: none;
         overflow-y: auto;
     }
 
-    /* Permission tab has extra header blocks (meta + summary),
-       so use a shorter main row height to avoid vertical overflow. */
-    #tab-pane-permissions .history-main-row {
-        min-height: 0;
-        height: clamp(300px, calc(100dvh - 430px), 560px);
-    }
+    #tab-pane-permissions .history-main-row { overflow: hidden; }
 }
 
 .history-content {
@@ -3299,13 +3360,16 @@
     gap: 8px;
     padding: 14px;
     align-self: flex-start;
+    min-height: 0;
+    max-height: min(64dvh, calc(100dvh - 260px));
 }
 
 /* Container query: when content < 560px, filter goes full-width above list */
 @container main (max-width: 560px) {
     .user-filter-box {
         width: 100%;
-        max-height: none;
+        max-height: min(60dvh, calc(100dvh - 260px));
+        overflow: hidden;
         align-self: stretch;
     }
 
@@ -3418,8 +3482,8 @@
     color: #0369a1;
 }
 
-/* Ensure sidebar height adjusts correctly */
-.user-filter-box { height: fit-content; }
+/* Ensure sidebar keeps viewport-fit and lets user list scroll */
+.user-filter-box { overflow: hidden; }
 
 .user-filter-footer .user-bar-btn { flex: 1; text-align: center; }
 
@@ -3428,11 +3492,14 @@
 .user-filter-list {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     min-height: 0;
-    max-height: 280px;
+    max-height: min(38dvh, 300px);
     display: flex;
     flex-direction: column;
     gap: 1px;
+    padding-bottom: 6px;
+    overscroll-behavior: contain;
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.1) transparent;
 }
@@ -3484,9 +3551,17 @@
     border-top: 1px solid rgba(255,255,255,0.06);
     padding-top: 8px;
     margin-top: 2px;
+    flex-shrink: 0;
 }
 
-.user-filter-footer .user-bar-btn { flex: 1; text-align: center; }
+.user-filter-footer .user-bar-btn {
+    flex: 1;
+    text-align: center;
+    padding: 3px 10px;
+    min-height: 30px;
+    font-size: 0.72rem;
+    border-radius: 7px;
+}
 
 
 /* ======================================================================== */
@@ -4099,25 +4174,25 @@
 
     .user-filter-box {
         width: 100% !important;
-        max-height: none;
+        max-height: min(60dvh, calc(100dvh - 260px));
+        overflow: hidden;
         align-self: stretch;
-        /* Collapsible horizontal layout for filter items on tablet */
     }
 
-    /* On tablet/mobile, show filter list as horizontal wrap */
+    /* Keep user list vertical and scrollable on tablet/mobile */
     .user-filter-list {
-        max-height: 140px;
-        flex-direction: row;
-        flex-wrap: wrap;
+        max-height: min(34dvh, 200px);
+        flex-direction: column;
+        flex-wrap: nowrap;
         gap: 4px;
     }
 
     .user-filter-item {
-        flex-shrink: 0;
-        flex-basis: auto;
+        flex-shrink: 1;
+        flex-basis: 100%;
         padding: 4px 10px;
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 8px;
         font-size: 0.75rem;
     }
 
@@ -5489,6 +5564,11 @@
     min-width: 0;
 }
 
+.tmx-search-input-wrap {
+    position: relative;
+    min-width: 0;
+}
+
 .tmx-search-input {
     width: 100%;
     min-width: 0;
@@ -5525,6 +5605,74 @@
 .tmx-search-clear:hover {
     border-color: rgba(16,185,129,0.55);
     color: var(--text-primary);
+}
+
+.tmx-search-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.96);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 14px 30px rgba(2, 8, 23, 0.52);
+    z-index: 22;
+    display: none;
+}
+
+.tmx-search-dropdown.is-open {
+    display: flex;
+    flex-direction: column;
+}
+
+.tmx-search-dropdown-empty {
+    padding: 10px 11px;
+    color: rgba(148,163,184,0.92);
+    font-size: 0.74rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.tmx-search-option {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: transparent;
+    color: var(--text-primary);
+    text-align: left;
+    padding: 8px 11px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tmx-search-option:last-child {
+    border-bottom: 0;
+}
+
+.tmx-search-option:hover {
+    background: rgba(30, 41, 59, 0.72);
+}
+
+.tmx-search-option-name {
+    font-size: 0.78rem;
+    color: rgba(226,232,240,0.98);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tmx-search-option-path {
+    font-size: 0.68rem;
+    color: rgba(148,163,184,0.95);
+    font-family: 'JetBrains Mono', monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .tmx-list {
@@ -6431,6 +6579,297 @@
 .dropdown-item .theme-label { font-size: 0; }
 .dropdown-item .theme-label::before { font-size: 13px; }
 
+/* --- Group User Modal --- */
+body.group-user-modal-open {
+    overflow: hidden;
+}
+
+.group-user-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1800;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.group-user-modal.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.group-user-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.group-user-modal-box {
+    position: absolute;
+    inset: 24px;
+    max-width: 1200px;
+    max-height: calc(100vh - 48px);
+    margin: 0 auto;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.group-user-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.group-user-header-main {
+    min-width: 0;
+    flex: 1;
+}
+
+.group-user-title {
+    font-size: 0.88rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.group-user-subtitle {
+    margin-top: 4px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+.group-user-switch-wrap {
+    margin-top: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: min(520px, 100%);
+}
+
+.group-user-switch-label {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.group-user-switch-select {
+    min-width: 220px;
+    max-width: 100%;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    padding: 0 10px;
+}
+
+.group-user-switch-select:disabled {
+    opacity: 0.7;
+}
+
+.group-user-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.group-user-toolbar-btn,
+.group-user-mini-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.group-user-toolbar-btn:hover,
+.group-user-mini-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.group-user-close {
+    width: 30px;
+    padding: 0;
+}
+
+.group-user-modal-body {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1.2fr 1.2fr;
+    gap: 14px;
+    padding: 14px;
+}
+
+.group-user-pane {
+    min-height: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-surface);
+    display: flex;
+    flex-direction: column;
+}
+
+.group-user-pane-head {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    font-weight: 700;
+}
+
+.group-user-pane-filter-wrap {
+    padding: 8px 8px 0;
+}
+
+.group-user-search {
+    width: 100%;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-base);
+    color: var(--text-primary);
+    padding: 0 10px;
+    font-size: 0.78rem;
+    outline: none;
+}
+
+.group-user-search:focus {
+    border-color: var(--accent);
+}
+
+.group-user-list {
+    overflow: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.group-user-row {
+    width: 100%;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: transparent;
+    color: inherit;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.group-user-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.group-user-row.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.2) inset;
+}
+
+.group-user-row.included {
+    border-color: rgba(56, 189, 248, 0.45);
+}
+
+.group-user-row.drag-over {
+    border-color: rgba(16, 185, 129, 0.7);
+    box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.35) inset;
+    background: rgba(16, 185, 129, 0.08);
+}
+
+.group-user-row[draggable="true"] {
+    cursor: grab;
+}
+
+.group-user-row[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.group-user-row-main {
+    font-size: 0.82rem;
+    color: var(--text-primary);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.group-user-row-meta {
+    max-width: 180px;
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.group-user-row-action {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+    background: rgba(15, 23, 42, 0.4);
+}
+
+.group-user-empty {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    padding: 10px 8px;
+}
+
+@media (max-width: 1024px) {
+    .group-user-modal-box {
+        inset: 10px;
+        max-height: calc(100vh - 20px);
+    }
+
+    .group-user-modal-body {
+        grid-template-columns: 1fr;
+    }
+
+    .group-user-modal-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .group-user-header-actions {
+        justify-content: flex-end;
+    }
+}
+
 /* ── Selected Disk Card Highlight ─────────────────────────── */
 .team-disk-card.selected {
     background: rgba(255, 255, 255, 0.08) !important;
@@ -6485,12 +6924,13 @@
 
     .user-filter-box {
         width: 100% !important;
-        max-height: none;
+        max-height: min(60dvh, calc(100dvh - 260px));
+        overflow: hidden;
         align-self: stretch;
     }
 
     .user-filter-list {
-        max-height: 200px;
+        max-height: min(34dvh, 200px);
     }
 
     .history-chart-card {

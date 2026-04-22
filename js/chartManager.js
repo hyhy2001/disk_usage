@@ -235,7 +235,7 @@ export class ChartManager {
             dataStore.latestStats.used,
             dataStore
         );
-        this.renderUsersChart(dataStore.getTopUsers(10));
+        this.renderUsersChart(dataStore.getTopConsumers(10));
         this._bindRangeBtns();
     }
 
@@ -631,16 +631,39 @@ export class ChartManager {
 
         const sumTeams    = teamData.reduce((s, t) => s + t.used, 0);
         const unknownBytes = Math.max(0, totalUsed - sumTeams);
-        const allTeams    = [...teamData];
+        let allTeams    = [...teamData];
         const bgColors    = [
             this.colors.sky, this.colors.emerald, this.colors.amber,
             this.colors.rose, '#8b5cf6', this.colors.slate, '#06b6d4', '#a78bfa'
         ];
 
         if (unknownBytes > 0) {
-            allTeams.push({ name: 'Unknown', used: unknownBytes });
+            allTeams.push({ name: 'Other', used: unknownBytes });
             bgColors.push('#334155');
         }
+
+        // Normalize legend naming: merge any "Unknown" bucket into "Other".
+        const mergedTeams = new Map();
+        allTeams.forEach((t) => {
+            const baseName = String(t?.name || '').trim() || 'Other';
+            const normalizedName = baseName.toLowerCase() === 'unknown' ? 'Other' : baseName;
+            const key = normalizedName.toLowerCase();
+            const used = Number(t?.used || 0);
+            if (!mergedTeams.has(key)) {
+                mergedTeams.set(key, {
+                    ...t,
+                    name: normalizedName,
+                    used,
+                });
+                return;
+            }
+            const cur = mergedTeams.get(key);
+            cur.used += used;
+            if (cur.team_id === undefined && t?.team_id !== undefined) {
+                cur.team_id = t.team_id;
+            }
+        });
+        allTeams = Array.from(mergedTeams.values()).sort((a, b) => (b.used || 0) - (a.used || 0));
 
         const labels = allTeams.map(t => t.name);
         const data   = allTeams.map(t => t.used / 1e12);
@@ -716,17 +739,12 @@ export class ChartManager {
                     this._selectedTeamIdx = idx;
 
                     if (!team || team.team_id === undefined) {
-                        if (team?.name === 'Unknown') {
-                            // JS-generated slice for unaccounted disk space — no user mapping
-                            this._showNoDataUsersChart();
+                        // Any bucket without team_id is treated as "Other"/uncategorized users.
+                        const otherUsers = dataStore.getOtherUsers();
+                        if (otherUsers.length) {
+                            this.renderUsersChart(otherUsers);
                         } else {
-                            // "Other" catchall from report — show other_usage (system users)
-                            const otherUsers = dataStore.getOtherUsers();
-                            if (otherUsers.length) {
-                                this.renderUsersChart(otherUsers);
-                            } else {
-                                this._showNoDataUsersChart();
-                            }
+                            this._showNoDataUsersChart();
                         }
                         this._showTeamFilterBadge(team?.name ?? 'Other', () => this._clearTeamFilter(dataStore));
                         return;
@@ -774,7 +792,7 @@ export class ChartManager {
     /** Clear team filter — restore all-users chart and hide badge */
     _clearTeamFilter(dataStore) {
         this._selectedTeamIdx = null;
-        this.renderUsersChart(dataStore.getTopUsers(10));
+        this.renderUsersChart(dataStore.getTopConsumers(10));
         const badge = document.getElementById('team-filter-badge');
         if (badge) badge.style.display = 'none';
     }

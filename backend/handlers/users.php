@@ -23,15 +23,87 @@ function api_users_from_latest_main_report($disk_path) {
     $raw = @file_get_contents($latest_file);
     if ($raw === false) return array();
     $json = @json_decode($raw, true);
-    if (!is_array($json) || !isset($json['user_usage']) || !is_array($json['user_usage'])) return array();
+    if (!is_array($json)) return array();
 
     $users = array();
-    foreach ($json['user_usage'] as $u) {
-        if (is_array($u) && isset($u['name']) && $u['name'] !== '') {
-            $users[] = (string)$u['name'];
+    if (isset($json['user_usage']) && is_array($json['user_usage'])) {
+        foreach ($json['user_usage'] as $u) {
+            if (is_array($u) && isset($u['name']) && $u['name'] !== '') {
+                $users[] = (string)$u['name'];
+            }
         }
     }
+
+    // Include "other_usage" users too so Group User UI can count/show "Other" correctly.
+    if (isset($json['other_usage']) && is_array($json['other_usage'])) {
+        foreach ($json['other_usage'] as $u) {
+            if (is_array($u) && isset($u['name']) && $u['name'] !== '') {
+                $users[] = (string)$u['name'];
+            }
+        }
+    }
+
     return api_users_normalize_list($users);
+}
+
+function api_users_system_groups_from_latest_main_report($disk_path) {
+    $info = api_get_latest_main_report_info($disk_path);
+    $latest_file = isset($info['latest_file']) ? $info['latest_file'] : false;
+    if (!$latest_file || !is_file($latest_file)) return array();
+
+    $raw = @file_get_contents($latest_file);
+    if ($raw === false) return array();
+    $json = @json_decode($raw, true);
+    if (!is_array($json)) return array();
+
+    $team_name_by_id = array();
+    if (isset($json['team_usage']) && is_array($json['team_usage'])) {
+        foreach ($json['team_usage'] as $t) {
+            if (!is_array($t)) continue;
+            if (!isset($t['team_id'])) continue;
+            $tid = trim((string)$t['team_id']);
+            if ($tid === '') continue;
+            $tname = isset($t['name']) ? trim((string)$t['name']) : '';
+            if ($tname === '') $tname = 'Team ' . $tid;
+            $team_name_by_id[$tid] = $tname;
+        }
+    }
+
+    $groups = array();
+    if (isset($json['user_usage']) && is_array($json['user_usage'])) {
+        foreach ($json['user_usage'] as $u) {
+            if (!is_array($u) || !isset($u['name'])) continue;
+            $uname = trim((string)$u['name']);
+            if ($uname === '') continue;
+
+            $team_id = isset($u['team_id']) ? trim((string)$u['team_id']) : '';
+            $group_name = '';
+            if ($team_id !== '' && isset($team_name_by_id[$team_id])) {
+                $group_name = $team_name_by_id[$team_id];
+            } elseif ($team_id !== '') {
+                $group_name = 'Team ' . $team_id;
+            } else {
+                $group_name = 'Ungrouped';
+            }
+
+            if (!isset($groups[$group_name])) $groups[$group_name] = array();
+            $groups[$group_name][$uname] = true;
+        }
+    }
+
+    $out = array();
+    $names = array_keys($groups);
+    sort($names, SORT_NATURAL | SORT_FLAG_CASE);
+    foreach ($names as $name) {
+        $users = array_keys($groups[$name]);
+        sort($users);
+        $out[] = array(
+            'name' => $name,
+            'users' => $users,
+            'count' => count($users),
+        );
+    }
+    return $out;
 }
 
 function api_handle_users($disk_path) {
@@ -76,7 +148,11 @@ function api_handle_users($disk_path) {
         }
 
         $users = api_users_normalize_list($users);
-        $data = array('users' => $users);
+        $system_groups = api_users_system_groups_from_latest_main_report($disk_path);
+        $data = array(
+            'users' => $users,
+            'system_groups' => $system_groups,
+        );
         api_cache_set($cache_key, $data);
     }
     b64_success($data);

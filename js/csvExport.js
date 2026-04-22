@@ -90,20 +90,21 @@ export async function streamExportGzip(filename, headers, fetchChunkCallback, fo
     try {
         fileHandle = await window.showSaveFilePicker({
             suggestedName: filename + '.csv.gz',
-            types: [{ description: 'GZIP Compressed CSV', accept: { 'application/gzip': ['.gz'] } }]
+            types: [{ description: 'GZIP Compressed CSV', accept: { 'application/gzip': ['.gz'] } }],
         });
     } catch (err) {
         if (err.name === 'AbortError') throw new Error('AbortError');
         return false;
     }
 
-    const writable = await fileHandle.createWritable();
-    const cs = new CompressionStream('gzip');
-    const writer = cs.writable.getWriter();
-    cs.readable.pipeTo(writable);
+    const writable    = await fileHandle.createWritable();
+    const cs          = new CompressionStream('gzip');
+    const writer      = cs.writable.getWriter();
+    // Save promise — must await AFTER writer.close() so all compressed bytes reach the file.
+    const pipePromise = cs.readable.pipeTo(writable);
 
     const encoder = new TextEncoder();
-    const bom = '\uFEFF';
+    const bom     = '\uFEFF';
 
     const escape = v => {
         const s = String(v ?? '');
@@ -111,30 +112,39 @@ export async function streamExportGzip(filename, headers, fetchChunkCallback, fo
             ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
 
-    // Header
-    const headerLine = headers.map(escape).join(',');
-    await writer.write(encoder.encode(bom + headerLine + '\r\n'));
+    try {
+        // Header row
+        const headerLine = headers.map(escape).join(',');
+        await writer.write(encoder.encode(bom + headerLine + '\r\n'));
 
-    let hasMore = true;
-    while (hasMore) {
-        const chunkData = await fetchChunkCallback();
-        if (!chunkData) break;
-        
-        hasMore = !chunkData.isLast;
-        const rows = chunkData.rows || [];
+        let hasMore = true;
+        while (hasMore) {
+            const chunkData = await fetchChunkCallback();
+            if (!chunkData) break;
 
-        if (rows.length > 0) {
-            const lines = rows.map(row => 
-                headers.map(h => {
-                    const val = formatRow ? formatRow(row, h) : row[h.toLowerCase().replace(/ /g, '_')];
-                    return escape(val ?? '');
-                }).join(',')
-            ).join('\r\n') + '\r\n';
-            
-            await writer.write(encoder.encode(lines));
+            hasMore = !chunkData.isLast;
+            const rows = chunkData.rows || [];
+
+            if (rows.length > 0) {
+                const lines = rows.map(row =>
+                    headers.map(h => {
+                        const val = formatRow ? formatRow(row, h) : row[h.toLowerCase().replace(/ /g, '_')];
+                        return escape(val ?? '');
+                    }).join(',')
+                ).join('\r\n') + '\r\n';
+
+                await writer.write(encoder.encode(lines));
+            }
         }
-    }
 
-    await writer.close();
-    return true;
+        await writer.close();
+        await pipePromise; // flush all compressed bytes into the file before returning
+        return true;
+
+    } catch (err) {
+        // Abort both streams so the browser marks the file as failed/incomplete
+        await writer.abort(err).catch(() => {});
+        await writable.abort(err).catch(() => {});
+        throw err;
+    }
 }

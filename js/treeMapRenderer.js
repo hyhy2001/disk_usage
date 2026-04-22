@@ -7,6 +7,7 @@ let _currentNode = null;
 let _searchQuery = '';
 let _searchRenderToken = 0;
 let _searchDebounceTimer = null;
+let _searchOutsideClickBound = false;
 
 let _searchState = {
     q: '',
@@ -315,6 +316,69 @@ function mapSearchHitToNode(hit) {
     };
 }
 
+function hideSearchDropdown() {
+    const box = document.getElementById('tmx-search-dropdown');
+    if (!box) return;
+    box.classList.remove('is-open');
+    box.innerHTML = '';
+}
+
+function pickSearchHit(hit) {
+    const node = mapSearchHitToNode(hit);
+    _searchQuery = '';
+    resetSearchState('');
+    const input = document.getElementById('tmx-search-input');
+    if (input) input.value = '';
+    hideSearchDropdown();
+    _currentNode = node;
+    renderCurrentNode();
+}
+
+function renderSearchDropdown() {
+    const box = document.getElementById('tmx-search-dropdown');
+    if (!box) return;
+
+    const q = (_searchQuery || '').trim();
+    if (!q) {
+        hideSearchDropdown();
+        return;
+    }
+
+    if (_searchState.loading && _searchState.items.length === 0) {
+        box.classList.add('is-open');
+        box.innerHTML = '<div class="tmx-search-dropdown-empty">Searching...</div>';
+        return;
+    }
+
+    if (_searchState.items.length === 0) {
+        box.classList.add('is-open');
+        box.innerHTML = '<div class="tmx-search-dropdown-empty">No match found.</div>';
+        return;
+    }
+
+    let html = '';
+    _searchState.items.forEach(function(hit, idx) {
+        const label = hit.name || hit.path || 'node';
+        const fullPath = hit.path || '/';
+        html +=
+            '<button type="button" class="tmx-search-option" data-idx="' + idx + '">' +
+                '<span class="tmx-search-option-name">' + escHtml(label) + '</span>' +
+                '<span class="tmx-search-option-path">' + escHtml(fullPath) + '</span>' +
+            '</button>';
+    });
+
+    box.classList.add('is-open');
+    box.innerHTML = html;
+
+    box.querySelectorAll('.tmx-search-option').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const idx = parseInt(btn.getAttribute('data-idx') || '-1', 10);
+            if (isNaN(idx) || idx < 0 || idx >= _searchState.items.length) return;
+            pickSearchHit(_searchState.items[idx]);
+        });
+    });
+}
+
 function renderList(node) {
     const list = document.getElementById('tmx-list');
     if (!list) return;
@@ -378,77 +442,6 @@ function renderList(node) {
     syncTableHeadGutter();
 }
 
-function renderGlobalSearchList() {
-    const list = document.getElementById('tmx-list');
-    if (!list) return;
-
-    list.innerHTML = '';
-
-    if (_searchState.items.length === 0 && !_searchState.hasMore) {
-        list.innerHTML = '<div class="tmx-empty">No global match found.</div>';
-        return;
-    }
-
-    _searchState.items.forEach(function(hit) {
-        const node = mapSearchHitToNode(hit);
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'tmx-item';
-
-        const icon = (node.type === 'file_group' || node.type === 'file') ? '📄' : '📁';
-
-        btn.innerHTML =
-            '<span class="tmx-item-folder">' +
-                '<span class="tmx-item-icon">' + icon + '</span>' +
-                '<span class="tmx-item-main">' +
-                '<span class="tmx-item-name">' + escHtml(node.name || node.path || 'node') + '</span>' +
-                '</span>' +
-            '</span>' +
-            '<span class="tmx-item-owner">' + escHtml(node.owner || '-') + '</span>' +
-            '<span class="tmx-item-size">' + escHtml(fmt(node.value || 0)) + '</span>' +
-            '<span class="tmx-item-type">' + escHtml(getNodeTypeLabel(node)) + '</span>';
-
-        btn.addEventListener('click', function() {
-            if (node.has_children || node.shard_id) {
-                _searchQuery = '';
-                resetSearchState('');
-                const input = document.getElementById('tmx-search-input');
-                if (input) input.value = '';
-                _currentNode = node;
-                renderCurrentNode();
-            } else {
-                setMeta(node, _searchState.source || 'global_search');
-            }
-        });
-
-        list.appendChild(btn);
-    });
-
-    if (_searchState.hasMore) {
-        const moreWrap = document.createElement('div');
-        moreWrap.className = 'tmx-load-more';
-        const moreBtn = document.createElement('button');
-        moreBtn.type = 'button';
-        moreBtn.className = 'user-bar-btn';
-        moreBtn.textContent = _searchState.loading ? 'Loading...' : 'Load more results';
-        moreBtn.disabled = _searchState.loading;
-        moreBtn.addEventListener('click', async function() {
-            moreBtn.disabled = true;
-            moreBtn.textContent = 'Loading...';
-            await loadMoreGlobalSearch();
-            renderGlobalSearchList();
-            const titleEl = document.getElementById('tmx-current-title');
-            if (titleEl) {
-                titleEl.textContent = 'Global search "' + _searchState.q + '" (' + _searchState.items.length + '/' + _searchState.total + ')';
-            }
-        });
-        moreWrap.appendChild(moreBtn);
-        list.appendChild(moreWrap);
-    }
-
-    syncTableHeadGutter();
-}
-
 function syncTableHeadGutter() {
     const wrap = document.querySelector('.tmx-wrap');
     const list = document.getElementById('tmx-list');
@@ -477,10 +470,11 @@ async function renderCurrentNode() {
 
         const searchTitleEl = document.getElementById('tmx-current-title');
         if (searchTitleEl) {
-            searchTitleEl.textContent = 'Global search "' + query + '" (' + _searchState.items.length + '/' + _searchState.total + ')';
+            searchTitleEl.textContent = 'Global search "' + query + '" • choose a path from dropdown';
         }
 
-        renderGlobalSearchList();
+        renderList(node);
+        renderSearchDropdown();
         return;
     }
 
@@ -501,6 +495,7 @@ async function renderCurrentNode() {
     }
 
     renderList(node);
+    hideSearchDropdown();
 }
 
 function renderExplorer(rootNode, meta) {
@@ -533,7 +528,10 @@ function renderExplorer(rootNode, meta) {
             '<div class="glass-panel tmx-wrap">' +
                 '<div class="tmx-breadcrumb" id="tmx-breadcrumb"></div>' +
                 '<div class="tmx-search">' +
-                    '<input id="tmx-search-input" class="tmx-search-input" type="text" placeholder="Global search path/name..." autocomplete="off" />' +
+                    '<div class="tmx-search-input-wrap">' +
+                        '<input id="tmx-search-input" class="tmx-search-input" type="text" placeholder="Global search path/name..." autocomplete="off" />' +
+                        '<div class="tmx-search-dropdown" id="tmx-search-dropdown"></div>' +
+                    '</div>' +
                     '<button type="button" id="tmx-search-clear" class="tmx-search-clear">Clear</button>' +
                 '</div>' +
                 '<div class="tmx-current-title" id="tmx-current-title"></div>' +
@@ -581,6 +579,19 @@ function renderExplorer(rootNode, meta) {
                 renderCurrentNode();
             }, 180);
         });
+        searchInput.addEventListener('focus', function() {
+            if ((_searchQuery || '').trim()) renderSearchDropdown();
+        });
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                hideSearchDropdown();
+                return;
+            }
+            if (e.key === 'Enter' && _searchState.items.length > 0) {
+                e.preventDefault();
+                pickSearchHit(_searchState.items[0]);
+            }
+        });
     }
 
     const clearBtn = document.getElementById('tmx-search-clear');
@@ -589,8 +600,19 @@ function renderExplorer(rootNode, meta) {
             _searchQuery = '';
             resetSearchState('');
             if (searchInput) searchInput.value = '';
+            hideSearchDropdown();
             renderCurrentNode();
         });
+    }
+
+    if (!_searchOutsideClickBound) {
+        document.addEventListener('click', function(ev) {
+            const target = ev.target;
+            const searchWrap = document.querySelector('.tmx-search');
+            if (!searchWrap || !target) return;
+            if (!searchWrap.contains(target)) hideSearchDropdown();
+        });
+        _searchOutsideClickBound = true;
     }
 
     renderCurrentNode();
