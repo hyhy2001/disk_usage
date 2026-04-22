@@ -62,7 +62,31 @@ function renderSnapshotView() {
         return;
     }
 
-    const { general, teams, users, other } = snap;
+    const { general } = snap;
+    const teams = _store.getTeamDistribution();
+    const other = _store.getOtherUsers();
+
+    let users = [];
+    if (snap.grouped && Array.isArray(teams) && teams.length > 0) {
+        const merged = new Map();
+        teams.forEach((t) => {
+            const isOther = String(t?.name || '').trim().toLowerCase() === 'other';
+            if (isOther) return;
+            const members = _store.getUsersByTeamId(t.team_id) || [];
+            members.forEach((u) => {
+                if (!u || !u.name) return;
+                const name = String(u.name);
+                const used = Number(u.used || 0);
+                const prev = merged.get(name) || 0;
+                if (used > prev) merged.set(name, used);
+            });
+        });
+        users = Array.from(merged.entries())
+            .map(([name, used]) => ({ name, used }))
+            .sort((a, b) => b.used - a.used);
+    } else {
+        users = (snap.users || []).slice().sort((a, b) => b.used - a.used);
+    }
     const sys = general.total;   // df -h total (authoritative)
     const usedByDf = general.used;
 

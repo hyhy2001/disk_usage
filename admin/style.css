@@ -1,0 +1,248 @@
+:root {
+    --admin-bg: #f3f6fb;
+    --admin-surface: #ffffff;
+    --admin-border: #d7deea;
+    --admin-border-strong: #c7d2e3;
+    --admin-text: #1f2a44;
+    --admin-muted: #6b7a96;
+    --admin-accent: #2f6fed;
+    --admin-success: #1f9d67;
+    --admin-danger: #d14a4a;
+    --admin-warning: #b07a16;
+    --admin-shadow: 0 6px 24px rgba(31, 42, 68, 0.08);
+}
+
+body {
+    background: var(--admin-bg);
+    color: var(--admin-text);
+}
+
+.admin-topbar {
+    background: var(--admin-surface);
+    border-bottom: 1px solid var(--admin-border);
+    box-shadow: 0 1px 0 rgba(31, 42, 68, 0.02);
+}
+
+.admin-form-card {
+    max-width: 540px;
+    margin: 0 auto 14px;
+    border: 1px solid var(--admin-border);
+    box-shadow: var(--admin-shadow);
+}
+
+.admin-form {
+    display: grid;
+    gap: 12px;
+}
+
+.admin-form label {
+    display: grid;
+    gap: 6px;
+    font-size: 0.84rem;
+    color: var(--admin-muted);
+    font-weight: 600;
+}
+
+.dashboard-actions,
+.editor-toolbar,
+.restore-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.restore-row .form-select {
+    width: min(520px, 100%);
+}
+
+.team-editor {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.team-card {
+    border: 1px solid var(--admin-border);
+    border-radius: 12px;
+    padding: 12px;
+    background: var(--admin-surface);
+    box-shadow: 0 2px 8px rgba(31, 42, 68, 0.05);
+}
+
+.team-head {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) auto auto;
+    gap: 8px;
+    align-items: end;
+    margin-bottom: 8px;
+}
+
+.team-head label,
+.disk-grid label {
+    display: grid;
+    gap: 4px;
+    color: var(--admin-muted);
+    font-size: 0.77rem;
+    font-weight: 600;
+}
+
+.team-head input,
+.disk-grid input {
+    width: 100%;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid var(--admin-border);
+    background: #fff;
+    color: var(--admin-text);
+    padding: 0 10px;
+    outline: none;
+}
+
+.team-head input:focus,
+.disk-grid input:focus {
+    border-color: var(--admin-accent);
+    box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.14);
+}
+
+.disk-list {
+    display: grid;
+    gap: 8px;
+}
+
+.disk-grid {
+    border: 1px solid var(--admin-border);
+    border-radius: 10px;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(130px, 1fr)) auto;
+    gap: 8px;
+    background: #f8faff;
+}
+
+.disk-actions {
+    display: flex;
+    align-items: end;
+}
+
+.empty-team-note {
+    color: var(--admin-muted);
+    font-size: 0.8rem;
+    padding: 8px 0 2px;
+}
+
+.raw-preview-wrap {
+    border: 1px solid var(--admin-border);
+    border-radius: 10px;
+    background: #f9fbff;
+    padding: 8px;
+    margin-bottom: 10px;
+}
+
+.raw-preview-wrap summary {
+    cursor: pointer;
+    color: var(--admin-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.raw-json-preview {
+    margin: 8px 0 0;
+    max-height: 280px;
+    overflow: auto;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--admin-border);
+    background: #f4f7fd;
+    color: #2a3b5f;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.75rem;
+    line-height: 1.42;
+}
+
+.diff-box {
+    border: 1px solid var(--admin-border);
+    border-radius: 10px;
+    padding: 10px;
+    background: #f9fbff;
+}
+
+.diff-box h3 {
+    margin: 0 0 6px;
+    font-size: 0.88rem;
+}
+
+.diff-summary {
+    margin: 0 0 8px;
+    color: var(--admin-muted);
+    font-size: 0.8rem;
+}
+
+.diff-list {
+    margin: 0;
+    padding-left: 18px;
+    display: grid;
+    gap: 4px;
+    max-height: 260px;
+    overflow: auto;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.75rem;
+}
+
+.diff-list li {
+    line-height: 1.35;
+    color: #3a4a68;
+}
+
+.diff-list li.diff-add {
+    color: var(--admin-success);
+}
+
+.diff-list li.diff-remove {
+    color: var(--admin-danger);
+}
+
+.diff-list li.diff-change {
+    color: #3f66c7;
+}
+
+.admin-alert {
+    margin-top: 10px;
+    margin-bottom: 18px;
+    border: 1px solid var(--admin-border);
+}
+
+.admin-alert.success {
+    color: #155b3f;
+    border-color: #b6e2cf;
+    background: #edf9f3;
+}
+
+.admin-alert.error {
+    color: #7a2b2b;
+    border-color: #f0c3c3;
+    background: #fdf1f1;
+}
+
+#unsaved-badge {
+    border: 1px solid #f0d27a;
+}
+
+.hidden {
+    display: none !important;
+}
+
+@media (max-width: 860px) {
+    .team-head {
+        grid-template-columns: 1fr;
+    }
+
+    .disk-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .disk-actions {
+        align-items: center;
+    }
+}

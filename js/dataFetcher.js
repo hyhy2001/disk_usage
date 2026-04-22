@@ -145,6 +145,15 @@ class DataFetcher {
         };
         document.addEventListener('groupUserConfigReady', onGroupConfigUpdated);
         document.addEventListener('groupUserConfigChanged', onGroupConfigUpdated);
+
+        // Team comparison chart is a separate canvas flow; force a repaint on
+        // theme switch so axis/label colors follow light/dark mode correctly.
+        document.addEventListener('themeChanged', () => {
+            if (!this._lastTeamData || this._lastTeamData.length === 0) return;
+            const overviewEmpty = document.getElementById('overview-empty-state');
+            if (!overviewEmpty || overviewEmpty.style.display === 'none') return;
+            this._renderTeamComparisonChart(this._lastTeamData, this._getTeamChartApiMode());
+        });
     }
 
     // Avoid spamming identical toast messages when users click rapidly.
@@ -217,6 +226,13 @@ class DataFetcher {
         this.updateMetricCards();
     }
 
+    _getTeamChartApiMode() {
+        const storedMode = localStorage.getItem('teamChartViewMode') || 'absolute-linear';
+        if (storedMode === 'absolute-log') return 'logarithmic';
+        if (storedMode === 'percent') return 'percent';
+        return 'linear';
+    }
+
     _initSortUI() {
         const btnAlpha = document.getElementById('btn-sort-alpha');
         const btnMore = document.getElementById('btn-sort-disk-more');
@@ -264,14 +280,9 @@ class DataFetcher {
             }
 
             if (this._lastTeamData) {
-                const storedMode = localStorage.getItem('teamChartViewMode') || 'absolute-linear';
-                let apiMode = 'linear';
-                if (storedMode === 'absolute-log') apiMode = 'logarithmic';
-                else if (storedMode === 'percent') apiMode = 'percent';
-
                 // Add minor timeout to ensure DOM container is available over the race-condition sync flow
                 setTimeout(() => {
-                    this._renderTeamComparisonChart(this._lastTeamData, apiMode);
+                    this._renderTeamComparisonChart(this._lastTeamData, this._getTeamChartApiMode());
                 }, 50);
             }
         };
@@ -363,10 +374,7 @@ class DataFetcher {
                     updateUI();
 
                     if (this._lastTeamData && window._teamCompChart) {
-                        let scale = 'linear';
-                        if (currentMode === 'absolute-log') scale = 'logarithmic';
-                        const apiMode = currentMode === 'percent' ? 'percent' : scale;
-                        this._renderTeamComparisonChart(this._lastTeamData, apiMode);
+                        this._renderTeamComparisonChart(this._lastTeamData, this._getTeamChartApiMode());
                     }
                 });
             });
@@ -393,6 +401,10 @@ class DataFetcher {
         const usedData = [];
         const freeData = [];
         const absoluteData = []; // for tooltips
+        const css = getComputedStyle(document.documentElement);
+        const textSecondary = (css.getPropertyValue('--text-secondary') || '').trim() || '#94a3b8';
+        const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+        const gridColor = theme === 'light' ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.08)';
 
         const currentSort = localStorage.getItem('teamDiskSort') || 'alpha-asc';
 
@@ -485,8 +497,9 @@ class DataFetcher {
                 scales: {
                     x: {
                         stacked: true,
-                        grid: { display: false, color: 'rgba(255,255,255,0.05)' },
+                        grid: { display: false, color: gridColor },
                         ticks: {
+                            color: textSecondary,
                             autoSkip: false,
                             maxRotation: 45,
                             minRotation: 45
@@ -495,8 +508,9 @@ class DataFetcher {
                     y: {
                         type: mode === 'logarithmic' ? 'logarithmic' : 'linear',
                         stacked: mode !== 'logarithmic',
-                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        grid: { color: gridColor },
                         ticks: {
+                            color: textSecondary,
                             callback: function (value) {
                                 if (mode === 'percent') return value + '%';
                                 return fmt(value);
@@ -1009,18 +1023,9 @@ class DataFetcher {
                 overviewEmpty.style.display = 'flex';
                 // Render the comparison chart
                 if (this._lastTeamData && this._lastTeamData.length > 0) {
-                    let currentMode = localStorage.getItem('teamChartViewMode');
-                    if (!currentMode) {
-                        const savedScale = localStorage.getItem('teamChartScale') || 'linear';
-                        const isPercent = localStorage.getItem('teamChartPercent') === 'true';
-                        currentMode = isPercent ? 'percent' : (savedScale === 'logarithmic' ? 'absolute-log' : 'absolute-linear');
-                    }
-                    let apiMode = 'linear';
-                    if (currentMode === 'absolute-log') apiMode = 'logarithmic';
-                    else if (currentMode === 'percent') apiMode = 'percent';
                     // Need a small timeout to allow display:flex to compute layout before Chart.js takes over
                     setTimeout(() => {
-                        this._renderTeamComparisonChart(this._lastTeamData, apiMode);
+                        this._renderTeamComparisonChart(this._lastTeamData, this._getTeamChartApiMode());
                     }, 50);
                 }
             }

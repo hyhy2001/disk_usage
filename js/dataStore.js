@@ -240,32 +240,41 @@ export class DataStore {
         ungroupedUsers.sort((a, b) => b.used - a.used);
 
         const ungroupedSum = ungroupedUsers.reduce((s, u) => s + (u.used || 0), 0);
+        let otherTeamId = null;
         if (ungroupedSum > 0) {
             const otherIdx = distribution.findIndex((g) => String(g?.name || '').trim().toLowerCase() === 'other');
             if (otherIdx >= 0) {
-                const otherTeamId = distribution[otherIdx].team_id || 'group:__other__';
+                otherTeamId = distribution[otherIdx].team_id || 'group:__other__';
                 const existingMembers = membersByGroup.get(otherTeamId) || [];
                 membersByGroup.set(otherTeamId, existingMembers.concat(ungroupedUsers).sort((a, b) => b.used - a.used));
                 distribution[otherIdx].used = (distribution[otherIdx].used || 0) + ungroupedSum;
             } else {
-                const otherKey = 'group:__other__';
-                membersByGroup.set(otherKey, ungroupedUsers.slice());
+                otherTeamId = 'group:__other__';
+                membersByGroup.set(otherTeamId, ungroupedUsers.slice());
                 distribution.push({
                     name: 'Other',
                     used: ungroupedSum,
-                    team_id: otherKey,
+                    team_id: otherTeamId,
                     is_group: true,
                 });
             }
         }
+        if (!otherTeamId) {
+            const existingOther = distribution.find((g) => String(g?.name || '').trim().toLowerCase() === 'other');
+            otherTeamId = existingOther?.team_id || null;
+        }
 
         distribution.sort((a, b) => b.used - a.used);
         const topConsumers = distribution.slice();
+        const otherUsers = otherTeamId
+            ? (membersByGroup.get(otherTeamId) || []).slice().sort((a, b) => b.used - a.used)
+            : [];
 
         this.groupedView = {
             distribution,
             membersByGroup,
             ungroupedUsers,
+            otherUsers,
             topConsumers,
         };
 
@@ -356,8 +365,8 @@ export class DataStore {
 
     /** Return other_usage (system/unregistered users), sorted by usage desc */
     getOtherUsers() {
-        if (this.groupedView?.ungroupedUsers) {
-            return this.groupedView.ungroupedUsers.slice().sort((a, b) => b.used - a.used);
+        if (this.groupedView?.otherUsers) {
+            return this.groupedView.otherUsers.slice().sort((a, b) => b.used - a.used);
         }
         if (!this.latestSnapshot || !this.latestSnapshot.other) return [];
         return this.latestSnapshot.other.slice().sort((a, b) => b.used - a.used);

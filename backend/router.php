@@ -20,6 +20,10 @@ function api_dispatch_request($root_dir) {
         api_handle_group_config($root_dir);
     }
 
+    if ($type === 'admin') {
+        api_handle_admin($root_dir);
+    }
+
     if ($req_id === '') {
         http_response_code(400);
         echo 'Missing disk id.';

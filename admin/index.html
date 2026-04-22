@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disk Usage Admin</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css">
+    <link rel="stylesheet" href="./style.css?v=1">
+</head>
+<body data-bs-theme="light">
+    <div class="page">
+        <header class="navbar navbar-expand-md d-print-none admin-topbar">
+            <div class="container-xl">
+                <h1 class="navbar-brand navbar-brand-autodark m-0">Disk Usage Admin</h1>
+                <div class="navbar-nav flex-row order-md-last">
+                    <span id="unsaved-badge" class="badge bg-yellow-lt text-yellow-fg me-2 hidden">Unsaved Changes</span>
+                    <button id="btn-logout" type="button" class="btn btn-danger btn-sm hidden">Logout</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-wrapper">
+            <div class="page-header d-print-none">
+                <div class="container-xl">
+                    <div class="row g-2 align-items-center">
+                        <div class="col">
+                            <h2 class="page-title">Admin Dashboard</h2>
+                            <div class="text-secondary">Tabler-styled visual manager for <code>disks.json</code></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-body">
+                <div class="container-xl">
+                    <section id="admin-setup" class="card hidden admin-form-card">
+                        <div class="card-body">
+                            <h3 class="card-title">Initial Setup</h3>
+                            <p class="text-secondary">Create the first admin account. This can only be done once.</p>
+                            <form id="form-setup" class="admin-form">
+                                <label>Username
+                                    <input id="setup-username" class="form-control" type="text" minlength="3" maxlength="64" required autocomplete="username">
+                                </label>
+                                <label>Password
+                                    <input id="setup-password" class="form-control" type="password" minlength="10" required autocomplete="new-password">
+                                </label>
+                                <label>Confirm Password
+                                    <input id="setup-password-confirm" class="form-control" type="password" minlength="10" required autocomplete="new-password">
+                                </label>
+                                <button class="btn btn-primary" type="submit">Create Admin Account</button>
+                            </form>
+                        </div>
+                    </section>
+
+                    <section id="admin-login" class="card hidden admin-form-card">
+                        <div class="card-body">
+                            <h3 class="card-title">Admin Login</h3>
+                            <form id="form-login" class="admin-form">
+                                <label>Username
+                                    <input id="login-username" class="form-control" type="text" required autocomplete="username">
+                                </label>
+                                <label>Password
+                                    <input id="login-password" class="form-control" type="password" required autocomplete="current-password">
+                                </label>
+                                <button class="btn btn-primary" type="submit">Sign In</button>
+                            </form>
+                        </div>
+                    </section>
+
+                    <section id="admin-dashboard" class="hidden">
+                        <div class="row row-cards mb-3">
+                            <div class="col-sm-6 col-lg-3">
+                                <div class="card card-sm">
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-center">
+                                            <div class="subheader">Teams</div>
+                                        </div>
+                                        <div id="stat-teams" class="h1 mb-0">0</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-lg-3">
+                                <div class="card card-sm">
+                                    <div class="card-body">
+                                        <div class="subheader">Disks</div>
+                                        <div id="stat-disks" class="h1 mb-0">0</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-lg-3">
+                                <div class="card card-sm">
+                                    <div class="card-body">
+                                        <div class="subheader">Backups</div>
+                                        <div id="stat-backups" class="h1 mb-0">0</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-lg-3">
+                                <div class="card card-sm">
+                                    <div class="card-body">
+                                        <div class="subheader">Changes</div>
+                                        <div id="stat-changes" class="h1 mb-0">0</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Disk Mapping Editor</h3>
+                                <div id="admin-welcome" class="text-secondary small"></div>
+                            </div>
+                            <div class="card-body">
+                                <div class="dashboard-actions">
+                                    <button id="btn-reload" class="btn btn-outline-primary" type="button">Reload</button>
+                                    <button id="btn-diff" class="btn btn-outline-secondary" type="button">Show Diff</button>
+                                    <button id="btn-save" class="btn btn-primary" type="button">Save disks.json</button>
+                                </div>
+
+                                <div class="editor-toolbar">
+                                    <button id="btn-add-team" class="btn btn-azure" type="button">+ Add Team</button>
+                                    <button id="btn-refresh-raw" class="btn btn-outline-secondary" type="button">Refresh JSON Preview</button>
+                                </div>
+
+                                <div id="team-editor" class="team-editor"></div>
+
+                                <div class="restore-row">
+                                    <select id="backup-select" class="form-select">
+                                        <option value="">No backup selected</option>
+                                    </select>
+                                    <button id="btn-refresh-backups" class="btn btn-outline-secondary" type="button">Refresh Backups</button>
+                                    <button id="btn-restore-backup" class="btn btn-warning" type="button">Restore Selected</button>
+                                </div>
+
+                                <details class="raw-preview-wrap">
+                                    <summary>Raw JSON Preview</summary>
+                                    <pre id="raw-json-preview" class="raw-json-preview"></pre>
+                                </details>
+
+                                <div id="diff-box" class="diff-box hidden">
+                                    <h3>Diff Preview</h3>
+                                    <p id="diff-summary" class="diff-summary">No changes detected.</p>
+                                    <ul id="diff-list" class="diff-list"></ul>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div id="admin-message" class="alert alert-secondary admin-alert" role="alert"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>
+    <script src="./main.js?v=2" type="module"></script>
+</body>
+</html>
