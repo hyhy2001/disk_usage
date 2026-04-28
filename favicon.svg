@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded background -->
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <!-- Disk body -->
+  <rect x="10" y="16" width="44" height="32" rx="5" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+  <!-- Divider lines (HDD platters) -->
+  <line x1="10" y1="26" x2="54" y2="26" stroke="#fff" stroke-width="2" stroke-opacity="0.5"/>
+  <line x1="10" y1="38" x2="54" y2="38" stroke="#fff" stroke-width="2" stroke-opacity="0.5"/>
+  <!-- Usage bar (bottom section) -->
+  <rect x="15" y="41" width="24" height="4" rx="2" fill="url(#bar)"/>
+  <!-- Activity LED -->
+  <circle cx="48" cy="43" r="2.5" fill="#34d399"/>
+  <!-- Small chart icon top-right -->
+  <polyline points="36,22 40,19 44,21 49,17" fill="none" stroke="#facc15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
