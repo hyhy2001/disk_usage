@@ -349,7 +349,7 @@ function api_handle_dirs_ndjson($file_path, $who, $offset, $limit, $filter_min, 
 function api_handle_dirs($disk_path) {
     $who        = sanitize_name(get_b64_param('user', ''));
     $offset     = get_int('offset', 0,   0,    PHP_INT_MAX);
-    $limit      = get_int('limit',  500, 1,    50000);
+    $limit      = get_int('limit',  500, 1,    5000);
     $filter_q   = strtolower(trim(param('filter_query', '')));
     $filter_min = get_int('filter_min_size', 0, 0, PHP_INT_MAX);
     $filter_max = get_int('filter_max_size', 0, 0, PHP_INT_MAX);
@@ -411,7 +411,7 @@ function api_handle_dirs($disk_path) {
     }
 
     // Fast-path: decode whole JSON once (bounded by file size), then filter/paginate in memory.
-    $fast_decode_max_bytes = 33554432; // 32 MiB
+    $fast_decode_max_bytes = 16777216; // 16 MiB
     $file_size = @filesize($file_path);
     if ($has_filters && $file_size !== false && $file_size > 0 && $file_size <= $fast_decode_max_bytes) {
         $raw = @file_get_contents($file_path);

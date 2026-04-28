@@ -441,6 +441,161 @@ function createModalShell() {
     bindSearch('group-user-search-disks', 'disks');
     bindSearch('group-user-search-users', 'users');
 
+    const usersContainer = document.getElementById('group-user-users');
+    if (usersContainer) {
+        usersContainer.addEventListener('click', (e) => {
+            const removeBtn = e.target && typeof e.target.closest === 'function'
+                ? e.target.closest('[data-remove-user]')
+                : null;
+            if (removeBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const encoded = removeBtn.getAttribute('data-remove-user');
+                if (!encoded) return;
+                onRemoveUserFromSelectedGroup(decodeURIComponent(encoded));
+                return;
+            }
+
+            const row = e.target && typeof e.target.closest === 'function'
+                ? e.target.closest('[data-user-name]')
+                : null;
+            if (!row) return;
+
+            const encoded = row.getAttribute('data-user-name');
+            if (!encoded) return;
+            const userName = decodeURIComponent(encoded);
+            if (e.ctrlKey || e.metaKey) {
+                const set = new Set(state.selectedUserNames || []);
+                if (set.has(userName)) set.delete(userName);
+                else set.add(userName);
+                state.selectedUserNames = Array.from(set);
+            } else {
+                state.selectedUserNames = [userName];
+            }
+            renderAll();
+        });
+
+        usersContainer.addEventListener('dragstart', (e) => {
+            const row = e.target && typeof e.target.closest === 'function'
+                ? e.target.closest('[data-user-name]')
+                : null;
+            if (!row) return;
+            if (e.target && typeof e.target.closest === 'function' && e.target.closest('[data-remove-user]')) return;
+
+            const encoded = row.getAttribute('data-user-name');
+            if (!encoded) return;
+            const userName = decodeURIComponent(encoded);
+            const selected = Array.isArray(state.selectedUserNames) ? state.selectedUserNames : [];
+            const names = selected.includes(userName) ? selected.slice() : [userName];
+            if (!selected.includes(userName)) state.selectedUserNames = [userName];
+            state.dragUser = { name: userName, names, fromGroupId: state.selectedGroupId };
+            if (e.dataTransfer) {
+                e.dataTransfer.setData('text/plain', names.join('\n'));
+                e.dataTransfer.effectAllowed = 'move';
+            }
+        });
+
+        usersContainer.addEventListener('dragend', () => {
+            state.dragUser = null;
+            document.querySelectorAll('.group-user-row.drag-over').forEach((node) => node.classList.remove('drag-over'));
+        });
+    }
+
+    const groupsContainer = document.getElementById('group-user-groups');
+    if (groupsContainer) {
+        groupsContainer.addEventListener('click', (e) => {
+            const row = e.target && typeof e.target.closest === 'function'
+                ? e.target.closest('[data-group-id]')
+                : null;
+            if (!row) return;
+
+            const groupId = row.getAttribute('data-group-id');
+            if (!groupId) return;
+            if (e.ctrlKey || e.metaKey) {
+                const set = new Set(state.selectedGroupIds || []);
+                if (set.has(groupId)) set.delete(groupId);
+                else set.add(groupId);
+                state.selectedGroupIds = Array.from(set);
+                state.selectedGroupId = set.has(groupId) ? groupId : (state.selectedGroupIds[0] || null);
+            } else {
+                state.selectedGroupId = groupId;
+                state.selectedGroupIds = [groupId];
+            }
+            state.selectedUserNames = [];
+            persistViewState();
+            renderAll();
+        });
+
+        groupsContainer.addEventListener('dblclick', (e) => {
+            const row = e.target && typeof e.target.closest === 'function'
+                ? e.target.closest('[data-group-id]')
+                : null;
+            if (!row) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const groupId = row.getAttribute('data-group-id');
+            if (groupId) startInlineRenameGroup(groupId);
+        });
+
+        groupsContainer.addEventListener('dragover', (e) => {
+            const row = e.target && typeof e.target.closest === 'function'
+                ? e.target.closest('[data-drop-group-id]')
+                : null;
+            if (!row || !state.dragUser) return;
+            e.preventDefault();
+            row.classList.add('drag-over');
+        });
+
+        groupsContainer.addEventListener('dragleave', (e) => {
+            const row = e.target && typeof e.target.closest === 'function'
+                ? e.target.closest('[data-drop-group-id]')
+                : null;
+            if (!row) return;
+            row.classList.remove('drag-over');
+        });
+
+        groupsContainer.addEventListener('drop', (e) => {
+            const row = e.target && typeof e.target.closest === 'function'
+                ? e.target.closest('[data-drop-group-id]')
+                : null;
+            if (!row || !state.dragUser) return;
+            e.preventDefault();
+            row.classList.remove('drag-over');
+            const targetGroupId = row.getAttribute('data-drop-group-id');
+            const diskId = String(state.selectedDiskId || '').trim();
+            const names = Array.isArray(state.dragUser.names) && state.dragUser.names.length > 0
+                ? state.dragUser.names
+                : [state.dragUser.name];
+            moveUsersToGroup(names, diskId, targetGroupId);
+            state.dragUser = null;
+        });
+    }
+
+    const disksContainer = document.getElementById('group-user-disks');
+    if (disksContainer) {
+        disksContainer.addEventListener('click', async (e) => {
+            const row = e.target && typeof e.target.closest === 'function'
+                ? e.target.closest('[data-disk-id]')
+                : null;
+            if (!row) return;
+
+            const diskId = row.getAttribute('data-disk-id');
+            state.selectedDiskId = diskId;
+            state.selectedGroupId = null;
+            state.selectedGroupIds = [];
+            state.selectedUserNames = [];
+            persistViewState();
+            renderAll();
+            try {
+                const payload = await loadUsersForDisk(diskId);
+                const changed = applySystemGroupsSeedForDisk(diskId, payload.systemGroups || [], payload.users || []);
+                if (changed) persistConfigAndBroadcast();
+            } catch (_err) {
+            }
+            renderAll();
+        });
+    }
+
     document.getElementById('group-user-group-switch')?.addEventListener('change', (e) => {
         const teamName = String(e.target?.value || '').trim();
         state.selectedTeamSpace = teamName || null;
@@ -850,54 +1005,6 @@ function renderGroups() {
         `;
     }).join('') || '<div class="group-user-empty">No team space matched.</div>';
 
-    container.querySelectorAll('[data-group-id]').forEach((el) => {
-        el.addEventListener('click', (e) => {
-            const groupId = el.getAttribute('data-group-id');
-            if (!groupId) return;
-            if (e.ctrlKey || e.metaKey) {
-                const set = new Set(state.selectedGroupIds || []);
-                if (set.has(groupId)) set.delete(groupId);
-                else set.add(groupId);
-                state.selectedGroupIds = Array.from(set);
-                state.selectedGroupId = set.has(groupId) ? groupId : (state.selectedGroupIds[0] || null);
-            } else {
-                state.selectedGroupId = groupId;
-                state.selectedGroupIds = [groupId];
-            }
-            state.selectedUserNames = [];
-            persistViewState();
-            renderAll();
-        });
-        el.addEventListener('dblclick', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const groupId = el.getAttribute('data-group-id');
-            if (groupId) startInlineRenameGroup(groupId);
-        });
-    });
-
-    container.querySelectorAll('[data-drop-group-id]').forEach((el) => {
-        el.addEventListener('dragover', (e) => {
-            if (!state.dragUser) return;
-            e.preventDefault();
-            el.classList.add('drag-over');
-        });
-        el.addEventListener('dragleave', () => {
-            el.classList.remove('drag-over');
-        });
-        el.addEventListener('drop', (e) => {
-            if (!state.dragUser) return;
-            e.preventDefault();
-            el.classList.remove('drag-over');
-            const targetGroupId = el.getAttribute('data-drop-group-id');
-            const diskId = String(state.selectedDiskId || '').trim();
-            const names = Array.isArray(state.dragUser.names) && state.dragUser.names.length > 0
-                ? state.dragUser.names
-                : [state.dragUser.name];
-            moveUsersToGroup(names, diskId, targetGroupId);
-            state.dragUser = null;
-        });
-    });
 }
 
 function getSystemGroupRowsForDisk(diskId) {
@@ -1029,25 +1136,6 @@ function renderDisks() {
         `;
     }).join('') || '<div class="group-user-empty">No disk matched this team space.</div>';
 
-    container.querySelectorAll('[data-disk-id]').forEach((el) => {
-        el.addEventListener('click', async () => {
-            const diskId = el.getAttribute('data-disk-id');
-            state.selectedDiskId = diskId;
-            state.selectedGroupId = null;
-            state.selectedGroupIds = [];
-            state.selectedUserNames = [];
-            persistViewState();
-            renderAll();
-            try {
-                const payload = await loadUsersForDisk(diskId);
-                const changed = applySystemGroupsSeedForDisk(diskId, payload.systemGroups || [], payload.users || []);
-                if (changed) persistConfigAndBroadcast();
-            } catch (_err) {
-                // non-blocking: still allow UI switching
-            }
-            renderAll();
-        });
-    });
 }
 
 function renderUsersLoading() {
@@ -1123,51 +1211,6 @@ function renderUsers() {
                 </div>
             `).join('');
 
-            container.querySelectorAll('[data-user-name]').forEach((el) => {
-                el.addEventListener('click', (e) => {
-                    if (e.target && typeof e.target.closest === 'function' && e.target.closest('[data-remove-user]')) return;
-                    const encoded = el.getAttribute('data-user-name');
-                    if (!encoded) return;
-                    const userName = decodeURIComponent(encoded);
-                    if (e.ctrlKey || e.metaKey) {
-                        const set = new Set(state.selectedUserNames || []);
-                        if (set.has(userName)) set.delete(userName);
-                        else set.add(userName);
-                        state.selectedUserNames = Array.from(set);
-                    } else {
-                        state.selectedUserNames = [userName];
-                    }
-                    renderAll();
-                });
-                el.addEventListener('dragstart', (e) => {
-                    if (e.target && typeof e.target.closest === 'function' && e.target.closest('[data-remove-user]')) return;
-                    const encoded = el.getAttribute('data-user-name');
-                    if (!encoded) return;
-                    const userName = decodeURIComponent(encoded);
-                    const selected = Array.isArray(state.selectedUserNames) ? state.selectedUserNames : [];
-                    const names = selected.includes(userName) ? selected.slice() : [userName];
-                    if (!selected.includes(userName)) state.selectedUserNames = [userName];
-                    state.dragUser = { name: userName, names, fromGroupId: state.selectedGroupId };
-                    if (e.dataTransfer) {
-                        e.dataTransfer.setData('text/plain', names.join('\n'));
-                        e.dataTransfer.effectAllowed = 'move';
-                    }
-                });
-                el.addEventListener('dragend', () => {
-                    state.dragUser = null;
-                    document.querySelectorAll('.group-user-row.drag-over').forEach((node) => node.classList.remove('drag-over'));
-                });
-            });
-
-            container.querySelectorAll('[data-remove-user]').forEach((el) => {
-                el.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const encoded = el.getAttribute('data-remove-user');
-                    if (!encoded) return;
-                    onRemoveUserFromSelectedGroup(decodeURIComponent(encoded));
-                });
-            });
         })
         .catch((err) => {
             if (token !== state.usersLoadingToken) return;

@@ -320,6 +320,27 @@ Browser (Vanilla JS, no framework)
 
 _Built for teams managing large shared storage environments._
 
+
+
+## 🧭 Architecture Note
+
+This repository is the **dashboard/UI layer** of a two-part system:
+- `check_disk` generates reports (`disk_usage_report*.json`, `permission_issues*.json`, `detail_users/*.db`, `tree_map_data.db`)
+- `disk_usage` reads those reports and serves them via `api.php` + frontend renderers.
+
+For a full end-to-end sequence (scanner → report files → PHP API → UI), see:
+- `../system_architecture.md`
+
+## ✅ Git Safety (avoid accidental commits)
+
+The project `.gitignore` is configured to prevent accidental commits of local/runtime artifacts such as:
+- `node_modules/`
+- generated `*.min.js` / `*.min.css`
+- local reports/databases (`reports/`, `detail_users/`, `database/*.db`)
+- local logs and temporary files
+
+If you intentionally need to version a generated artifact, add it explicitly with `git add -f <file>`.
+
 ## 📄 License
 
 [MIT](LICENSE)

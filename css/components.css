@@ -3504,6 +3504,35 @@
     scrollbar-color: rgba(255,255,255,0.1) transparent;
 }
 
+/* Permission tab: keep user list scrollable in all layout modes */
+#tab-pane-permissions .perm-filter-section:last-child {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+#tab-pane-permissions .user-filter-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    -webkit-overflow-scrolling: touch;
+}
+
+#tab-pane-permissions .user-filter-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+#tab-pane-permissions .user-filter-list::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.18);
+    border-radius: 8px;
+}
+
+#tab-pane-permissions .user-filter-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
 
 .user-filter-item {
     display: flex;

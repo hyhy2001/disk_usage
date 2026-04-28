@@ -88,13 +88,28 @@ function api_handle_files_db($file_path, $who, $offset, $limit, $filter_min, $fi
     }
     // Build query parts based on schema: split JOIN vs classic files table.
     if ($is_split) {
-        $from_clause  = 'files_data fd JOIN dirs_index di ON fd.dir_id = di.id';
-        $select_cols  = "(di.path || '/' || fd.basename) AS path, fd.size AS size, fd.xt AS xt";
-        $order_clause = 'fd.size DESC';
-        $where_size   = 'fd.size';
-        $path_expr    = "LOWER(di.path || '/' || fd.basename)";
-        $name_expr    = 'LOWER(fd.basename)';
-        $ext_expr     = 'fd.xt';
+        $fd_cols = api_files_db_table_columns($db, 'files_data');
+        $is_compact_split = isset($fd_cols['basename_id']) && isset($fd_cols['xt_id']);
+        if ($is_compact_split) {
+            $from_clause  = 'files_data fd '
+                          . 'JOIN dirs_index di ON fd.dir_id = di.id '
+                          . 'JOIN basename_index bi ON fd.basename_id = bi.id '
+                          . 'LEFT JOIN xt_index xi ON fd.xt_id = xi.id';
+            $select_cols  = "(di.path || '/' || bi.basename) AS path, fd.size AS size, COALESCE(xi.xt, '') AS xt";
+            $order_clause = 'fd.size DESC';
+            $where_size   = 'fd.size';
+            $path_expr    = "LOWER(di.path || '/' || bi.basename)";
+            $name_expr    = 'LOWER(bi.basename)';
+            $ext_expr     = "COALESCE(xi.xt, '')";
+        } else {
+            $from_clause  = 'files_data fd JOIN dirs_index di ON fd.dir_id = di.id';
+            $select_cols  = "(di.path || '/' || fd.basename) AS path, fd.size AS size, fd.xt AS xt";
+            $order_clause = 'fd.size DESC';
+            $where_size   = 'fd.size';
+            $path_expr    = "LOWER(di.path || '/' || fd.basename)";
+            $name_expr    = 'LOWER(fd.basename)';
+            $ext_expr     = 'fd.xt';
+        }
     } else {
         $cols = api_files_db_table_columns($db, 'files');
         $from_clause  = 'files';
@@ -357,7 +372,7 @@ function api_handle_files_ndjson($file_path, $who, $offset, $limit, $filter_min,
 function api_handle_files($disk_path) {
     $who        = sanitize_name(get_b64_param('user', ''));
     $offset     = get_int('offset', 0,   0,    PHP_INT_MAX);
-    $limit      = get_int('limit',  500, 1,    50000);
+    $limit      = get_int('limit',  500, 1,    5000);
     $filter_q   = strtolower(trim(param('filter_query', '')));
     $filter_ext = strtolower(trim(param('filter_ext', '')));
     $filter_min = get_int('filter_min_size', 0, 0, PHP_INT_MAX);
@@ -420,7 +435,7 @@ function api_handle_files($disk_path) {
     }
 
     // Fast-path: decode whole JSON once (bounded by file size), then filter/paginate in memory.
-    $fast_decode_max_bytes = 33554432; // 32 MiB
+    $fast_decode_max_bytes = 16777216; // 16 MiB
     $file_size = @filesize($file_path);
     if ($has_filters && $file_size !== false && $file_size > 0 && $file_size <= $fast_decode_max_bytes) {
         $raw = @file_get_contents($file_path);

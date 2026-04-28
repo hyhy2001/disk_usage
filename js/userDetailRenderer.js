@@ -21,6 +21,15 @@ const FILE_PAGE     = 500;  // rows per page
 let _currentFilters = JSON.parse(localStorage.getItem('ud_filters') || 'null') || { query: '', ext: '', minSize: 0, maxSize: 0 };
 let _allUserNames   = [];
 
+// ── Debounce utility ──────────────────────────────────────────────────────────
+function _debounce(fn, ms) {
+    let timer;
+    return function (...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), ms);
+    };
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function _ext(path) {
@@ -385,7 +394,7 @@ function _attachFilterEvents(contentEl, root) {
                 el.classList.toggle('hidden', q.length > 0 && !el.dataset.value.toLowerCase().includes(q.toLowerCase()));
             });
         };
-        userSearch?.addEventListener('input', e => _filterUserOptions(e.target.value));
+        userSearch?.addEventListener('input', _debounce(e => _filterUserOptions(e.target.value), 120));
 
         userOptions?.addEventListener('click', e => {
             const opt = e.target.closest('.ud-dropdown-option');
@@ -685,6 +694,12 @@ function _attachFilterEvents(contentEl, root) {
 
 // ── API fetch ─────────────────────────────────────────────────────────────────
 
+async function _fetchApiText(url, options) {
+    const res = await fetch(url, options);
+    if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
+    return res.text();
+}
+
 async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE) {
     if (_abortCtrl) _abortCtrl.abort();
     _abortCtrl = new AbortController();
@@ -694,9 +709,7 @@ async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE) {
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
 
-    const res = await fetch(url + `&_t=${Date.now()}`, { signal: _abortCtrl.signal, cache: 'no-store' });
-    if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
-    const text = await res.text();
+    const text = await _fetchApiText(url + `&_t=${Date.now()}`, { signal: _abortCtrl.signal, cache: 'no-store' });
     let json;
     try { json = JSON.parse(text); } catch { json = JSON.parse(atob(text)); }
     if (json.status !== 'success') throw new Error(json.message || 'API error');
@@ -711,9 +724,7 @@ async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE) {
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
 
-    const res = await fetch(url + `&_t=${Date.now()}`, { cache: 'no-store' });
-    if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
-    const text = await res.text();
+    const text = await _fetchApiText(url + `&_t=${Date.now()}`, { cache: 'no-store' });
     let json;
     try { json = JSON.parse(text); } catch { json = JSON.parse(atob(text)); }
     if (json.status !== 'success') throw new Error(json.message || 'API error');
@@ -722,12 +733,12 @@ async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE) {
 
 async function _fetchUserList(diskId) {
     const url = `api.php?id=${encodeURIComponent(diskId)}&type=users`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const text = await res.text();
-    let json;
-    try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { return []; } }
-    return json?.data?.users || [];
+    try {
+        const json = await window.appFetcher._fetchJson(url, { cacheTimeMs: 30000 });
+        return json?.data?.users || [];
+    } catch (_err) {
+        return [];
+    }
 }
 
 // Lazy count: fired in background after initial render to get the accurate total
@@ -738,12 +749,14 @@ async function _fetchDirCount(diskId, user) {
     if (_currentFilters.query)   url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
-    const res  = await fetch(url + `&_t=${Date.now()}`, { cache: 'no-store' });
-    if (!res.ok) return null;
-    const text = await res.text();
-    let json;
-    try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { return null; } }
-    return (json?.status === 'success') ? (json.data.dir_count ?? null) : null;
+    try {
+        const text = await _fetchApiText(url + `&_t=${Date.now()}`, { cache: 'no-store' });
+        let json;
+        try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { return null; } }
+        return (json?.status === 'success') ? (json.data.dir_count ?? null) : null;
+    } catch (_err) {
+        return null;
+    }
 }
 
 async function _fetchFileCount(diskId, user) {
@@ -753,12 +766,14 @@ async function _fetchFileCount(diskId, user) {
     if (_currentFilters.ext)     url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
-    const res  = await fetch(url + `&_t=${Date.now()}`, { cache: 'no-store' });
-    if (!res.ok) return null;
-    const text = await res.text();
-    let json;
-    try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { return null; } }
-    return (json?.status === 'success') ? (json.data.file_count ?? null) : null;
+    try {
+        const text = await _fetchApiText(url + `&_t=${Date.now()}`, { cache: 'no-store' });
+        let json;
+        try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { return null; } }
+        return (json?.status === 'success') ? (json.data.file_count ?? null) : null;
+    } catch (_err) {
+        return null;
+    }
 }
 
 // Update badge + pagination in-place after accurate count arrives

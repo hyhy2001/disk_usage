@@ -25,6 +25,8 @@ const _pageCache = {};       // key: shard:offset:limit => response
 const _inflight = {};        // key => Promise
 const _searchPageCache = {}; // key: q:offset:limit => response
 const _searchInflight = {};  // key => Promise
+let _listDelegationBound = false;
+let _lastRenderedNodeState = null;
 
 function escHtml(s) {
     return String(s)
@@ -384,6 +386,27 @@ function renderList(node) {
     if (!list) return;
 
     const st = getNodeState(node);
+    _lastRenderedNodeState = st;
+
+    if (!_listDelegationBound) {
+        list.addEventListener('click', function(e) {
+            const btn = e.target && typeof e.target.closest === 'function'
+                ? e.target.closest('.tmx-item[data-child-idx]')
+                : null;
+            if (!btn || !_lastRenderedNodeState) return;
+            const idx = parseInt(btn.getAttribute('data-child-idx'), 10);
+            if (isNaN(idx) || idx < 0 || idx >= _lastRenderedNodeState.children.length) return;
+            const child = _lastRenderedNodeState.children[idx];
+            if (child.has_children || child.shard_id) {
+                _currentNode = child;
+                renderCurrentNode();
+            } else {
+                setMeta(child, _lastRenderedNodeState.source || 'index');
+            }
+        });
+        _listDelegationBound = true;
+    }
+
     list.innerHTML = '';
 
     if (st.children.length === 0 && !st.hasMore) {
@@ -391,10 +414,12 @@ function renderList(node) {
         return;
     }
 
-    st.children.forEach(function(child) {
+    const fragment = document.createDocumentFragment();
+    st.children.forEach(function(child, idx) {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'tmx-item';
+        btn.setAttribute('data-child-idx', String(idx));
 
         const icon = (child.type === 'file_group' || child.type === 'file') ? '📄' : '📁';
 
@@ -409,16 +434,7 @@ function renderList(node) {
             '<span class="tmx-item-size">' + escHtml(fmt(child.value || 0)) + '</span>' +
             '<span class="tmx-item-type">' + escHtml(getNodeTypeLabel(child)) + '</span>';
 
-        btn.addEventListener('click', function() {
-            if (child.has_children || child.shard_id) {
-                _currentNode = child;
-                renderCurrentNode();
-            } else {
-                setMeta(child, st.source || 'index');
-            }
-        });
-
-        list.appendChild(btn);
+        fragment.appendChild(btn);
     });
 
     if (st.hasMore) {
@@ -436,9 +452,10 @@ function renderList(node) {
             setMeta(node, getNodeState(node).source || 'index');
         });
         moreWrap.appendChild(moreBtn);
-        list.appendChild(moreWrap);
+        fragment.appendChild(moreWrap);
     }
 
+    list.appendChild(fragment);
     syncTableHeadGutter();
 }
 

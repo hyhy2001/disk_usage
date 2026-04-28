@@ -165,15 +165,42 @@ class DataFetcher {
         showToast(title, message, variant);
     }
 
-    async _fetchJson(url, { signal } = {}) {
-        const res = await fetch(url, { signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
-        return res.json();
+    // Lightweight in-memory cache for idempotent GET JSON requests.
+    // - cacheTimeMs > 0: serve cached payload while fresh.
+    // - Also dedupes concurrent identical inflight requests.
+    async _fetchJson(url, { signal, cacheTimeMs = 0 } = {}) {
+        if (!this._fetchCache) this._fetchCache = new Map();
+        if (!this._fetchInflight) this._fetchInflight = new Map();
+
+        if (cacheTimeMs > 0) {
+            const cached = this._fetchCache.get(url);
+            if (cached && (Date.now() - cached.time) < cacheTimeMs) {
+                return cached.data;
+            }
+            const pending = this._fetchInflight.get(url);
+            if (pending) return pending;
+        }
+
+        const exec = (async () => {
+            const res = await fetch(url, { signal });
+            if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
+            const data = await res.json();
+            if (cacheTimeMs > 0) {
+                this._fetchCache.set(url, { time: Date.now(), data });
+            }
+            return data;
+        })();
+
+        if (cacheTimeMs > 0) {
+            this._fetchInflight.set(url, exec);
+            exec.finally(() => this._fetchInflight.delete(url));
+        }
+        return exec;
     }
 
     async _fetchDiskMeta(diskId, signal) {
         try {
-            const json = await this._fetchJson(`api.php?id=${encodeURIComponent(diskId)}&type=meta`, { signal });
+            const json = await this._fetchJson(`api.php?id=${encodeURIComponent(diskId)}&type=meta`, { signal, cacheTimeMs: 15000 });
             if (json?.status !== 'success' || !json?.data) return null;
             return json.data;
         } catch (_err) {
@@ -570,7 +597,7 @@ class DataFetcher {
                 list.innerHTML = skeletonHTML;
             }
             // Fetch configuration securely via api.php (path hidden)
-            const rawDisks = await this._fetchJson('api.php?type=disks');
+            const rawDisks = await this._fetchJson('api.php?type=disks', { cacheTimeMs: 30000 });
             if (!Array.isArray(rawDisks)) throw new Error('Invalid disks payload');
 
             // Flatten the disks for internal application logic
@@ -865,7 +892,7 @@ class DataFetcher {
         grid.innerHTML = '<div class="glass-panel" style="padding:20px;"><div class="spinner"></div> Loading team data...</div>';
 
         try {
-            const result = await this._fetchJson(`api.php?type=team&name=${encodeURIComponent(teamName)}`);
+            const result = await this._fetchJson(`api.php?type=team&name=${encodeURIComponent(teamName)}`, { cacheTimeMs: 20000 });
 
             if (result.status !== 'success' || !result.data || result.data.length === 0) {
                 grid.innerHTML = '<div class="glass-panel" style="padding:20px; color:var(--text-secondary);">No disk usage reports available for this team.</div>';
@@ -1166,20 +1193,7 @@ class DataFetcher {
                 </div>`;
         }
         try {
-            const res = await fetch(`api.php?id=${encodeURIComponent(diskId)}&type=permissions`);
-            if (!res.ok) throw new Error(`HTTP ${res.status} from permissions API`);
-            const text = await res.text();
-            let json;
-            try {
-                json = JSON.parse(text);
-            } catch (err1) {
-                try {
-                    json = JSON.parse(atob(text));
-                } catch (err2) {
-                    console.error("API response was neither valid JSON nor Base64.", { text_preview: text.substring(0, 100) });
-                    throw new Error(`Invalid API Response: ${text.substring(0, 100)}`);
-                }
-            }
+            const json = await this._fetchJson(`api.php?id=${encodeURIComponent(diskId)}&type=permissions`, { cacheTimeMs: 60000 });
 
             if (json?.status === 'success') {
                 if (this._activeDisk !== diskId) return;
@@ -1243,20 +1257,7 @@ class DataFetcher {
 
         const run = (async () => {
         try {
-            const res = await fetch(`api.php?id=${encodeURIComponent(diskId)}&type=treemap`);
-            if (!res.ok) throw new Error(`HTTP ${res.status} from treemap API`);
-
-            const text = await res.text();
-            let json;
-            try {
-                json = JSON.parse(text);
-            } catch (err1) {
-                try {
-                    json = JSON.parse(atob(text));
-                } catch (err2) {
-                    throw new Error(`Invalid API Response: ${text.substring(0, 100)}`);
-                }
-            }
+            const json = await this._fetchJson(`api.php?id=${encodeURIComponent(diskId)}&type=treemap`, { cacheTimeMs: 60000 });
 
             if (json?.status === 'success') {
                 if (this._activeDisk !== diskId) return;
