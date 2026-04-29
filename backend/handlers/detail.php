@@ -183,31 +183,24 @@ function _detail_query_dirs($db, $offset, $limit, $filter_min, $filter_max, $q_a
 }
 
 function _detail_query_files($db, $offset, $limit, $filter_min, $filter_max, $q_array, $ext_lookup, $has_filters, $total_meta) {
+    // Always use the 'files' view, which exists in both old and new split schemas
+    $files_check = @$db->query("SELECT 1 FROM sqlite_master WHERE type IN ('table','view') AND name='files' LIMIT 1");
+    $has_files = $files_check && ($files_check->fetchArray(SQLITE3_ASSOC) !== false);
+    if ($files_check) $files_check->finalize();
+    if (!$has_files) return array('rows' => array(), 'has_more' => false, 'total' => 0);
+
+    $from_clause = 'files';
+    $select_cols = 'path, size, xt';
+    $order_clause = 'size DESC';
+    $where_size = 'size';
+    $path_expr = 'LOWER(path)';
+    $ext_expr = 'xt';
+
+    // Detect if we have split schema with FTS for optimized query path
     $is_split = false;
     $split_check = @$db->query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='files_data' LIMIT 1");
     $is_split = $split_check && ($split_check->fetchArray(SQLITE3_ASSOC) !== false);
     if ($split_check) $split_check->finalize();
-
-    if ($is_split) {
-        $from_clause = 'files_data fd JOIN dirs_index di ON fd.dir_id = di.id';
-        $select_cols = "(di.path || '/' || fd.basename) AS path, fd.size AS size, fd.xt AS xt";
-        $order_clause = 'fd.size DESC';
-        $where_size = 'fd.size';
-        $path_expr = "LOWER(di.path || '/' || fd.basename)";
-        $ext_expr = 'fd.xt';
-    } else {
-        $files_check = @$db->query("SELECT 1 FROM sqlite_master WHERE type IN ('table','view') AND name='files' LIMIT 1");
-        $has_files = $files_check && ($files_check->fetchArray(SQLITE3_ASSOC) !== false);
-        if ($files_check) $files_check->finalize();
-        if (!$has_files) return array('rows' => array(), 'has_more' => false, 'total' => 0);
-
-        $from_clause = 'files';
-        $select_cols = 'path, size, xt';
-        $order_clause = 'size DESC';
-        $where_size = 'size';
-        $path_expr = 'LOWER(path)';
-        $ext_expr = 'xt';
-    }
 
     $conds = array();
     $binds = array();
@@ -243,7 +236,7 @@ function _detail_query_files($db, $offset, $limit, $filter_min, $filter_max, $q_
         }
 
         if ($fts4_match !== '') {
-            $conds[] = 'fd.id IN (SELECT docid FROM fts_files WHERE fts_files MATCH :fts_q)';
+            $conds[] = 'id IN (SELECT docid FROM fts_files WHERE fts_files MATCH :fts_q)';
             $binds[':fts_q'] = array($fts4_match, SQLITE3_TEXT);
         } else {
             $qConds = array(); $i = 0;
