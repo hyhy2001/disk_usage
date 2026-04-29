@@ -68,8 +68,14 @@ function api_dispatch_request($root_dir) {
     if ($type === 'dirs') {
         api_handle_dirs($disk_path);
     }
+    if ($type === 'dirs_csv') {
+        api_handle_dirs_csv($disk_path);
+    }
     if ($type === 'files') {
         api_handle_files($disk_path);
+    }
+    if ($type === 'files_csv') {
+        api_handle_files_csv($disk_path);
     }
     if ($type === 'detail') {
         api_handle_detail($disk_path);

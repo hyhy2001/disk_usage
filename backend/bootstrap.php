@@ -7,6 +7,7 @@ require_once __DIR__ . '/lib/request.php';
 require_once __DIR__ . '/lib/response.php';
 require_once __DIR__ . '/lib/filesystem.php';
 require_once __DIR__ . '/lib/cache.php';
+require_once __DIR__ . '/lib/export_throttle.php';
 
 require_once __DIR__ . '/handlers/disks.php';
 require_once __DIR__ . '/handlers/team.php';

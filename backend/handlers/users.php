@@ -136,15 +136,21 @@ function api_handle_users($disk_path) {
             }
         }
 
-        // Fallback #2 (legacy): derive users from detail report filenames.
+        // Fallback #2: user list from unified data_detail.db.
         if (count($users) === 0 && is_dir($detail_dir)) {
-            $dh = @opendir($detail_dir);
-            while ($dh && ($f = readdir($dh)) !== false) {
-                if (preg_match('/(?:.*_)?detail_report_(?:dirs?|files?)_(.+)\.(?:json|ndjson)$/i', $f, $m)) {
-                    $users[] = $m[1];
+            $data_detail = $detail_dir . DIRECTORY_SEPARATOR . 'data_detail.db';
+            if (is_file($data_detail) && class_exists('SQLite3')) {
+                try {
+                    $db = defined('SQLITE3_OPEN_READONLY') ? new SQLite3($data_detail, SQLITE3_OPEN_READONLY) : new SQLite3($data_detail);
+                    $rs = @$db->query('SELECT username FROM user_meta ORDER BY username');
+                    while ($rs && ($row = $rs->fetchArray(SQLITE3_ASSOC)) !== false) {
+                        if (isset($row['username']) && $row['username'] !== '') $users[] = (string)$row['username'];
+                    }
+                    if ($rs) $rs->finalize();
+                    $db->close();
+                } catch (Exception $e) {
                 }
             }
-            if ($dh) closedir($dh);
         }
 
         $users = api_users_normalize_list($users);

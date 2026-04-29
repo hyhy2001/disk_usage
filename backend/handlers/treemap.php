@@ -42,6 +42,26 @@ function api_treemap_normalize_item_fields(&$item) {
     if (!isset($item['type']))        $item['type']        = 'directory';
 }
 
+
+function api_treemap_item_value($item) {
+    if (!is_array($item)) return 0.0;
+    if (isset($item['value'])) return (float)$item['value'];
+    if (isset($item['size'])) return (float)$item['size'];
+    return 0.0;
+}
+
+function api_treemap_sort_items_by_size(&$items) {
+    if (!is_array($items)) return;
+    usort($items, function($a, $b) {
+        $va = api_treemap_item_value($a);
+        $vb = api_treemap_item_value($b);
+        if ($va !== $vb) return ($va > $vb) ? -1 : 1;
+        $na = strtolower(isset($a['name']) ? $a['name'] : (isset($a['path']) ? $a['path'] : ''));
+        $nb = strtolower(isset($b['name']) ? $b['name'] : (isset($b['path']) ? $b['path'] : ''));
+        return strcmp($na, $nb);
+    });
+}
+
 function api_treemap_read_shard_from_db($db_path, $shard_id) {
     if (!class_exists('SQLite3')) return false;
     if (!is_file($db_path)) return false;
@@ -351,6 +371,7 @@ function api_handle_treemap($disk_path) {
         $items = array();
     }
 
+    api_treemap_sort_items_by_size($items);
     $total = count($items);
     $paged = array_slice($items, $offset, $limit);
     $has_more = ($offset + count($paged)) < $total;
