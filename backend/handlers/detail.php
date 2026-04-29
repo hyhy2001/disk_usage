@@ -71,7 +71,7 @@ function api_handle_detail($disk_path) {
     if ($rowf && isset($rowf['total_files'])) $total_files_meta = (int)$rowf['total_files'];
     if ($meta_files_rs) $meta_files_rs->finalize();
 
-    if ($total_dirs_meta === 0 || $date === 0) {
+    if ($total_dirs_meta === 0 || $total_files_meta === 0 || $date === 0) {
         $meta_rs = @$db->query('SELECT date, user, total_items, total_used FROM meta LIMIT 1');
         $mr = $meta_rs ? $meta_rs->fetchArray(SQLITE3_ASSOC) : false;
         if ($mr) {
@@ -82,6 +82,15 @@ function api_handle_detail($disk_path) {
             if ($total_used === 0 && isset($mr['total_used'])) $total_used = (int)$mr['total_used'];
         }
         if ($meta_rs) $meta_rs->finalize();
+    }
+
+    // Last-resort: if total_files_meta is still 0, count rows directly from the
+    // files view (cheap on indexed schema).
+    if ($total_files_meta === 0) {
+        $cnt_rs = @$db->query('SELECT COUNT(*) AS c FROM files');
+        $cr = $cnt_rs ? $cnt_rs->fetchArray(SQLITE3_ASSOC) : false;
+        if ($cr && isset($cr['c'])) $total_files_meta = (int)$cr['c'];
+        if ($cnt_rs) $cnt_rs->finalize();
     }
 
     $dir = _detail_query_dirs($db, $dir_offset, $limit, $filter_min, $filter_max, $q_array, $has_filters_dir, $total_dirs_meta);
