@@ -135,7 +135,7 @@
 
 /* Explorer-like lazy tree (faster for huge node counts) */
 .tmx-wrap {
-    --tmx-grid-cols: minmax(220px, 360px) minmax(80px, 110px) minmax(140px, 200px) minmax(80px, 110px) 1fr;
+    --tmx-grid-cols: 1fr 1fr 1fr 1fr;
     --tmx-list-scrollbar: 0px;
     display: flex;
     flex-direction: column;
