@@ -45,6 +45,14 @@ function formatPercent(pct) {
     return '0%';
 }
 
+function getBarColor(pct) {
+    if (pct >= 50) return '#ef4444'; // red
+    if (pct >= 25) return '#f59e0b'; // amber
+    if (pct >= 10) return '#facc15'; // yellow
+    if (pct >= 1)  return '#38bdf8'; // sky
+    return '#10b981';                // emerald
+}
+
 function getNodeIconSvg(node) {
     if (node && (node.type === 'file_group' || node.type === 'file')) {
         return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
@@ -452,6 +460,7 @@ function renderList(node) {
         const pct = getPercentOfDisk(value);
         const pctText = formatPercent(pct);
         const barWidth = Math.max(0.5, Math.min(100, pct)).toFixed(2);
+        const barColor = getBarColor(pct);
 
         btn.innerHTML =
             '<span class="tmx-item-folder">' +
@@ -466,7 +475,7 @@ function renderList(node) {
                     '<span class="tmx-size-val">' + escHtml(fmt(value)) + '</span>' +
                     '<span class="tmx-size-pct">' + pctText + '</span>' +
                 '</span>' +
-                '<span class="tmx-size-bar-bg"><span class="tmx-size-bar-fill" style="width:' + barWidth + '%"></span></span>' +
+                '<span class="tmx-size-bar-bg"><span class="tmx-size-bar-fill" style="width:' + barWidth + '%;background:' + barColor + '"></span></span>' +
             '</span>' +
             '<span class="tmx-item-type">' + escHtml(getNodeTypeLabel(child)) + '</span>';
 
