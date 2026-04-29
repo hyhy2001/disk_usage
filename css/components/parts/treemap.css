@@ -135,7 +135,7 @@
 
 /* Explorer-like lazy tree (faster for huge node counts) */
 .tmx-wrap {
-    --tmx-grid-cols: minmax(220px, 1fr) minmax(90px, 120px) minmax(90px, 120px) minmax(90px, 120px);
+    --tmx-grid-cols: minmax(220px, 360px) minmax(80px, 110px) minmax(140px, 200px) minmax(80px, 110px) 1fr;
     --tmx-list-scrollbar: 0px;
     display: flex;
     flex-direction: column;
@@ -288,7 +288,7 @@
 
 .tmx-search {
     display: grid;
-    grid-template-columns: minmax(160px, 1fr) auto;
+    grid-template-columns: minmax(160px, 1fr) 34px;
     gap: 8px;
     margin-bottom: 8px;
     flex: 0 0 auto;
@@ -323,14 +323,19 @@
 }
 
 .tmx-search-clear {
+    width: 34px;
     height: 34px;
     border: 1px solid rgba(255,255,255,0.14);
     border-radius: 8px;
-    padding: 0 12px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: rgba(255,255,255,0.05);
     color: var(--text-secondary);
     font-size: 0.75rem;
     cursor: pointer;
+    flex-shrink: 0;
 }
 
 .tmx-search-clear:hover {
@@ -474,9 +479,16 @@
 }
 
 .tmx-item-icon {
-    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
     opacity: 0.92;
+    color: #94a3b8;
 }
+.tmx-item-icon.is-dir { color: #38bdf8; }
+.tmx-item-icon.is-file { color: #facc15; }
 
 .tmx-item-main {
     min-width: 0;
@@ -516,8 +528,42 @@
     color: rgba(203,213,225,0.88);
     font-family: 'JetBrains Mono', monospace;
     white-space: nowrap;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
     align-self: center;
     justify-self: start;
+    width: 100%;
+}
+
+.tmx-size-text {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+}
+
+.tmx-size-val {
+    font-weight: 500;
+}
+
+.tmx-size-pct {
+    color: rgba(148,163,184,0.7);
+    font-size: 0.62rem;
+}
+
+.tmx-size-bar-bg {
+    width: 100%;
+    height: 3px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.tmx-size-bar-fill {
+    height: 100%;
+    background: #10b981;
+    border-radius: 2px;
 }
 
 .tmx-item-type {
@@ -557,8 +603,8 @@
     }
 
     .tmx-item {
-        grid-template-columns: minmax(0, 1fr) auto auto;
-        grid-template-rows: auto auto;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-rows: auto auto auto;
         gap: 8px 12px;
         padding: 10px;
     }
@@ -589,22 +635,8 @@
         content: none;
     }
 
-    .tmx-item-size {
-        grid-column: 2;
-        grid-row: 2;
-        justify-self: end;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding-right: 8px;
-    }
-
-    .tmx-item-size::before {
-        content: none;
-    }
-
     .tmx-item-type {
-        grid-column: 3;
+        grid-column: 2;
         grid-row: 2;
         justify-self: end;
         display: inline-flex;
@@ -613,6 +645,17 @@
     }
 
     .tmx-item-type::before {
+        content: none;
+    }
+
+    .tmx-item-size {
+        grid-column: 1 / -1;
+        grid-row: 3;
+        justify-self: stretch;
+        padding-right: 0;
+    }
+
+    .tmx-item-size::before {
         content: none;
     }
 }
@@ -640,12 +683,12 @@
     }
 
     .tmx-search {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 34px;
         gap: 6px;
     }
 
     .tmx-search-clear {
-        width: auto;
+        width: 34px;
         justify-self: end;
     }
 

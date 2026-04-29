@@ -28,6 +28,30 @@ const _searchInflight = {};  // key => Promise
 let _listDelegationBound = false;
 let _lastRenderedNodeState = null;
 
+function getRootTotalSize() {
+    return Math.max(0, Number((_rootNode && _rootNode.value) || 0));
+}
+
+function getPercentOfDisk(value) {
+    const total = getRootTotalSize();
+    if (!total) return 0;
+    return Math.max(0, Math.min(100, (Number(value || 0) / total) * 100));
+}
+
+function formatPercent(pct) {
+    if (pct >= 10) return pct.toFixed(1) + '%';
+    if (pct >= 1) return pct.toFixed(2) + '%';
+    if (pct > 0) return '<0.01%';
+    return '0%';
+}
+
+function getNodeIconSvg(node) {
+    if (node && (node.type === 'file_group' || node.type === 'file')) {
+        return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+    }
+    return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+}
+
 function escHtml(s) {
     return String(s)
         .replace(/&/g, '&amp;')
@@ -421,17 +445,29 @@ function renderList(node) {
         btn.className = 'tmx-item';
         btn.setAttribute('data-child-idx', String(idx));
 
-        const icon = (child.type === 'file_group' || child.type === 'file') ? '📄' : '📁';
+        const isFile = (child.type === 'file_group' || child.type === 'file');
+        const iconSvg = getNodeIconSvg(child);
+        const iconClass = isFile ? 'is-file' : 'is-dir';
+        const value = Number(child.value || 0);
+        const pct = getPercentOfDisk(value);
+        const pctText = formatPercent(pct);
+        const barWidth = Math.max(0.5, Math.min(100, pct)).toFixed(2);
 
         btn.innerHTML =
             '<span class="tmx-item-folder">' +
-                '<span class="tmx-item-icon">' + icon + '</span>' +
+                '<span class="tmx-item-icon ' + iconClass + '">' + iconSvg + '</span>' +
                 '<span class="tmx-item-main">' +
-                '<span class="tmx-item-name">' + escHtml(child.name || child.path || 'node') + '</span>' +
+                    '<span class="tmx-item-name">' + escHtml(child.name || child.path || 'node') + '</span>' +
                 '</span>' +
             '</span>' +
             '<span class="tmx-item-owner">' + escHtml(child.owner || '-') + '</span>' +
-            '<span class="tmx-item-size">' + escHtml(fmt(child.value || 0)) + '</span>' +
+            '<span class="tmx-item-size">' +
+                '<span class="tmx-size-text">' +
+                    '<span class="tmx-size-val">' + escHtml(fmt(value)) + '</span>' +
+                    '<span class="tmx-size-pct">' + pctText + '</span>' +
+                '</span>' +
+                '<span class="tmx-size-bar-bg"><span class="tmx-size-bar-fill" style="width:' + barWidth + '%"></span></span>' +
+            '</span>' +
             '<span class="tmx-item-type">' + escHtml(getNodeTypeLabel(child)) + '</span>';
 
         fragment.appendChild(btn);
@@ -537,8 +573,8 @@ function renderExplorer(rootNode, meta) {
         '<div class="treemap-layout">' +
             '<div class="glass-panel treemap-toolbar">' +
                 '<div class="treemap-toolbar-left">' +
-                    '<button class="user-bar-btn" id="tm-back-btn">← Back</button>' +
-                    '<button class="user-bar-btn" id="tm-root-btn">Root</button>' +
+                    '<button class="user-bar-btn" id="tm-back-btn" data-tooltip="Back to parent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg> Back</button>' +
+                    '<button class="user-bar-btn" id="tm-root-btn" data-tooltip="Jump to disk root"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg> Root</button>' +
                 '</div>' +
                 '<div class="treemap-toolbar-right"><span class="treemap-meta" id="tm-meta"></span></div>' +
             '</div>' +
@@ -549,13 +585,13 @@ function renderExplorer(rootNode, meta) {
                         '<input id="tmx-search-input" class="tmx-search-input" type="text" placeholder="Global search path/name..." autocomplete="off" />' +
                         '<div class="tmx-search-dropdown" id="tmx-search-dropdown"></div>' +
                     '</div>' +
-                    '<button type="button" id="tmx-search-clear" class="tmx-search-clear">Clear</button>' +
+                    '<button type="button" id="tmx-search-clear" class="tmx-search-clear" data-tooltip="Clear search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
                 '</div>' +
                 '<div class="tmx-current-title" id="tmx-current-title"></div>' +
                 '<div class="tmx-table-head">' +
                     '<span class="tmx-col-name">Folder</span>' +
                     '<span class="tmx-col-owner">Owner</span>' +
-                    '<span class="tmx-col-size">Size</span>' +
+                    '<span class="tmx-col-size">Size · %</span>' +
                     '<span class="tmx-col-type">Type</span>' +
                 '</div>' +
                 '<div class="tmx-list" id="tmx-list"></div>' +
