@@ -56,9 +56,12 @@ function getCssBundleJobs(rootDir) {
     const bundleDir = path.join(rootDir, bundleName);
     const partsDir = path.join(bundleDir, 'parts');
 
-    const partFiles = fs.existsSync(partsDir)
-      ? walk(partsDir, n => n.endsWith('.css') && !n.endsWith('.min.css')).sort()
-      : [];
+    const partsIndexFile = path.join(partsDir, '_index.css');
+    const partFiles = fs.existsSync(partsIndexFile)
+      ? [partsIndexFile]
+      : (fs.existsSync(partsDir)
+        ? walk(partsDir, n => n.endsWith('.css') && !n.endsWith('.min.css')).sort()
+        : []);
 
     const namedMain = path.join(bundleDir, `${bundleName}.css`);
     const indexMain = path.join(bundleDir, 'index.css');
@@ -82,27 +85,36 @@ async function buildCssBundles() {
   const jobs = getCssBundleJobs(cssDir);
 
   for (const job of jobs) {
-    const chunks = [];
+    let result;
 
-    if (job.partFiles.length) {
-      for (const file of job.partFiles) {
-        chunks.push(fs.readFileSync(file, 'utf8'));
+    try {
+      if (job.partFiles.length) {
+        result = await esbuild.build({
+          entryPoints: job.partFiles,
+          bundle: true,
+          minify: true,
+          write: false,
+          target: ['es2020'],
+          loader: { '.css': 'css' },
+        });
+      } else {
+        result = await esbuild.build({
+          entryPoints: [job.mainFile],
+          bundle: true,
+          minify: true,
+          write: false,
+          target: ['es2020'],
+          loader: { '.css': 'css' },
+        });
       }
+    } catch (e) {
+      console.error(`Error building ${job.bundleName}:`, e.message);
+      process.exit(1);
     }
 
-    if (job.mainFile && job.partFiles.length === 0) {
-      chunks.push(fs.readFileSync(job.mainFile, 'utf8'));
-    }
-
-    const source = chunks.join('\n');
-    const result = await esbuild.transform(source, {
-      loader: 'css',
-      minify: true,
-      target: ['es2020'],
-    });
-
+    const output = result.outputFiles?.[0]?.text ?? '';
     fs.mkdirSync(path.dirname(job.outFile), { recursive: true });
-    fs.writeFileSync(job.outFile, result.code);
+    fs.writeFileSync(job.outFile, output);
     console.log(`CSS bundle: ${job.outFile}`);
   }
 

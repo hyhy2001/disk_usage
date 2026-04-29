@@ -34,4 +34,5 @@
 }
 .sidebar-backdrop.visible {
     opacity: 1;
-    pointer-events: all;    /* ← Only intercept clicks when actually visible */
+    pointer-events: all;
+}

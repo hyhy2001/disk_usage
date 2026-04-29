@@ -109,3 +109,10 @@
 .canvas-wrapper {
     flex: 1;
     position: relative;
+    width: 100%;
+    /* CRITICAL: explicit height lets Chart.js ResizeObserver detect changes */
+    height: 250px;
+    min-height: 250px;
+    overflow: hidden;
+    box-sizing: border-box;
+}
