@@ -1,0 +1,37 @@
+
+/* -- Hamburger Button (mobile only) ---------------------------------------- */
+.hamburger-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.06);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    transition: background 0.2s;
+}
+.hamburger-btn:hover { background: rgba(255,255,255,0.12); }
+
+/* -- Disk icon trigger + flyout: hidden by default, shown only in icon-only mode -- */
+.disk-icon-trigger { display: none; }
+.disk-flyout       { display: none; }
+
+/* Sidebar overlay backdrop (mobile) */
+.sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 150;
+    opacity: 0;
+    pointer-events: none;   /* ← CRITICAL: don't intercept clicks when invisible */
+    transition: opacity 0.25s;
+}
+.sidebar-backdrop.visible {
+    opacity: 1;
+    pointer-events: all;    /* ← Only intercept clicks when actually visible */

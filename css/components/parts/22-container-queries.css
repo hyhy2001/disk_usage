@@ -1,0 +1,384 @@
+/* ============================================================================
+   CONTAINER QUERY RESPONSIVE OVERRIDES (components.css)
+   Supersede viewport-based @media queries for content inside .main-content.
+   .main-content has container-type: inline-size declared in layout.css.
+   ============================================================================ */
+
+/* ── ≤ 900px content: snapshot two-col guaranteed stack ─────────────────── */
+@container main (max-width: 900px) {
+    .snapshot-two-col {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    /* History charts grid → single col */
+    .history-charts-row {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* ud-grid (User Detail) → single col */
+    .ud-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── ≤ 720px content: flex-heavy layouts collapse ────────────────────────── */
+@container main (max-width: 720px) {
+    /* History filter + charts stack */
+    .history-main-row {
+        flex-direction: column;
+    }
+
+    .user-filter-box {
+        width: 100% !important;
+        max-height: min(60dvh, calc(100dvh - 260px));
+        overflow: hidden;
+        align-self: stretch;
+    }
+
+    .user-filter-list {
+        max-height: min(34dvh, 200px);
+    }
+
+    .history-chart-card {
+        width: 100% !important;
+        min-width: 0;
+    }
+
+    .history-chart-body {
+        height: 200px;
+        min-height: 160px;
+        overflow: hidden;
+    }
+
+    /* Overview tab: disk card grid → 1 col */
+    .disk-card-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Perm items: hide some columns to save space */
+    .perm-item {
+        grid-template-columns: 20px 90px 1fr 1fr !important;
+    }
+}
+
+/* ── ≤ 560px content: compact everything ────────────────────────────────── */
+@container main (max-width: 560px) {
+    /* detail tabs scroll horizontally on very narrow */
+    .detail-tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: 6px;
+    }
+
+    .detail-tab-btn {
+        flex-shrink: 0;
+        font-size: 0.75rem;
+        padding: 6px 10px;
+        gap: 5px;
+        white-space: nowrap;
+    }
+
+    /* workspace header actions wrap */
+    .workspace-header {
+        flex-wrap: wrap;
+        height: auto;
+        gap: 8px;
+        padding-bottom: 4px;
+    }
+
+    /* stat bar in overview stacks */
+    .page-stat-bar {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 2px;
+        flex-wrap: wrap;
+    }
+
+    /* team card in list view stacks */
+    .disk-card-grid.list-view .team-disk-card {
+        flex-direction: column;
+        gap: 10px;
+        padding: 14px 16px;
+    }
+
+    .disk-card-grid.list-view .team-disk-card .card-header {
+        flex: unset;
+        width: 100%;
+    }
+
+    /* Perm flat list: simple 2-col */
+    .perm-item {
+        grid-template-columns: 20px 1fr !important;
+        gap: 6px;
+    }
+
+    .perm-user-badge,
+    .perm-item-type {
+        display: none;
+    }
+
+    .perm-item-error {
+        display: none;
+    }
+}
+
+/* ── ≤ 400px content: absolute minimum ──────────────────────────────────── */
+@container main (max-width: 400px) {
+    .workspace-nav-tabs .tab-btn {
+        padding: 8px 10px;
+        font-size: 0.78rem;
+        gap: 5px;
+    }
+
+    .workspace-nav-tabs .tab-btn span {
+        display: none; /* hide tab text, show only icon on very narrow */
+    }
+
+    .page-stat-bar {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .stat-divider {
+        display: none;
+    }
+
+    .header-disk-name {
+        font-size: 1.1rem;
+    }
+}
+
+/* ── Inode Stat Cards ────────────────────────────────────────────────────────── */
+.inode-stat-card {
+    padding: 12px 16px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+}
+:root[data-theme='light'] .inode-stat-card {
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-color: rgba(15, 23, 42, 0.08);
+}
+
+.inode-user-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    transition: background 0.2s, border-color 0.2s;
+}
+.inode-user-card:hover {
+    background: rgba(255,255,255,0.07);
+}
+
+:root[data-theme='light'] .inode-user-card {
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-color: rgba(15, 23, 42, 0.08);
+}
+:root[data-theme='light'] .inode-user-card:hover {
+    background: #f8fafc;
+    border-color: rgba(0,0,0,0.15);
+}
+
+.inode-free-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid var(--glass-border);
+}
+:root[data-theme='light'] .inode-free-dot {
+    background: rgba(0,0,0,0.12);
+    border: none;
+}
+
+/* ── Light Mode Enhancements: Inode / Permission / TreeMap / Group Config ── */
+:root[data-theme='light'] .inode-panel {
+    background: rgba(255, 255, 255, 0.96);
+    border-color: rgba(15, 23, 42, 0.1);
+}
+
+:root[data-theme='light'] .inode-chart-wrapper {
+    background: rgba(248, 250, 252, 0.78);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 12px;
+    padding: 10px;
+}
+
+:root[data-theme='light'] #inode-user-grid {
+    scrollbar-color: rgba(15, 23, 42, 0.24) transparent;
+}
+
+:root[data-theme='light'] .perm-meta {
+    color: #64748b;
+}
+
+:root[data-theme='light'] .perm-meta-date {
+    color: #b45309;
+}
+
+:root[data-theme='light'] .perm-summary-bar {
+    background: rgba(248, 250, 252, 0.85);
+    border: 1px solid rgba(15, 23, 42, 0.09);
+    border-radius: 12px;
+}
+
+:root[data-theme='light'] .perm-flat-list {
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    background: rgba(255, 255, 255, 0.96);
+}
+
+:root[data-theme='light'] .perm-item {
+    border-bottom-color: rgba(15, 23, 42, 0.08);
+}
+
+:root[data-theme='light'] .perm-item:hover {
+    background: rgba(226, 232, 240, 0.55);
+}
+
+:root[data-theme='light'] .perm-user-badge {
+    background: rgba(2, 132, 199, 0.12);
+    color: #0369a1;
+    border-color: rgba(2, 132, 199, 0.25);
+}
+
+:root[data-theme='light'] .perm-user-badge.perm-unk {
+    background: rgba(245, 158, 11, 0.14);
+    color: #b45309;
+    border-color: rgba(245, 158, 11, 0.28);
+}
+
+:root[data-theme='light'] .perm-item-path {
+    color: #0f172a;
+}
+
+:root[data-theme='light'] .perm-item-type {
+    background: rgba(14, 165, 233, 0.11);
+    color: #0369a1;
+    border-color: rgba(14, 165, 233, 0.24);
+    opacity: 1;
+}
+
+:root[data-theme='light'] .perm-item-error {
+    color: #dc2626;
+}
+
+:root[data-theme='light'] .treemap-toolbar,
+:root[data-theme='light'] .treemap-breadcrumb,
+:root[data-theme='light'] .tmx-current-title,
+:root[data-theme='light'] .tmx-breadcrumb {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(15, 23, 42, 0.1);
+}
+
+:root[data-theme='light'] .treemap-canvas {
+    background: rgba(248, 250, 252, 0.92);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+:root[data-theme='light'] .tm-crumb,
+:root[data-theme='light'] .tmx-crumb-btn {
+    background: rgba(241, 245, 249, 0.86);
+    border-color: rgba(15, 23, 42, 0.13);
+    color: #334155;
+}
+
+:root[data-theme='light'] .tmx-search-input,
+:root[data-theme='light'] .tmx-search-clear,
+:root[data-theme='light'] .tmx-search-dropdown,
+:root[data-theme='light'] .tmx-item {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(15, 23, 42, 0.12);
+    color: #0f172a;
+}
+
+:root[data-theme='light'] .tmx-item:hover {
+    background: rgba(226, 232, 240, 0.45);
+    border-color: rgba(16, 185, 129, 0.45);
+}
+
+:root[data-theme='light'] .tmx-search-option {
+    color: #0f172a;
+    border-bottom-color: rgba(15, 23, 42, 0.08);
+}
+
+:root[data-theme='light'] .tmx-search-option:hover {
+    background: rgba(226, 232, 240, 0.6);
+}
+
+:root[data-theme='light'] .tmx-search-option-name {
+    color: #0f172a;
+}
+
+:root[data-theme='light'] .tmx-search-option-path,
+:root[data-theme='light'] .tmx-item-owner,
+:root[data-theme='light'] .tmx-item-type,
+:root[data-theme='light'] .tmx-item-size,
+:root[data-theme='light'] .treemap-meta {
+    color: #64748b;
+}
+
+.scan-status-banner {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 10px;
+    margin: 4px 0 0;
+    border-radius: 6px;
+    background: rgba(251, 146, 60, 0.10);
+    border: 1px solid rgba(251, 146, 60, 0.25);
+    font-size: 0.71rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: #fb923c;
+    letter-spacing: 0.02em;
+    animation: fade-in-banner 0.25s ease;
+    overflow: hidden;
+}
+
+.scan-status-banner.hidden {
+    display: none;
+}
+
+.scan-status-banner-icon {
+    flex-shrink: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #fb923c;
+    box-shadow: 0 0 6px rgba(251, 146, 60, 0.7);
+    animation: pulse-orange 1.8s infinite;
+}
+
+.scan-status-banner-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@keyframes pulse-orange {
+    0%   { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(251, 146, 60, 0.6); }
+    70%  { transform: scale(1); box-shadow: 0 0 0 5px rgba(251, 146, 60, 0); }
+    100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(251, 146, 60, 0); }
+}
+
+@keyframes fade-in-banner {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+:root[data-theme='light'] .scan-status-banner {
+    background: rgba(234, 88, 12, 0.08);
+    border-color: rgba(234, 88, 12, 0.22);
+    color: #ea580c;
+}
+
+:root[data-theme='light'] .scan-status-banner-icon {
+    background: #ea580c;
+    box-shadow: 0 0 6px rgba(234, 88, 12, 0.6);
+}
+

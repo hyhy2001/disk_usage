@@ -1,0 +1,42 @@
+    width: 100%;
+    /* CRITICAL: explicit height lets Chart.js ResizeObserver detect changes */
+    height: 250px;
+    min-height: 250px;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+/* Timeline chart taller */
+.large-span .canvas-wrapper {
+    height: 340px;
+    min-height: 340px;
+}
+
+/* -- Overview Compact Fit (Desktop) ---------------------------------------- */
+/* Keep the same chart positions, but scale heights so 3 charts fit better
+   in one viewport on common laptop/desktop sizes. */
+@media (min-width: 1101px) and (min-height: 760px) {
+    #page-overview .charts-grid {
+        gap: 16px;
+    }
+
+    #page-overview .chart-container {
+        padding: 18px;
+        gap: 12px;
+        min-height: 280px;
+    }
+
+    #page-overview .canvas-wrapper {
+        height: clamp(185px, 21vh, 245px);
+        min-height: 185px;
+    }
+
+    #page-overview .large-span .canvas-wrapper {
+        height: clamp(255px, 32vh, 336px);
+        min-height: 255px;
+    }
+
+    #page-overview .large-span .timeline-header {
+        padding-bottom: 2px;
+    }
+}

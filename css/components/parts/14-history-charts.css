@@ -1,0 +1,111 @@
+/* ======================================================================== */
+/* -- History chart cards --------------------------------------------------- */
+:root[data-theme='light'] .history-chart-title {
+    color: #374151;
+}
+
+:root[data-theme='light'] .history-chart-card {
+    background: rgba(255,253,250,0.95);
+}
+
+/* -- Light mode: scrollbars use dark-on-light color ----------------------- */
+:root[data-theme='light'] * {
+    scrollbar-color: rgba(0,0,0,0.18) transparent;
+}
+
+/* -- Donut chart canvas background (keeps chart readable on white panels) -- */
+:root[data-theme='light'] #teamChart {
+    background: transparent;
+}
+
+/* -- Team pie chart is clickable -- */
+#teamChart {
+    cursor: pointer;
+}
+
+/* -- Usage bars track background in light mode ----------------------------- */
+:root[data-theme='light'] .usage-bar-track,
+:root[data-theme='light'] .pivot-mini-bar,
+:root[data-theme='light'] .progress-track,
+:root[data-theme='light'] .sbar-track {
+    background: rgba(0,0,0,0.12) !important;
+}
+
+/* -- Code inline text in unknown notes ------------------------------------- */
+:root[data-theme='light'] .unknown-note code {
+    color: #4338ca;
+    background: rgba(67,56,202,0.07);
+}
+
+/* -- Separator bars between panels: make visible -------------------------- */
+:root[data-theme='light'] .stat-divider {
+    background: rgba(0,0,0,0.12) !important;
+}
+
+/* -- Period trend table header cells --------------------------------------- */
+:root[data-theme='light'] .period-table th {
+    color: #5B6377;
+    background: rgba(0,0,0,0.03);
+}
+
+/* -- Team usage country chips in detail ----------------------------------- */
+:root[data-theme='light'] .country-chip {
+    background: rgba(0,0,0,0.06);
+    border-color: rgba(0,0,0,0.10);
+    color: #374151;
+}
+
+/* -- Light mode chart canvas: give chart area a clean white base ----------- */
+:root[data-theme='light'] .canvas-wrapper {
+    background: rgba(255,255,255,0.70);
+    border-radius: 10px;
+}
+
+/* -- Glass panels more solid and with clearer shadow in light mode ---------- */
+:root[data-theme='light'] .glass-panel {
+    background: rgba(255,255,255,0.90) !important;
+    border: 1px solid rgba(0,0,0,0.09) !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04) !important;
+}
+
+/* -- Scale toggle button -- Light mode --------------------------------------- */
+.scale-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.10);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.18s;
+}
+.scale-toggle-btn .icon-log { display: none; }
+.scale-toggle-btn.active .icon-linear { display: none; }
+.scale-toggle-btn.active .icon-log { display: block; }
+.scale-toggle-btn:hover {
+    background: rgba(255,255,255,0.18);
+    color: var(--text-primary);
+}
+.scale-toggle-btn.active {
+    background: rgba(16,185,129,0.18);
+    border-color: rgba(16,185,129,0.4);
+    color: #10b981;
+}
+
+:root[data-theme='light'] .scale-toggle-btn {
+    border-color: rgba(0,0,0,0.11);
+    background: rgba(0,0,0,0.05);
+    color: #5B6377;
+}
+:root[data-theme='light'] .scale-toggle-btn:hover {
+    background: rgba(0,0,0,0.09);
+    color: #1E2235;
+}
+:root[data-theme='light'] .scale-toggle-btn.active {
+    background: rgba(5,150,105,0.12);
+    border-color: rgba(5,150,105,0.35);
+    color: #059669;
+}
+

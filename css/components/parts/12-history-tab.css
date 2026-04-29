@@ -1,0 +1,396 @@
+/* ===========================================================================
+   HISTORY & ANALYSIS TAB -- REDESIGN
+   =========================================================================== */
+
+.history-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 0;
+}
+
+/* -- ① Time Range Bar ------------------------------------------------------- */
+.history-timerange {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.timerange-presets {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.timerange-label {
+    font-size: 0.9rem;
+    margin-right: 4px;
+    color: var(--text-secondary);
+}
+
+.hrange-btn {
+    /* TASK-01: Minimum touch target for range filter buttons */
+    padding: 6px 14px;
+    min-height: 32px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.03em;
+    font-family: inherit;
+}
+
+.hrange-btn:hover { background: rgba(245,158,11,0.12); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
+.hrange-btn.active { background: rgba(245,158,11,0.15); border-color: #f59e0b; color: #fbbf24; font-weight: 600; }
+
+.timerange-custom {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* -- ② History Charts Row -------------------------------------------------- */
+.history-charts-row {
+    display: grid;
+    /* 1 column since the second chart was removed */
+    grid-template-columns: 1fr;
+    gap: 14px;
+    min-width: 0;
+    width: 100%;
+}
+
+/* Stack to 1 col at 1100px:
+   Calculation: 1100px viewport - 270px sidebar = 830px content
+   830px - 200px filter - gaps = 610px ÷ 2 = 305px per chart (borderline)
+   So stack to 1 column at ≤ 1100px for comfortable readability */
+@media (max-width: 1100px) {
+    .history-charts-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* -- Shared Chart Card ----------------------------------------------------- */
+.history-chart-card {
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    /* CRITICAL: grid child must have min-width: 0 to not overflow cell */
+    min-width: 0;
+    box-sizing: border-box;
+    /* NOTE: no overflow:hidden -- would clip chart tooltips */
+}
+
+.history-chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.history-chart-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+}
+
+.history-chart-stat {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #fbbf24;
+}
+
+.scale-toggle-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.05);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.04em;
+}
+
+.scale-toggle-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: var(--text-primary);
+}
+
+.scale-toggle-btn.active {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: #10b981;
+    color: #10b981;
+}
+
+/* -- Chart Expand Button --------------------------------------------------- */
+.chart-expand-btn {
+    font-size: 0.85rem;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.chart-expand-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: var(--text-primary);
+    border-color: rgba(255,255,255,0.2);
+}
+
+/* -- Chart Modal Overlay --------------------------------------------------- */
+.chart-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.chart-modal-overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.chart-modal-box {
+    background: #0d1117;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 1100px;
+    height: min(80vh, 680px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+    transform: scale(0.96);
+    transition: transform 0.2s ease;
+}
+
+.chart-modal-overlay.visible .chart-modal-box {
+    transform: scale(1);
+}
+
+.chart-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+}
+
+.chart-modal-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.chart-modal-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chart-modal-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.chart-modal-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: var(--text-primary);
+}
+
+.chart-modal-close {
+    font-size: 0.9rem;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    justify-content: center;
+}
+
+.chart-modal-body {
+    flex: 1;
+    min-height: 0;
+    padding: 20px;
+    position: relative;
+}
+
+.chart-modal-body canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.chart-modal-hint {
+    padding: 10px 20px;
+    font-size: 0.7rem;
+    color: #334155;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    flex-shrink: 0;
+}
+
+.chart-modal-hint kbd {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+}
+
+.history-chart-body {
+    position: relative;
+    height: 340px;
+}
+
+.history-chart-body-lg {
+    height: 280px;
+}
+
+.history-chart-body canvas,
+.history-chart-body-lg canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* -- ③ User Chip Filter Bar ----------------------------------------------- */
+.history-user-bar {
+    padding: 14px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.user-bar-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.user-bar-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    margin-right: 4px;
+}
+
+.user-bar-btn {
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.user-bar-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+.user-bar-btn-reset { margin-left: auto; }
+
+.user-bar-search {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 4px 10px;
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    font-family: inherit;
+    outline: none;
+    width: 130px;
+    transition: border-color 0.15s;
+}
+
+.user-bar-search:focus { border-color: rgba(245,158,11,0.4); }
+
+.select-input-sm {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-family: inherit;
+    padding: 4px 8px;
+    outline: none;
+    cursor: pointer;
+}
+
+.user-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.user-chip {
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-secondary);
+    font-size: 0.74rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.14s;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.user-chip:hover {
+    background: rgba(245,158,11,0.1);
+    border-color: rgba(245,158,11,0.35);
+    color: #fbbf24;
+}
+
+.user-chip.active {
+    background: rgba(245,158,11,0.18);
+    border-color: #f59e0b;
+    color: #fbbf24;
+    font-weight: 600;
+}
+

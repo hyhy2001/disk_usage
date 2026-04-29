@@ -1,0 +1,366 @@
+/* ===========================================================================
+   RESPONSIVE AUDIT FIXES -- Added 2026-03-21
+   Covers all 15 issues identified in PLAN-responsive-audit.md
+   =========================================================================== */
+
+/* -------------------------------------------------------------------------
+   C1 -- sbar-row: fixed 160px name column breaks at narrow widths
+   ------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+    .sbar-row {
+        grid-template-columns: minmax(0, 130px) 1fr minmax(0, 48px) minmax(0, auto);
+        gap: 6px;
+    }
+}
+@media (max-width: 520px) {
+    /* Compact vertical layout: name+pct on row 1, full-width bar on row 2 */
+    .sbar-row:not(.general-row) {
+        display: grid;
+        grid-template-areas:
+            "name pct"
+            "track track";
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto;
+        gap: 5px 8px;
+        padding: 8px 0;
+    }
+
+    .sbar-row:not(.general-row) .sbar-name  { grid-area: name; }
+    .sbar-row:not(.general-row) .sbar-track {
+        grid-area: track;
+        width: 100%;
+        height: 8px;
+        min-width: 0;
+    }
+    .sbar-row:not(.general-row) .sbar-pct  { grid-area: pct; align-self: center; }
+    /* Hide value: not enough room */
+    .sbar-val { display: none; }
+
+    /* General row: uses its own vertical layout from the 640px breakpoint */
+    .general-row.sbar-row {
+        grid-template-columns: minmax(0, 95px) 1fr minmax(0, 40px);
+    }
+    .general-val-col { align-items: flex-start; }
+}
+
+/* -------------------------------------------------------------------------
+   C2 -- general-subrow: hardcoded 170px padding-left kills mobile
+   ------------------------------------------------------------------------- */
+@media (max-width: 600px) {
+    .general-subrow {
+        padding-left: 0;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+}
+
+/* -------------------------------------------------------------------------
+   C3 -- detail-layout: 240px sidebar has no media query
+   ------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+    .detail-layout {
+        grid-template-columns: 1fr;
+    }
+    .filter-sidebar {
+        position: static;
+        max-height: none;
+    }
+}
+
+/* -------------------------------------------------------------------------
+   C4 -- perm-item: 4-column grid overflows at 640px
+   ------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+    .perm-item {
+        grid-template-columns: 22px 1fr;
+        grid-template-rows: auto auto;
+        gap: 4px 8px;
+    }
+    .perm-item-type {
+        grid-column: 2;
+        justify-self: start;
+    }
+    .perm-item-error {
+        grid-column: 1 / -1;
+        font-size: 0.68rem;
+        padding-left: 2px;
+    }
+}
+@media (max-width: 480px) {
+    .perm-item { font-size: 0.72rem; padding: 5px 6px; }
+    .perm-item-path { font-size: 0.67rem; }
+}
+
+/* -------------------------------------------------------------------------
+   C5 -- history-timerange: date inputs don't wrap at 480px
+   ------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+    .history-timerange {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .timerange-custom {
+        width: 100%;
+    }
+    .timerange-custom .date-input {
+        flex: 1;
+        min-width: 0;
+    }
+}
+@media (max-width: 480px) {
+    .timerange-presets { flex-wrap: wrap; }
+}
+
+/* -------------------------------------------------------------------------
+   C6 -- detail-stat-bar: font-size 2rem + large padding breaks 375px
+   ------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+    .stat-number { font-size: 1.5rem; }
+    .detail-stat-bar { padding: 14px 18px; }
+    .page-stat-bar { width: 100%; }
+}
+@media (max-width: 560px) {
+    .stat-number { font-size: 1.25rem; }
+    .detail-stat-bar { padding: 12px 14px; }
+}
+@media (max-width: 520px) {
+    .detail-stat-bar {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        padding: 10px 12px;
+        gap: 4px 0;
+        align-items: start;
+    }
+    .detail-stat-bar .stat-divider { display: none; }
+    .stat-number { font-size: 1.1rem; }
+    .stat-block { padding: 4px 8px; }
+
+    /* Shared header stat bar -- also 2x2 on very small screens */
+    .page-stat-bar {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        padding: 8px 10px;
+        gap: 2px 0;
+    }
+    .page-stat-bar .stat-divider { display: none; }
+    .page-stat-bar .stat-number { font-size: 1rem; }
+}
+
+/* -------------------------------------------------------------------------
+   C7 -- perm-summary-bar: 1.8rem numbers + 4+ items overflow 375px
+   ------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+    .perm-summary-num { font-size: 1.4rem; }
+    .perm-summary-bar { padding: 12px 16px; }
+}
+@media (max-width: 520px) {
+    .perm-summary-bar {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        padding: 12px;
+    }
+    .perm-summary-bar .stat-divider { display: none; }
+    .perm-summary-num { font-size: 1.25rem; }
+    .perm-summary-item { align-items: center; }
+}
+
+/* -------------------------------------------------------------------------
+   M1 -- timeline-header: range buttons wrap poorly at narrow widths
+   ------------------------------------------------------------------------- */
+@media (max-width: 560px) {
+    .timeline-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .chart-range-btns {
+        flex-wrap: wrap;
+        gap: 3px;
+    }
+    .range-btn {
+        font-size: 0.68rem;
+        padding: 3px 7px;
+    }
+}
+
+/* -------------------------------------------------------------------------
+   M2 -- history-chart-body: 340px fixed height too tall on mobile
+   ------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+    .history-chart-body { height: 260px; }
+}
+@media (max-width: 560px) {
+    .history-chart-body { height: 210px; }
+}
+@media (max-width: 480px) {
+    .history-chart-body { height: 175px; }
+}
+
+/* -------------------------------------------------------------------------
+   M3 -- user-filter-box: responsive stacking at 768px
+   ------------------------------------------------------------------------- */
+@media (max-width: 1100px) {
+    /* Switch 2-col history chart grid to 1 col for readability */
+    .history-charts-row {
+        grid-template-columns: 1fr;
+    }
+    /* history-chart-card fills full width naturally in 1-col grid */
+}
+
+@media (max-width: 768px) {
+    .history-main-row { flex-direction: column; }
+
+    .user-filter-box {
+        width: 100% !important;
+        max-height: min(60dvh, calc(100dvh - 260px));
+        overflow: hidden;
+        align-self: stretch;
+    }
+
+    /* Keep user list vertical and scrollable on tablet/mobile */
+    .user-filter-list {
+        max-height: min(34dvh, 200px);
+        flex-direction: column;
+        flex-wrap: nowrap;
+        gap: 4px;
+    }
+
+    .user-filter-item {
+        flex-shrink: 1;
+        flex-basis: 100%;
+        padding: 4px 10px;
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 8px;
+        font-size: 0.75rem;
+    }
+
+    /* Keep user-search & path-search full width side by side */
+    .perm-filter-searches {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+}
+
+/* -------------------------------------------------------------------------
+   M4 -- chart-modal-box: full-screen on mobile, better as bottom sheet
+   ------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+    .chart-modal-overlay {
+        padding: 0;
+        align-items: flex-end;
+    }
+    .chart-modal-box {
+        border-radius: 16px 16px 0 0;
+        height: min(88vh, 640px);
+        max-width: 100%;
+    }
+}
+@media (max-width: 480px) {
+    .chart-modal-body { padding: 12px; }
+    .chart-modal-title { font-size: 0.75rem; }
+}
+
+/* -------------------------------------------------------------------------
+   M5 -- scan-summary-bar: ssb-right min-width:200px breaks at 480px
+   ------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+    .scan-summary-bar {
+        flex-direction: column;
+        gap: 10px;
+        padding: 10px 14px;
+    }
+    .ssb-right {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
+/* -------------------------------------------------------------------------
+   M6 -- detail-tabs: 3 tabs with emojis overflow at 375px
+   ------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+    .detail-tab-btn {
+        font-size: 0.79rem;
+        padding: 7px 10px;
+    }
+}
+@media (max-width: 520px) {
+    .detail-tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: 8px;
+    }
+    .detail-tab-btn {
+        white-space: nowrap;
+        flex-shrink: 0;
+        font-size: 0.74rem;
+        padding: 6px 9px;
+    }
+}
+
+/* -------------------------------------------------------------------------
+   M8 -- hrange-btn: 6 buttons in a row overflow at 375px
+   ------------------------------------------------------------------------- */
+@media (max-width: 500px) {
+    .timerange-presets {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+    .hrange-btn {
+        padding: 4px 10px;
+        font-size: 0.72rem;
+    }
+}
+
+/* -------------------------------------------------------------------------
+   N2 -- perm-meta-dir: long path not truncated
+   ------------------------------------------------------------------------- */
+.perm-meta-dir {
+    max-width: 340px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+@media (max-width: 640px) {
+    .perm-meta-dir { max-width: 200px; }
+}
+@media (max-width: 480px) {
+    .perm-meta-dir { max-width: 140px; }
+}
+
+/* -------------------------------------------------------------------------
+   N4 -- header-top-row: stat bar not full-width when it wraps
+   ------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+    .page-stat-bar { width: 100%; }
+}
+
+/* -------------------------------------------------------------------------
+   N5 -- canvas-wrapper: prevents collapse on very small containers
+   ------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+    .canvas-wrapper { min-height: 180px; }
+    .large-span .canvas-wrapper { min-height: 220px; }
+}
+@media (max-width: 520px) {
+    .canvas-wrapper { min-height: 150px; }
+    .large-span .canvas-wrapper { min-height: 190px; }
+}
+
+/* -------------------------------------------------------------------------
+   EXTRA -- snapshot two-col already in components.css at :900px, ensure
+   panel padding scales on small screens
+   ------------------------------------------------------------------------- */
+@media (max-width: 520px) {
+    .snapshot-section { padding: 14px 14px; }
+    .detail-panel { padding: 14px; }
+    .perm-user-card { padding: 12px 14px; }
+    .result-section-header { padding: 10px 14px; }
+    .chart-container { padding: 14px; }
+}
+
+/* -------------------------------------------------------------------------
+   END RESPONSIVE AUDIT FIXES
+   ------------------------------------------------------------------------- */
+

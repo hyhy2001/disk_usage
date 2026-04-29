@@ -1,0 +1,73 @@
+/* ==========================================================================
+   CUSTOM TOOLTIP — driven by tooltip.js
+   Singleton <div id="js-tooltip"> appended to <body>.
+   Reads data-tooltip="" on any element. Immune to stacking context.
+   ========================================================================== */
+
+#js-tooltip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 99999;
+    /* Solid dark background — no backdrop-filter (causes blur rectangle artifact) */
+    background: rgba(10, 14, 22, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 8px;
+    padding: 6px 11px;
+    /* Typography */
+    font-size: 0.71rem;
+    font-weight: 500;
+    font-family: inherit;
+    color: #e2e8f0;
+    letter-spacing: 0.015em;
+    line-height: 1.4;
+    white-space: pre;
+    text-align: left;
+    pointer-events: none;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.04);
+    /* Hidden by default */
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+#js-tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Downward arrow (tooltip above element) */
+#js-tooltip[data-arrow="down"]::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: rgba(255, 255, 255, 0.13);
+}
+
+/* Upward arrow (tooltip below element) */
+#js-tooltip[data-arrow="up"]::after {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-bottom-color: rgba(255, 255, 255, 0.13);
+}
+
+/* Light mode */
+:root[data-theme='light'] #js-tooltip {
+    background: rgba(15, 20, 30, 0.90);
+    border-color: rgba(0, 0, 0, 0.2);
+    color: #f1f5f9;
+}
+:root[data-theme='light'] #js-tooltip[data-arrow="down"]::after {
+    border-top-color: rgba(0, 0, 0, 0.2);
+}
+:root[data-theme='light'] #js-tooltip[data-arrow="up"]::after {
+    border-bottom-color: rgba(0, 0, 0, 0.2);
+}
+

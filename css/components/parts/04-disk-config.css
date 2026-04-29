@@ -1,0 +1,162 @@
+/* Nested Disk Configuration Styles */
+.disk-project-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 20px;
+}
+
+.disk-project-header {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    padding: 0 10px 8px 10px;
+    display: flex;
+    align-items: center;
+    user-select: none;
+    transition: color 0.2s ease;
+}
+
+.disk-project-header:hover {
+    color: var(--text-secondary);
+}
+
+.disk-team-group {
+    border-radius: 8px;
+    margin: 0;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.disk-team-group:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.disk-team-group.active-team {
+    background: rgba(16, 185, 129, 0.08); /* Emerald hint */
+    border-color: rgba(16, 185, 129, 0.2);
+}
+
+.disk-team-header {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    transition: color 0.2s ease;
+}
+
+.disk-team-group.active-team .disk-team-header {
+    color: var(--emerald-400);
+    font-weight: 600;
+}
+
+.disk-team-group.standalone {
+    margin: 0;
+}
+
+.disk-list-item.nested {
+    padding-left: 22px;
+}
+
+.disk-list-item.nested::before {
+    margin-left: 2px;
+}
+
+.disk-list-item {
+    padding: 8px 10px;
+    border-radius: 7px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    border: 1px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.disk-list-item::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.4;
+    flex-shrink: 0;
+}
+
+.disk-list-item:hover {
+    background: rgba(255,255,255,0.06);
+    color: var(--text-primary);
+}
+
+.disk-list-item.active {
+    background: rgba(16,185,129,0.12);
+    border-color: rgba(16,185,129,0.25);
+    color: var(--emerald-400);
+    /* TASK-09: Smooth active state transition */
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.disk-list-item.active::before {
+    opacity: 1;
+    background: var(--emerald-400);
+}
+
+.disk-list-item.loading {
+    color: #475569;
+    cursor: default;
+    font-style: italic;
+}
+
+
+.status-monitor {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.status-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.last-sync-time {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    margin-left: auto;
+    opacity: 0.8;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--text-secondary);
+    transition: var(--transition-smooth);
+}
+
+.status-dot.scanning {
+    background-color: var(--emerald-400);
+    box-shadow: 0 0 12px var(--emerald-400);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(52, 211, 153, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+

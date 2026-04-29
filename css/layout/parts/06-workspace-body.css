@@ -1,0 +1,75 @@
+/* -- Headers --------------------------------------------------------------- */
+.top-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Row 1: disk name + path + stats on one line */
+.header-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.header-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.header-sep {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    opacity: 0.4;
+    flex-shrink: 0;
+}
+
+.top-header h1 {
+    /* TASK-07: Fluid typography */
+    font-size: clamp(1.05rem, 2.5vw, 1.45rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+}
+
+.subtitle {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    padding-left: 2px;
+}
+
+.header-disk-path {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: #f59e0b;
+    opacity: 0.85;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+/* Shared Stat Bar -- compact inline variant */
+.page-stat-bar {
+    display: flex;
+    align-items: center;
+    padding: 8px 20px;
+    gap: 0;
+    flex-shrink: 0;
+    /* Allow stats to wrap on narrow content areas */
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+/* Metrics Grid - 3 Columns (kept for legacy if needed) */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+

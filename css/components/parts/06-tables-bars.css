@@ -1,0 +1,360 @@
+
+/* -----------------------------------------
+   Sidebar Navigation Items
+----------------------------------------- */
+.nav-links {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 28px;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 11px 14px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--border-radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    text-align: left;
+    transition: var(--transition-smooth);
+}
+
+.nav-item:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.nav-item.nav-active {
+    color: var(--text-accent);
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.25);
+}
+
+.nav-item.nav-active svg {
+    color: var(--emerald-400);
+}
+
+/* -----------------------------------------
+   SPA Page Sections
+----------------------------------------- */
+.page-section {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    opacity: 1;
+    min-width: 0;
+    transition: opacity 0.2s ease;
+}
+
+.page-hidden {
+    display: none !important;
+}
+
+.page-active {
+    display: flex;
+    animation: fadeInPage 0.25s ease-out;
+}
+
+@keyframes fadeInPage {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* -----------------------------------------
+   Column Resizer
+----------------------------------------- */
+.col-resizer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 150;
+    background: transparent;
+    transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.resizer-icon {
+    width: 12px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(40, 48, 60, 0.8);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    color: var(--text-muted, #94a3b8);
+    transition: all 0.2s;
+    /* ensure it bridges the edge well */
+    transform: translateX(0);
+}
+.col-resizer:hover, .col-resizer.active {
+    background: rgba(14, 165, 233, 0.3); /* Sky blue glow */
+}
+.col-resizer:hover .resizer-icon, .col-resizer.active .resizer-icon {
+    background: rgba(14, 165, 233, 0.2);
+    border-color: rgba(14, 165, 233, 0.4);
+    color: #38bdf8;
+    transform: scale(1.1);
+}
+@media (max-width: 850px) {
+    .col-resizer { display: none !important; }
+}
+
+/* -----------------------------------------
+   Generic Key/Value column
+----------------------------------------- */
+/* -----------------------------------------
+   Detail Page Panels
+----------------------------------------- */
+.detail-panel {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.panel-tag {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-accent);
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 100px;
+    padding: 3px 10px;
+    letter-spacing: 0.03em;
+}
+
+/* -----------------------------------------
+   Data Tables
+----------------------------------------- */
+.table-wrapper {
+    overflow-x: auto;
+    border-radius: var(--border-radius-sm);
+}
+
+.timeline-footer-table {
+    border-top: 1px solid rgba(255,255,255,0.06);
+    margin-top: 16px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 0 0 var(--border-radius-lg) var(--border-radius-lg);
+    overflow-x: auto;
+}
+
+.timeline-footer-table .data-table th {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.data-table thead th {
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    white-space: nowrap;
+}
+
+.data-table tbody tr {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    border-left: 2px solid transparent;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.data-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.data-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 2px solid var(--text-accent);
+    transform: translateX(4px);
+}
+
+.data-table tbody td {
+    padding: 11px 16px;
+    color: var(--text-primary);
+    vertical-align: middle;
+    font-feature-settings: 'tnum';
+}
+
+/* Colored text helpers for detail tables */
+.text-amber { color: #f59e0b; }
+
+/* Rank badge */
+.rank-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary);
+    min-width: 28px;
+}
+
+/* Team badge */
+.team-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 100px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: rgba(14, 165, 233, 0.12);
+    color: var(--sky-400);
+    border: 1px solid rgba(14, 165, 233, 0.2);
+}
+
+/* User name */
+.user-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+}
+
+/* Usage bar inside table */
+.usage-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 160px;
+}
+
+.usage-bar-wrap span {
+    font-size: 0.8rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary);
+    min-width: 40px;
+}
+
+.usage-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--emerald-500), var(--sky-500));
+    flex-shrink: 0;
+    max-width: 120px;
+    transition: width 0.6s ease;
+}
+
+/* Track wrapper for usage-bar -- visible in both modes */
+.usage-bar-wrap {
+    position: relative;
+    min-width: 160px;
+}
+.usage-bar-wrap::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 50%; transform: translateY(-50%);
+    width: 120px; height: 8px;
+    background: rgba(0,0,0,0.08);
+    border-radius: 4px;
+}
+:root:not([data-theme='light']) .usage-bar-wrap::before {
+    background: rgba(255,255,255,0.07);
+}
+
+/* -----------------------------------------
+   Detail Page -- General System Stat Bar
+----------------------------------------- */
+.detail-stat-bar {
+    display: flex;
+    align-items: center;
+    padding: 20px 32px;
+    gap: 0;
+}
+
+.stat-block {
+    flex: 1 1 auto;
+    min-width: 0;       /* allow flex item to shrink below its content */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    text-align: center;
+    padding: 0 8px;
+    overflow: hidden;   /* clip rather than overflow */
+}
+
+.stat-numbers-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    /* allow wrap so numbers don't overflow container */
+    flex-wrap: wrap;
+}
+
+/* Inline row: big number + small unit side-by-side */
+.stat-num-row {
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
+}
+
+.stat-number {
+    /* Fluid: scales from 1rem to 1.3rem based on viewport */
+    font-size: clamp(0.85rem, 2.5cqi, 1.3rem);
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+}
+
+.stat-number.text-rose { color: var(--rose-500); }
+.stat-number.text-amber { color: #f59e0b; }
+
+.stat-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-secondary);
+}
+
+.stat-unit {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-secondary);
+    opacity: 0.8;
+    vertical-align: middle;
+    display: inline;
+}
+
+.stat-divider {
+    width: 1px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+    margin: 0 4px;
+}
+
+:root[data-theme='light'] .stat-divider {
+    background: rgba(0,0,0,0.07);
+}
+
+/* -----------------------------------------

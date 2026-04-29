@@ -1,0 +1,380 @@
+/* ===========================================================================
+   USER FILTER BOX -- Vertical sidebar with search + scrollable list
+   =========================================================================== */
+
+/* History main row: filter box left + content right */
+.history-main-row {
+    display: flex;
+    flex-wrap: wrap;    /* filter box drops below on narrow screens */
+    gap: 14px;
+    align-items: stretch;
+}
+
+/* Desktop viewport-fit for History + Permission tabs:
+   keep filter/search panel and main chart/list fitting the screen height,
+   and only scroll user lists when content exceeds available space. */
+@media (min-width: 1101px) {
+    #tab-pane-history.detail-tab-pane.active {
+        min-height: 0;
+        height: calc(100dvh - 330px);
+        max-height: calc(100dvh - 330px);
+        overflow: hidden;
+    }
+
+    #tab-pane-history .history-layout {
+        min-height: 0;
+        height: 100%;
+        max-height: 100%;
+        overflow: hidden;
+    }
+
+    #tab-pane-permissions.detail-tab-pane.active {
+        min-height: 0;
+        height: calc(100dvh - 330px);
+        max-height: calc(100dvh - 330px);
+        overflow: hidden;
+    }
+
+    #tab-pane-permissions #permissions-body {
+        min-height: 0;
+        height: 100%;
+        overflow: hidden;
+    }
+
+    #tab-pane-permissions .perm-meta,
+    #tab-pane-permissions .perm-summary-bar {
+        flex-shrink: 0;
+    }
+
+    #tab-pane-permissions .history-main-row {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto;
+    }
+
+    #tab-pane-permissions .history-main-row > .user-filter-box,
+    #tab-pane-permissions .history-main-row > .history-content {
+        min-height: 0;
+        height: 100%;
+    }
+
+    #tab-pane-history .history-main-row {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto;
+    }
+
+    #tab-pane-history .history-timerange {
+        flex-shrink: 0;
+    }
+
+    #tab-pane-history .history-main-row {
+        flex-wrap: nowrap;
+        align-items: stretch;
+        overflow: hidden;
+    }
+
+    #tab-pane-permissions .history-main-row {
+        flex-wrap: nowrap;
+        align-items: stretch;
+        overflow: hidden;
+    }
+
+    #tab-pane-history .history-content,
+    #tab-pane-permissions .history-content {
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    #tab-pane-history .user-filter-box,
+    #tab-pane-permissions .user-filter-box {
+        align-self: stretch;
+        min-height: 0;
+        max-height: 100%;
+    }
+
+    #tab-pane-history .user-filter-list,
+    #tab-pane-permissions .user-filter-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
+        overflow-y: auto;
+    }
+
+    #tab-pane-history .history-chart-card {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: 100%;
+        max-height: min(56dvh, calc(100dvh - 390px));
+    }
+
+    #tab-pane-history .history-chart-body {
+        height: auto;
+        min-height: 180px;
+        flex: 1 1 auto;
+    }
+
+    #tab-pane-permissions .perm-flat-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: 100%;
+        max-height: none;
+        overflow-y: auto;
+    }
+
+    #tab-pane-permissions .history-main-row { overflow: hidden; }
+}
+
+.history-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* The filter panel box */
+.user-filter-box {
+    /* Fluid: preferred 220px, shrinks to 180px min, won't grow beyond 260px */
+    width: clamp(180px, 22%, 260px);
+    flex-shrink: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px;
+    align-self: flex-start;
+    min-height: 0;
+    max-height: min(64dvh, calc(100dvh - 260px));
+}
+
+/* Container query: when content < 560px, filter goes full-width above list */
+@container main (max-width: 560px) {
+    .user-filter-box {
+        width: 100%;
+        max-height: min(60dvh, calc(100dvh - 260px));
+        overflow: hidden;
+        align-self: stretch;
+    }
+
+    .history-content {
+        min-width: 0;
+    }
+}
+
+.user-filter-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2px;
+}
+
+.user-filter-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-secondary);
+}
+
+.user-filter-count {
+    font-size: 0.7rem;
+    color: #fbbf24;
+    font-weight: 600;
+    background: rgba(245,158,11,0.12);
+    border: 1px solid rgba(245,158,11,0.3);
+    padding: 1px 7px;
+    border-radius: 20px;
+}
+
+.user-filter-search {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    font-family: inherit;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.15s;
+}
+.user-filter-search:focus { border-color: rgba(245,158,11,0.4); }
+
+/* Wraps each filter group (type, path, users) */
+.perm-filter-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.perm-filter-section:last-child { border-bottom: none; padding-bottom: 0; }
+
+.perm-filter-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+/* File / Dir type toggle buttons */
+.perm-type-group {
+    display: flex;
+    gap: 4px;
+}
+
+.perm-type-btn {
+    flex: 1;
+    padding: 4px 6px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.14s;
+    letter-spacing: 0.03em;
+}
+.perm-type-btn:hover { background: rgba(255,255,255,0.09); color: var(--text-primary); }
+.perm-type-btn.active {
+    background: rgba(14,165,233,0.15);
+    border-color: rgba(14,165,233,0.4);
+    color: #38bdf8;
+}
+
+:root[data-theme='light'] .perm-type-btn {
+    background: rgba(0,0,0,0.04);
+    border-color: rgba(0,0,0,0.08);
+    color: #6B7280;
+}
+:root[data-theme='light'] .perm-type-btn:hover {
+    background: rgba(0,0,0,0.08);
+    color: #374151;
+}
+:root[data-theme='light'] .perm-type-btn.active {
+    background: rgba(14,165,233,0.11);
+    border-color: rgba(14,165,233,0.35);
+    color: #0369a1;
+}
+
+/* Ensure sidebar keeps viewport-fit and lets user list scroll */
+.user-filter-box { overflow: hidden; }
+
+.user-filter-footer .user-bar-btn { flex: 1; text-align: center; }
+
+
+
+.user-filter-list {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+    max-height: min(38dvh, 300px);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding-bottom: 6px;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+/* Permission tab: keep user list scrollable in all layout modes */
+#tab-pane-permissions .perm-filter-section:last-child {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+#tab-pane-permissions .user-filter-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    -webkit-overflow-scrolling: touch;
+}
+
+#tab-pane-permissions .user-filter-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+#tab-pane-permissions .user-filter-list::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.18);
+    border-radius: 8px;
+}
+
+#tab-pane-permissions .user-filter-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+
+.user-filter-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    transition: background 0.12s, color 0.12s;
+    user-select: none;
+}
+.user-filter-item:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
+.user-filter-item.selected { background: rgba(245,158,11,0.1); color: #fbbf24; }
+
+.user-filter-check {
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid rgba(255,255,255,0.2);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    transition: background 0.12s, border-color 0.12s;
+}
+.user-filter-item.selected .user-filter-check {
+    background: #f59e0b;
+    border-color: #f59e0b;
+    color: #000;
+}
+
+.user-filter-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.user-filter-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 4px 0; }
+
+.user-filter-footer {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding-top: 8px;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.user-filter-footer .user-bar-btn {
+    flex: 1;
+    text-align: center;
+    padding: 3px 10px;
+    min-height: 30px;
+    font-size: 0.72rem;
+    border-radius: 7px;
+}
+
+

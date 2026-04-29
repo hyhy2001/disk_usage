@@ -1,0 +1,142 @@
+
+/* Metric Display Cards */
+.metric-card {
+    padding: 24px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    transition: var(--transition-smooth);
+}
+
+.metric-card:hover {
+    background: var(--bg-surface-elevated);
+    transform: translateY(-2px);
+}
+
+.metric-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--border-radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.metric-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.metric-label {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.metric-value {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.metric-value .number {
+    font-size: 2rem;
+    color: #ffffff;
+}
+
+.metric-value .unit {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* Status Monitor (Sidebar) */
+.status-monitor {
+    margin-top: auto;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--border-radius-md);
+}
+
+/* Sidebar clock */
+.sidebar-clock {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.06em;
+    margin-top: 4px;
+    opacity: 0.8;
+}
+
+/* Disk selector — stretches to fill remaining sidebar space */
+.disk-selector-wrap {
+    padding: 10px 12px 6px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    margin: 4px 0;
+    /* Grow to fill gap between nav and status monitor */
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* critical for flex overflow */
+}
+
+.disk-selector-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #475569;
+    margin-bottom: 6px;
+}
+
+.disk-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    /* Grow to fill all available height inside disk-selector-wrap */
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+.disk-list::-webkit-scrollbar { width: 4px; }
+.disk-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+
+.disk-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 7px;
+    padding: 5px 10px;
+    margin-bottom: 6px;
+}
+
+.disk-search-icon {
+    color: #475569;
+    flex-shrink: 0;
+}
+
+.disk-search-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    width: 100%;
+    font-family: inherit;
+}
+
+.disk-search-input::placeholder {
+    color: #475569;
+}
+

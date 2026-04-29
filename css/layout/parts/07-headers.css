@@ -1,0 +1,111 @@
+/* -- Charts Grid ----------------------------------------------------------- */
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    /* Prevent grid from overflowing its container */
+    min-width: 0;
+    width: 100%;
+}
+
+
+
+.large-span {
+    grid-column: 1 / -1;
+}
+
+.chart-container {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 350px;
+    /* CRITICAL: prevents grid/flex children from overflowing their container */
+    min-width: 0;
+    width: 100%;
+    position: relative; /* Context for empty overlay */
+    /* NOTE: no overflow:hidden -- would clip Chart.js tooltips and expand buttons */
+}
+
+
+
+.panel-header h2 {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+/* Timeline chart header with right-aligned range buttons */
+.timeline-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-direction: row;
+    padding-bottom: 4px;
+}
+
+.chart-range-btns {
+    display: flex;
+    gap: 4px;
+}
+
+.range-btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text-secondary, #94a3b8);
+    font-size: 0.72rem;
+    font-weight: 600;
+    /* TASK-01: Minimum touch target */
+    padding: 6px 10px;
+    min-height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+
+.range-btn:hover {
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+}
+
+.range-btn.active {
+    background: rgba(245,158,11,0.18);
+    border-color: #f59e0b;
+    color: #f59e0b;
+}
+
+/* Stats subheader below chart title */
+.timeline-title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.timeline-stat-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-family: 'Inter', sans-serif;
+}
+
+.tsh-value {
+    /* TASK-07: Fluid typography */
+    font-size: clamp(1rem, 2vw, 1.3rem);
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+}
+
+.tsh-delta {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.tsh-up   { color: #10b981; }
+.tsh-down { color: #f43f5e; }
+
+.canvas-wrapper {
+    flex: 1;
+    position: relative;

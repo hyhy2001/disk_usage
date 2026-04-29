@@ -1,0 +1,56 @@
+/* ==========================================================================
+   TASK-05: Empty State Design
+   ========================================================================== */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 52px 40px;
+    gap: 12px;
+}
+
+.empty-state-icon {
+    width: 52px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 16px;
+    background: rgba(245,158,11,0.1);
+    border: 1px solid rgba(245,158,11,0.2);
+    color: #f59e0b;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+}
+
+.empty-state h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.empty-state p {
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0;
+    max-width: 320px;
+}
+
+/* Variant: emerald tint (for no-data-yet states) */
+.empty-state.variant-emerald .empty-state-icon {
+    background: rgba(16,185,129,0.1);
+    border-color: rgba(16,185,129,0.2);
+    color: var(--emerald-400);
+}
+
+/* Variant: rose tint (error states) */
+.empty-state.variant-rose .empty-state-icon {
+    background: rgba(244,63,94,0.1);
+    border-color: rgba(244,63,94,0.2);
+    color: var(--rose-400);
+}
+

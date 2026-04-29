@@ -1,0 +1,15 @@
+
+/* -- Team Selector Wrapper -- */
+.team-selector-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 1;
+    min-height: 0; /* Important for scrollable children in flex column */
+}
+.team-flyout-trigger {
+    display: none;
+}
+
+

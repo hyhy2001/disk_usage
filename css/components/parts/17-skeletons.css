@@ -1,0 +1,58 @@
+/* ==========================================================================
+   TASK-04: Skeleton Loading States
+   ========================================================================== */
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        rgba(255,255,255,0.04) 25%,
+        rgba(255,255,255,0.09) 50%,
+        rgba(255,255,255,0.04) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.6s infinite linear;
+    border-radius: 6px;
+    pointer-events: none;
+}
+
+:root[data-theme='light'] .skeleton {
+    background: linear-gradient(
+        90deg,
+        rgba(0,0,0,0.05) 25%,
+        rgba(0,0,0,0.1) 50%,
+        rgba(0,0,0,0.05) 75%
+    );
+    background-size: 200% 100%;
+}
+
+@keyframes skeletonShimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Skeleton variants */
+.skeleton-disk-item {
+    height: 34px;
+    margin-bottom: 4px;
+    border-radius: 7px;
+}
+
+.skeleton-row {
+    height: 40px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+}
+
+.skeleton-line {
+    height: 14px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+}
+
+.skeleton-line.short { width: 60%; }
+.skeleton-line.medium { width: 80%; }
+.skeleton-line.full { width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+    .skeleton { animation: none; opacity: 0.6; }
+}
+

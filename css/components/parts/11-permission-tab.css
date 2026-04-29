@@ -1,0 +1,137 @@
+/* ===========================================================================
+   PERMISSION ISSUES TAB
+   =========================================================================== */
+
+#permissions-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.perm-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    flex-wrap: wrap;
+}
+
+.perm-meta-date { color: #f59e0b; font-weight: 500; }
+
+.perm-meta-dir {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+}
+
+.perm-summary-bar {
+    display: flex;
+    align-items: stretch;
+    padding: 16px 24px;
+}
+
+.perm-summary-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+}
+
+.perm-summary-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.perm-summary-label {
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+}
+
+.perm-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.perm-user-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px 20px;
+}
+
+.perm-user-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.perm-user-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.perm-items {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.perm-item {
+    display: grid;
+    grid-template-columns: 20px 1fr 80px 1fr;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.04);
+    font-size: 0.75rem;
+}
+
+.perm-item > * {
+    min-width: 0;
+}
+
+.perm-item:hover { background: rgba(255,255,255,0.05); }
+
+.perm-item-icon { font-size: 0.9rem; text-align: center; }
+
+.perm-item-path {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.71rem;
+    color: var(--text-primary);
+    word-break: break-all;
+}
+
+.perm-item-type {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1px 7px;
+    border-radius: 4px;
+    background: rgba(56,189,248,0.1);
+    color: #38bdf8;
+    font-size: 0.65rem;
+    font-weight: 500;
+    border: 1px solid rgba(56,189,248,0.2);
+    white-space: nowrap;
+}
+
+.perm-item-error {
+    font-size: 0.7rem;
+    color: #fb7185;
+    font-style: italic;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+

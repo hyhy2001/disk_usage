@@ -1,0 +1,18 @@
+/* -- Workspace Body container (3-col flex) --------------------------------- */
+.workspace-body {
+    min-height: 0;
+    min-width: 0;
+    overflow: visible;
+}
+
+/* Workspace canvas: right-side work area */
+.workspace-canvas {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: visible;
+}
+
+
