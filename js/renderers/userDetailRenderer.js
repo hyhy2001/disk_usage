@@ -698,6 +698,19 @@ async function _fetchApiText(url, options) {
     return res.text();
 }
 
+function _parseApiJson(text) {
+    try {
+        return JSON.parse(text);
+    } catch (_jsonErr) {
+        try {
+            return JSON.parse(atob(text));
+        } catch (_b64Err) {
+            const preview = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+            throw new Error(preview ? `Invalid API response: ${preview}` : 'Invalid API response');
+        }
+    }
+}
+
 async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE) {
     if (_abortCtrl) _abortCtrl.abort();
     _abortCtrl = new AbortController();
@@ -708,8 +721,7 @@ async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE) {
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
 
     const text = await _fetchApiText(url, { signal: _abortCtrl.signal });
-    let json;
-    try { json = JSON.parse(text); } catch { json = JSON.parse(atob(text)); }
+    const json = _parseApiJson(text);
     if (json.status !== 'success') throw new Error(json.message || 'API error');
     return json.data.dir;
 }
@@ -725,8 +737,7 @@ async function _fetchDetail(diskId, user, dirOffset = 0, fileOffset = 0, limit =
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
 
     const text = await _fetchApiText(url, { signal: _abortCtrl.signal });
-    let json;
-    try { json = JSON.parse(text); } catch { json = JSON.parse(atob(text)); }
+    const json = _parseApiJson(text);
     if (json.status !== 'success') throw new Error(json.message || 'API error');
     return json.data;
 }
@@ -740,8 +751,7 @@ async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE) {
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
 
     const text = await _fetchApiText(url);
-    let json;
-    try { json = JSON.parse(text); } catch { json = JSON.parse(atob(text)); }
+    const json = _parseApiJson(text);
     if (json.status !== 'success') throw new Error(json.message || 'API error');
     return json.data.file;
 }
@@ -766,8 +776,7 @@ async function _fetchDirCount(diskId, user) {
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
     try {
         const text = await _fetchApiText(url);
-        let json;
-        try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { return null; } }
+        const json = _parseApiJson(text);
         return (json?.status === 'success') ? (json.data.dir_count ?? null) : null;
     } catch (_err) {
         return null;
@@ -783,8 +792,7 @@ async function _fetchFileCount(diskId, user) {
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
     try {
         const text = await _fetchApiText(url);
-        let json;
-        try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { return null; } }
+        const json = _parseApiJson(text);
         return (json?.status === 'success') ? (json.data.file_count ?? null) : null;
     } catch (_err) {
         return null;
