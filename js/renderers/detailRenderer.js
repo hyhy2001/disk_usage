@@ -334,7 +334,9 @@ export function applyFilters() {
     }
 
     // ── History charts ──────────────────────────────────────────────────────
-    if (chartMgr) {
+    const historyPane = document.getElementById('tab-pane-history');
+    const shouldRenderHistoryChart = !!(historyPane && historyPane.classList.contains('active'));
+    if (chartMgr && shouldRenderHistoryChart) {
         if (pivotUsers && f.selectedUsers && f.selectedUsers.length > 0) {
             chartMgr.renderUserTrendChart(_store.userTimelineMap, pivotUsers, f.startMs, f.endMs, _logScale);
         } else {
@@ -398,6 +400,12 @@ function initDetailTabs() {
             document.querySelectorAll('.detail-tab-pane').forEach(p => p.classList.remove('active'));
             document.getElementById(`tab-pane-${target}`)?.classList.add('active');
             saveFilters({ activeTab: target });
+            if (target === 'history') {
+                requestAnimationFrame(() => {
+                    applyFilters();
+                    requestAnimationFrame(() => AppState.chartManagerInstance?._resizeAll?.());
+                });
+            }
         });
     });
 

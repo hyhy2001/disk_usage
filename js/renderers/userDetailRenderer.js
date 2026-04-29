@@ -2,9 +2,7 @@
 // userDetailRenderer.js — Renders per-user detail reports (dirs + files)
 
 import { fmt, fmtDateSec }                  from '../utils/formatters.js';
-import { AppState }             from '../core/main.js';
-import { downloadCsv, downloadZip, streamExportGzip, toCsv }  from '../utils/csvExport.js';
-import { showToast, showProgressToast, updateProgressToast, closeProgressToast } from '../core/main.js';
+import { AppState, showToast }             from '../core/main.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _selectedUser   = localStorage.getItem('ud_selected_user') || null;
@@ -1193,106 +1191,56 @@ const UD_BTN_SPINNER_SVG = `
     </svg>
 </span>`;
 
-async function _udExportDirs() {
+function _buildUserCsvExportUrl(kind) {
+    const b64User = btoa(unescape(encodeURIComponent(_selectedUser)));
+    const params = new URLSearchParams({
+        id: _currentDisk,
+        type: kind === 'dirs' ? 'dirs_csv' : 'files_csv',
+        user_b64: b64User,
+        filter_query: _currentFilters.query || '',
+        filter_ext: _currentFilters.ext || '',
+        filter_min_size: _currentFilters.minSize || 0,
+        filter_max_size: _currentFilters.maxSize || 0
+    });
+    return 'api.php?' + params.toString();
+}
+
+function _downloadUserCsvExport(kind) {
+    const a = document.createElement('a');
+    a.href = _buildUserCsvExportUrl(kind);
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 1000);
+}
+
+function _startUserCsvExport(kind) {
     if (!_currentDisk || !_selectedUser) return;
-    const btn = document.querySelector('#ud-export-dirs-user');
-    
+
+    const btn = document.querySelector(kind === 'dirs' ? '#ud-export-dirs-user' : '#ud-export-files-user');
     const originalBtnHTML = btn ? btn.innerHTML : '';
-    if (btn) { btn.disabled = true; btn.innerHTML = UD_BTN_SPINNER_SVG; }
-
-    try {
-        const headers = ['User', 'Path', 'Used (bytes)'];
-        const suggestedName = `dirs_${_currentDisk}_${_selectedUser}`;
-        const formatRow = (row, h) => ({ User: row.user, Path: row.path, 'Used (bytes)': row.used })[h] ?? '';
-        
-        let offset = 0;
-        const limit = 10000;
-        const b64User = btoa(unescape(encodeURIComponent(_selectedUser)));
-        let processedTotal = 0;
-
-        const fetchChunk = async () => {
-            const params = new URLSearchParams({ id: _currentDisk, type: 'dirs', user_b64: b64User, offset, limit, filter_query: _currentFilters.query, filter_min_size: _currentFilters.minSize, filter_max_size: _currentFilters.maxSize, filter_ext: _currentFilters.ext });
-            const res = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-            const text = await res.text();
-            let json;
-            try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { throw new Error('Invalid JSON response'); } }
-            if (json?.status !== 'success') throw new Error(json?.message || 'API error');
-
-            const dirs    = json.data.dir.dirs || [];
-            const rows    = dirs.map(d => ({ user: _selectedUser, path: d.path, used: d.used }));
-            const hasMore = json.data.dir.has_more && dirs.length > 0;
-
-            offset         += limit;
-            processedTotal += rows.length;
-            // Show running count — avoids fake 100% from underestimated total_dirs
-            updateProgressToast('export-dirs', hasMore ? 50 : 99, `Streaming directories: ${processedTotal.toLocaleString()} rows${hasMore ? '...' : ''}`);
-
-            return { rows, isLast: !hasMore };
-        };
-        
-        showProgressToast('export-dirs', 'Streaming directories...');
-        const streamed = await streamExportGzip(suggestedName, headers, fetchChunk, formatRow);
-        if (streamed) showToast('Export Complete', 'Exported directories directly to disk (.gz)', 'success');
-        
-    } catch (err) {
-        if (err.name !== 'AbortError') alert('Export failed: ' + err.message);
-    } finally {
-        closeProgressToast('export-dirs');
-        if (btn) { btn.disabled = false; btn.innerHTML = originalBtnHTML; }
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = UD_BTN_SPINNER_SVG;
     }
+
+    _downloadUserCsvExport(kind);
+    showToast('Export Started', 'CSV export started. If all export slots are busy, the server will queue this download automatically.', 'info');
+
+    setTimeout(() => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalBtnHTML;
+        }
+    }, 2500);
+}
+
+async function _udExportDirs() {
+    _startUserCsvExport('dirs');
 }
 
 async function _udExportFiles() {
-    if (!_currentDisk || !_selectedUser) return;
-    const btn = document.querySelector('#ud-export-files-user');
-
-    const originalBtnHTML = btn ? btn.innerHTML : '';
-    if (btn) { btn.disabled = true; btn.innerHTML = UD_BTN_SPINNER_SVG; }
-
-    try {
-        const headers = ['User', 'Path', 'Size (bytes)'];
-        const suggestedName = `files_${_currentDisk}_${_selectedUser}`;
-        const formatRow = (row, h) => ({ User: row.user, Path: row.path, 'Size (bytes)': row.size })[h] ?? '';
-        
-        let offset = 0;
-        const limit = 10000;
-        const b64User = btoa(unescape(encodeURIComponent(_selectedUser)));
-        let processedTotal = 0;
-
-        const fetchChunk = async () => {
-            const params = new URLSearchParams({ id: _currentDisk, type: 'files', user_b64: b64User, offset, limit, filter_query: _currentFilters.query, filter_ext: _currentFilters.ext, filter_min_size: _currentFilters.minSize });
-            const res = await fetch('api.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-            const text = await res.text();
-            let json;
-            try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { throw new Error('Invalid JSON response'); } }
-            if (json?.status !== 'success') throw new Error(json?.message || 'API error');
-
-            const files   = json.data.file.files || [];
-            const rows    = files.map(f => ({ user: _selectedUser, path: f.path, size: f.size }));
-            const hasMore = json.data.file.has_more && files.length > 0;
-
-            offset         += limit;
-            processedTotal += rows.length;
-            // Show running count — avoids fake 100% from underestimated total_files
-            updateProgressToast('export-files', hasMore ? 50 : 99, `Streaming files: ${processedTotal.toLocaleString()} rows${hasMore ? '...' : ''}`);
-
-            return { rows, isLast: !hasMore };
-        };
-        
-        showProgressToast('export-files', 'Streaming files...');
-        const streamed = await streamExportGzip(suggestedName, headers, fetchChunk, formatRow);
-        if (streamed) showToast('Export Complete', 'Exported files directly to disk (.gz)', 'success');
-        
-    } catch (err) {
-        if (err.name !== 'AbortError') alert('Export failed: ' + err.message);
-    } finally {
-        closeProgressToast('export-files');
-        if (btn) { btn.disabled = false; btn.innerHTML = originalBtnHTML; }
-    }
+    _startUserCsvExport('files');
 }
 
 

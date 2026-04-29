@@ -43,6 +43,8 @@ export class ChartManager {
         };
 
         Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.animation = false;
+        Chart.defaults.animations = false;
         this._updateChartDefaults();
 
         // Re-theme all charts when user toggles light/dark — NO data re-fetch

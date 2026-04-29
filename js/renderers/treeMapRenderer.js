@@ -43,6 +43,7 @@ function getPercentOfDisk(value) {
 function formatPercent(pct) {
     if (pct >= 10) return pct.toFixed(1) + '%';
     if (pct >= 1) return pct.toFixed(2) + '%';
+    if (pct >= 0.01) return pct.toFixed(2) + '%';
     if (pct > 0) return '<0.01%';
     return '0%';
 }
