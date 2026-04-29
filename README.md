@@ -115,16 +115,23 @@ Returns the top-directory breakdown for a single user.
 
 Reads `detail_users/data_detail.db` and returns paginated file rows. Responses are JSON; the frontend only falls back to base64 parsing for older cached responses.
 
-### File Matching (Wildcard Support)
+### File Matching
 
-The API auto-discovers report files using case-insensitive substring matching — no exact filenames
-required. Supported patterns:
+The API discovers report files from each disk `path` using the backend rules below:
 
-| File type | Matched patterns |
-|-----------|----------------|
-| Usage reports | `*disk_usage_report*.json`, `*usage_report*.json`, `report_*.json`, `report-*.json` |
-| Permission files | `*permission_issue*.json`, `*permission_issues*.json` (singular or plural, any prefix/suffix) |
-| Excluded | `*detail_report*.json` (per-user reports, separate endpoint) |
+| Data type | Location | Matching rule |
+|-----------|----------|---------------|
+| Main usage/history reports | disk path root | JSON filenames containing `disk_usage_report` or `usage_report`, or starting with `report_` / `report-` |
+| Main report exclusions | disk path root | Files containing `permission_issue`, `detail_report`, or `inode_usage` are excluded from main usage/history aggregation |
+| Permission issues | disk path root | Latest JSON file whose name contains `permission_issue` |
+| Inode usage fallback | disk path root | Latest JSON file matching `*inode_usage_report*.json` |
+| Unified user detail | `detail_users/` | Preferred file is `data_detail.db` |
+| Legacy directory detail fallback | `detail_users/` | `detail_report_dir_<user>.json`, `detail_report_dirs_<user>.json`, or the same names with any prefix ending in `_` |
+| Legacy file detail fallback | `detail_users/` | `detail_report_file_<user>.json`, `detail_report_files_<user>.json`, or the same names with any prefix ending in `_` |
+| Treemap index | disk path root | Latest JSON file containing `tree_map_report` or `treemap_report` |
+| Treemap shard fallback | `tree_map_shards/` | `<shard_id>.json` when `tree_map_data.db` is unavailable |
+
+For user detail, `data_detail.db` takes precedence over legacy per-user JSON files.
 
 ### Request Flow
 
