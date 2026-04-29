@@ -103,13 +103,17 @@ Returns combined JSON with `history[]`, `latest` snapshot, team usage, user usag
 
 Returns `{ users: [{name, used}] }` — all users with detail reports for this disk.
 
-#### `?id=<disk_id>&type=dirs&user=<username>` — Directory report
+#### `?id=<disk_id>&type=detail&user_b64=<base64_username>` — Unified user detail
+
+Returns directory and file breakdowns for a single user in one JSON response. Usernames are sent as UTF-8 base64 via `user_b64` so spaces, Unicode, and system account names are handled safely.
+
+#### `?id=<disk_id>&type=dirs&user_b64=<base64_username>` — Directory report
 
 Returns the top-directory breakdown for a single user.
 
-#### `?id=<disk_id>&type=files&user=<username>&offset=N&limit=M` — Paginated file report
+#### `?id=<disk_id>&type=files&user_b64=<base64_username>&offset=N&limit=M` — Paginated file report
 
-Streams line-by-line (O(page_size) RAM, safe for 100 MB+ JSON files).
+Reads `detail_users/data_detail.db` and returns paginated file rows. Responses are JSON; the frontend only falls back to base64 parsing for older cached responses.
 
 ### File Matching (Wildcard Support)
 
@@ -131,11 +135,11 @@ Browser
   │
   ├── GET api.php?id=disk_sda&type=users    ← list users with detail reports
   │
-  ├── GET api.php?id=disk_sda&type=dirs     ← top directories for a user
-  │     &user=alice
+  ├── GET api.php?id=disk_sda&type=detail   ← dirs + files for a user
+  │     &user_b64=YWxpY2U=
   │
   ├── GET api.php?id=disk_sda&type=files    ← paginated file list for a user
-  │     &user=alice&offset=0&limit=500
+  │     &user_b64=YWxpY2U=&offset=0&limit=500
   │
   └── GET api.php?id=disk_sda              ← paginated permission issues
         &type=permissions                     with optional filters
@@ -198,8 +202,30 @@ cd disk_usage
 Each `path` directory should contain:
 - `disk_usage_report*.json` — one or more dated reports from check_disk
 - `permission_issue*.json` — permission scan output (optional)
-- `detail_report_dir_<user>.json` — per-user directory breakdown (optional)
-- `detail_report_file_<user>.json` — per-user file list (optional, can be 100 MB+)
+- `detail_users/data_detail.db` — unified per-user directory and file detail database (optional)
+- `tree_map_data.db` — treemap data database (optional)
+
+### SQLite report schemas
+
+`detail_users/data_detail.db` is the unified Detail User database. The dashboard reads these tables:
+
+| Table | Key columns | Purpose |
+|-------|-------------|---------|
+| `users` | `user_id`, `username`, `scan_date`, `total_dirs`, `total_files`, `total_used` | Per-user metadata and totals |
+| `dir_detail` | `user_id`, `dir_id`, `size` | Directory usage rows |
+| `file_detail` | `user_id`, `dir_id`, `basename_id`, `ext_id`, `size` | File usage rows |
+| `dirs_dict` | `dir_id`, `path` | Directory path dictionary |
+| `basename_dict` | `basename_id`, `basename` | File basename dictionary |
+| `ext_dict` | `ext_id`, `ext` | File extension dictionary |
+| `user_meta` | `username` | User list fallback for older/newer scanner output |
+
+`tree_map_data.db` stores lazy-loaded treemap shards:
+
+| Table | Key columns | Purpose |
+|-------|-------------|---------|
+| `shards` | `id`, `path`, `data` | One treemap shard per row; `data` is JSON text or zlib-compressed JSON |
+
+Shard JSON items may use either the compact scanner format `{id, name, size, owner, children_count}` or the dashboard format `{shard_id, name, value, type, owner, has_children, path}`; the API normalizes both before returning JSON.
 
 ---
 
@@ -260,15 +286,20 @@ No server required; everything runs client-side.
 
 ```bash
 # Snapshot + history
-curl "http://localhost/disk_usage/api.php?id=disk_sda" | base64 -d | python3 -m json.tool | head -30
+curl "http://localhost/disk_usage/api.php?id=disk_sda" | python3 -m json.tool | head -30
 
 # Permission issues with filters
 curl "http://localhost/disk_usage/api.php?id=disk_sda&type=permissions&item_type=file&path=/var/log&limit=10" \
-  | base64 -d | python3 -m json.tool
+  | python3 -m json.tool
+
+# Unified user detail (UTF-8 username encoded as base64)
+USER_B64="$(printf '%s' 'user1' | base64 | tr -d '\n')"
+curl "http://localhost/disk_usage/api.php?id=disk_sda&type=detail&user_b64=${USER_B64}&dir_offset=0&file_offset=0&limit=50" \
+  | python3 -m json.tool | head -30
 
 # Per-user files (paginated)
-curl "http://localhost/disk_usage/api.php?id=disk_sda&type=files&user=user1&offset=0&limit=50" \
-  | base64 -d | python3 -m json.tool | head -30
+curl "http://localhost/disk_usage/api.php?id=disk_sda&type=files&user_b64=${USER_B64}&offset=0&limit=50" \
+  | python3 -m json.tool | head -30
 ```
 
 ### CSV Export
@@ -303,11 +334,12 @@ check_disk (CLI, server-side)
   └── Scans filesystem → writes JSON to report_dir/
         ├── disk_usage_report_20260322.json      (snapshot + dirs + users)
         ├── permission_issues_20260322.json       (inaccessible paths)
-        └── detail_report_file_alice.json         (can be 100 MB+, all files)
+        ├── detail_users/data_detail.db           (unified per-user dirs/files)
+        └── tree_map_data.db                      (treemap shards/search)
 
 api.php (PHP, web server)
   ├── Aggregates all disk_usage_report*.json → history timeline
-  ├── Streams detail_report_file_*.json line-by-line → O(page_size) RAM
+  ├── Reads detail_users/data_detail.db → paginated user detail JSON
   └── Filters permission_issue*.json server-side → paginated JSON
 
 Browser (Vanilla JS, no framework)
