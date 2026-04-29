@@ -1328,8 +1328,12 @@ class DataFetcher {
             if (json?.status === 'success') {
                 if (this._activeDisk !== diskId) return;
                 this._treeMapLoaded = true;
+
+                const stats = this.dataStore?.latestStats || {};
+                const diskTotal = stats.total || 0;
+
                 document.dispatchEvent(new CustomEvent('treemapLoaded', {
-                    detail: json.data ? { diskId, ...json.data } : { diskId },
+                    detail: json.data ? { diskId, diskTotal, ...json.data } : { diskId, diskTotal },
                 }));
                 return;
             }

@@ -2,6 +2,7 @@ import { showToast } from '../core/main.js';
 import { fmt } from '../utils/formatters.js';
 
 let _diskId = null;
+let _diskTotal = 0;
 let _rootNode = null;
 let _currentNode = null;
 let _searchQuery = '';
@@ -28,12 +29,13 @@ const _searchInflight = {};  // key => Promise
 let _listDelegationBound = false;
 let _lastRenderedNodeState = null;
 
-function getRootTotalSize() {
+function getDiskTotalSize() {
+    if (_diskTotal > 0) return _diskTotal;
     return Math.max(0, Number((_rootNode && _rootNode.value) || 0));
 }
 
 function getPercentOfDisk(value) {
-    const total = getRootTotalSize();
+    const total = getDiskTotalSize();
     if (!total) return 0;
     return Math.max(0, Math.min(100, (Number(value || 0) / total) * 100));
 }
@@ -689,6 +691,7 @@ function renderExplorer(rootNode, meta) {
 document.addEventListener('treemapLoaded', function(e) {
     const detail = e.detail || {};
     _diskId = detail.diskId || null;
+    _diskTotal = Math.max(0, Number(detail.diskTotal || 0));
     _rootNode = detail.root || null;
     _currentNode = null;
     _searchQuery = '';
