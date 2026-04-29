@@ -1,10 +1,10 @@
 // userDetailRenderer.js — Detail User tab (Tab Pane 3 in Detail page)
 // userDetailRenderer.js — Renders per-user detail reports (dirs + files)
 
-import { fmt, fmtDateSec }                  from './formatters.js';
-import { AppState }             from './main.js';
-import { downloadCsv, downloadZip, streamExportGzip, toCsv }  from './csvExport.js';
-import { showToast, showProgressToast, updateProgressToast, closeProgressToast } from './main.js';
+import { fmt, fmtDateSec }                  from '../utils/formatters.js';
+import { AppState }             from '../core/main.js';
+import { downloadCsv, downloadZip, streamExportGzip, toCsv }  from '../utils/csvExport.js';
+import { showToast, showProgressToast, updateProgressToast, closeProgressToast } from '../core/main.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _selectedUser   = localStorage.getItem('ud_selected_user') || null;

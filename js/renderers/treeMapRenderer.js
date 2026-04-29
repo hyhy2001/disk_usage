@@ -1,5 +1,5 @@
-import { showToast } from './main.js';
-import { fmt } from './formatters.js';
+import { showToast } from '../core/main.js';
+import { fmt } from '../utils/formatters.js';
 
 let _diskId = null;
 let _rootNode = null;

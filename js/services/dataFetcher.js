@@ -1,11 +1,11 @@
-import { UINodes, AppState, animateValue, bytesToTB, showToast } from './main.js';
-import { DataStore } from './dataStore.js';
-import { ChartManager } from './chartManager.js';
-import { initRouter, navigateTo } from './router.js';
-import { renderDetailTables, initScaleToggle, resetDashboardToEmpty } from './detailRenderer.js';
-import { initUserDetailTab, resetUserDetailTab } from './userDetailRenderer.js';
-import { fmt, smartFmtTick } from './formatters.js';
-import { saveFilters, loadFilters } from './filterStorage.js';
+import { UINodes, AppState, animateValue, bytesToTB, showToast } from '../core/main.js';
+import { DataStore } from '../core/dataStore.js';
+import { ChartManager } from '../renderers/chartManager.js';
+import { initRouter, navigateTo } from '../core/router.js';
+import { renderDetailTables, initScaleToggle, resetDashboardToEmpty } from '../renderers/detailRenderer.js';
+import { initUserDetailTab, resetUserDetailTab } from '../renderers/userDetailRenderer.js';
+import { fmt, smartFmtTick } from '../utils/formatters.js';
+import { saveFilters, loadFilters } from '../utils/filterStorage.js';
 
 // ── Sidebar live clock ────────────────────────────────────────────────────────
 // Cache formatter to avoid re-creating Intl.DateTimeFormat every second (PF-02)

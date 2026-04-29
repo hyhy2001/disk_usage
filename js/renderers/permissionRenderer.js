@@ -1,9 +1,9 @@
 // permissionRenderer.js — Renders Permission Issues tab
 // Server-side pagination + filtering: users, item_type, path search.
 
-import { fmtDateSec as fmtDate } from './formatters.js';
-import { downloadCsv, downloadZip, streamExportGzip, toCsv }   from './csvExport.js';
-import { showProgressToast, updateProgressToast, closeProgressToast, showToast } from './main.js';
+import { fmtDateSec as fmtDate } from '../utils/formatters.js';
+import { downloadCsv, downloadZip, streamExportGzip, toCsv }   from '../utils/csvExport.js';
+import { showProgressToast, updateProgressToast, closeProgressToast, showToast } from '../core/main.js';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const PERM_PAGE     = 100;

@@ -3,7 +3,7 @@
  * Features: expand/collapse, download PNG, keyboard (Esc), smooth animation
  */
 
-import { AppState } from './main.js';
+import { AppState } from '../core/main.js';
 
 // ── Create modal DOM ─────────────────────────────────────────────────────────
 function buildModal() {

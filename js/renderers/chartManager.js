@@ -1,4 +1,4 @@
-import { smartFmt, smartFmtTick, pickUnit, fmt } from './formatters.js';
+import { smartFmt, smartFmtTick, pickUnit, fmt } from '../utils/formatters.js';
 
 /** Chart theme — returns appropriate colors based on current light/dark mode */
 function ct() {

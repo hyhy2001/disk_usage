@@ -1,5 +1,5 @@
 // SPA Router — manages page visibility and active nav state
-import { saveFilters, loadFilters } from './filterStorage.js';
+import { saveFilters, loadFilters } from '../utils/filterStorage.js';
 
 const PAGES = {
     overview: document.getElementById('page-overview'),

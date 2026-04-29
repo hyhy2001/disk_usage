@@ -1,4 +1,4 @@
-import { showToast } from './main.js';
+import { showToast } from '../../core/main.js';
 
 const STORAGE_KEY = 'du_group_user_config_v2';
 const VIEW_STATE_KEY = 'du_group_user_view_state_v1';

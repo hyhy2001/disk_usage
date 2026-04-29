@@ -1,7 +1,7 @@
 // Detail Page Renderer — 2 tabs: Latest Snapshot & History/Analysis
-import { AppState } from './main.js';
-import { fmt, fmtDate } from './formatters.js';
-import { saveFilters, loadFilters } from './filterStorage.js';
+import { AppState } from '../core/main.js';
+import { fmt, fmtDate } from '../utils/formatters.js';
+import { saveFilters, loadFilters } from '../utils/filterStorage.js';
 import { renderInodesTab } from './inodeRenderer.js';
 
 let _store = null;
