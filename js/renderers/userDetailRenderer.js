@@ -153,15 +153,15 @@ function _renderPagination(current, total, type) {
 }
 
 function _renderFileCard(fileData) {
-    if (!fileData || !fileData.files?.length) return '';
-    const grandTotal  = fileData.total_used || 1;
-    const totalFiles  = fileData.total_files ?? fileData.files.length;
+    const files = fileData?.files || [];
+    const grandTotal  = fileData?.total_used || 1;
+    const totalFiles  = fileData?.total_files ?? files.length;
     const totalPages  = Math.max(1, Math.ceil(totalFiles / FILE_PAGE));
     const currentPage = _filePage;
-    const shown       = (fileData.offset ?? 0) + fileData.files.length;
-    const badge       = `Page ${currentPage} of ${totalPages} · ${totalFiles.toLocaleString()} files`;
+    const shown       = (fileData?.offset ?? 0) + files.length;
+    const badge       = files.length ? `Page ${currentPage} of ${totalPages} · ${totalFiles.toLocaleString()} files` : 'No files';
 
-    const rows = fileData.files.map(f => {
+    const rows = files.length ? files.map(f => {
         const pct = Math.min((f.size / grandTotal) * 100, 100).toFixed(1);
         const ext = _ext(f.path);
         const clr = _extColor(ext);
@@ -174,7 +174,7 @@ function _renderFileCard(fileData) {
             </div>
             <span class="ud-path-val">${fmt(f.size)}</span>
         </div>`;
-    }).join('');
+    }).join('') : `<div class="ud-empty-row">No files matched the current filter.</div>`;
 
     return `
     <div class="ud-card glass-panel" id="ud-file-card">
