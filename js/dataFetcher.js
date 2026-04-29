@@ -36,6 +36,7 @@ class DataFetcher {
         this._activeSyncController = null;
         this._toastHistory = new Map(); // toastKey -> lastShownAtMs
         this._groupUserConfig = null;
+        this._scanStatusTimer = null; // ID of the status polling timer
 
         // Initialize charts
         AppState.chartManagerInstance = new ChartManager();
@@ -205,6 +206,68 @@ class DataFetcher {
             return json.data;
         } catch (_err) {
             return null;
+        }
+    }
+
+    async _fetchScanStatus(diskId) {
+        try {
+            // cacheTimeMs: 2000 so rapid clicks don't spam, but updates reasonably fast
+            const json = await this._fetchJson(`api.php?id=${encodeURIComponent(diskId)}&type=scan_status`, { cacheTimeMs: 2000 });
+            if (json?.status === 'success' && json.data) {
+                return json.data;
+            }
+        } catch (_e) {
+            // Ignore errors on background poll
+        }
+        return null;
+    }
+
+    _startStatusPolling(diskId) {
+        this._stopStatusPolling();
+        // Poll every 3 seconds
+        this._scanStatusTimer = setInterval(async () => {
+            if (this._activeDisk !== diskId) {
+                this._stopStatusPolling();
+                return;
+            }
+            const status = await this._fetchScanStatus(diskId);
+            // Insert banner into workspace actions area (near sync button)
+            const anchor = document.querySelector('.workspace-actions');
+            let banner = document.getElementById('scan-status-banner');
+            if (!banner && anchor) {
+                banner = document.createElement('div');
+                banner.id = 'scan-status-banner';
+                banner.className = 'scan-status-banner hidden';
+                banner.innerHTML = '<span class="scan-status-banner-icon"></span><span class="scan-status-banner-text"></span>';
+                // Insert as first child so it appears before the sync button
+                anchor.insertBefore(banner, anchor.firstChild);
+            }
+            const bannerText = banner ? banner.querySelector('.scan-status-banner-text') : null;
+
+            if (status && status.running) {
+                const stage = status.stage ? `[${status.stage}] ` : '';
+                const msg = status.message || 'Scanning filesystem';
+                UINodes.statusText.textContent = `Disk scan in progress — ${msg}`;
+                UINodes.statusDot.classList.add('scanning');
+                UINodes.statusDot.style.backgroundColor = '';
+                UINodes.statusDot.title = `Stage: ${status.stage}`;
+                if (banner && bannerText) {
+                    banner.classList.remove('hidden');
+                    bannerText.textContent = `${stage}${msg}`;
+                }
+            } else if (status && !status.running && !AppState.isProcessing) {
+                UINodes.statusText.textContent = "System Optimized";
+                UINodes.statusDot.classList.remove('scanning');
+                UINodes.statusDot.title = '';
+                if (banner) banner.classList.add('hidden');
+            }
+        }, 3000);
+    }
+
+    _stopStatusPolling() {
+        if (this._scanStatusTimer) {
+            clearInterval(this._scanStatusTimer);
+            this._scanStatusTimer = null;
         }
     }
 
@@ -635,6 +698,9 @@ class DataFetcher {
                 this._activeDisk = id;
                 saveFilters({ activeDisk: id });
                 // Keep disk activation lightweight; user list loads on demand in detail tab.
+
+                // Start polling scan status whenever the active disk changes
+                this._startStatusPolling(id);
 
                 // Hiding empty state constraints & show features
                 const currentTab = loadFilters().activePage || 'overview';

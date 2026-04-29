@@ -376,6 +376,12 @@ function api_handle_dirs($disk_path) {
         )));
     }
 
+    // Cache by source file mtime/size + all params that affect the response.
+    api_send_etag_cache($file_path, array(
+        'dirs', $who, $offset, $limit, $filter_q, $filter_min, $filter_max,
+        param('count_only', '0'),
+    ));
+
     $q_array = $filter_q !== '' ? array_values(array_filter(array_map('trim', explode(',', $filter_q)), 'strlen')) : array();
     $q_matchers = array();
     foreach ($q_array as $q) {

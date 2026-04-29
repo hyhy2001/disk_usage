@@ -71,6 +71,12 @@ function api_dispatch_request($root_dir) {
     if ($type === 'files') {
         api_handle_files($disk_path);
     }
+    if ($type === 'detail') {
+        api_handle_detail($disk_path);
+    }
+    if ($type === 'scan_status') {
+        api_handle_scan_status($disk_path);
+    }
 
     api_handle_aggregate($disk_path);
 }

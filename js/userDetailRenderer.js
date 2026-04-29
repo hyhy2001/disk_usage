@@ -709,11 +709,28 @@ async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE) {
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
 
-    const text = await _fetchApiText(url + `&_t=${Date.now()}`, { signal: _abortCtrl.signal, cache: 'no-store' });
+    const text = await _fetchApiText(url, { signal: _abortCtrl.signal });
     let json;
     try { json = JSON.parse(text); } catch { json = JSON.parse(atob(text)); }
     if (json.status !== 'success') throw new Error(json.message || 'API error');
     return json.data.dir;
+}
+
+async function _fetchDetail(diskId, user, dirOffset = 0, fileOffset = 0, limit = FILE_PAGE) {
+    if (_abortCtrl) _abortCtrl.abort();
+    _abortCtrl = new AbortController();
+    const b64User = btoa(unescape(encodeURIComponent(user)));
+    let url = `api.php?id=${encodeURIComponent(diskId)}&type=detail&user_b64=${encodeURIComponent(b64User)}&dir_offset=${dirOffset}&file_offset=${fileOffset}&limit=${limit}`;
+    if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
+    if (_currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
+    if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
+    if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
+
+    const text = await _fetchApiText(url, { signal: _abortCtrl.signal });
+    let json;
+    try { json = JSON.parse(text); } catch { json = JSON.parse(atob(text)); }
+    if (json.status !== 'success') throw new Error(json.message || 'API error');
+    return json.data;
 }
 
 async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE) {
@@ -724,7 +741,7 @@ async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE) {
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
 
-    const text = await _fetchApiText(url + `&_t=${Date.now()}`, { cache: 'no-store' });
+    const text = await _fetchApiText(url);
     let json;
     try { json = JSON.parse(text); } catch { json = JSON.parse(atob(text)); }
     if (json.status !== 'success') throw new Error(json.message || 'API error');
@@ -750,7 +767,7 @@ async function _fetchDirCount(diskId, user) {
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
     try {
-        const text = await _fetchApiText(url + `&_t=${Date.now()}`, { cache: 'no-store' });
+        const text = await _fetchApiText(url);
         let json;
         try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { return null; } }
         return (json?.status === 'success') ? (json.data.dir_count ?? null) : null;
@@ -767,7 +784,7 @@ async function _fetchFileCount(diskId, user) {
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
     try {
-        const text = await _fetchApiText(url + `&_t=${Date.now()}`, { cache: 'no-store' });
+        const text = await _fetchApiText(url);
         let json;
         try { json = JSON.parse(text); } catch { try { json = JSON.parse(atob(text)); } catch { return null; } }
         return (json?.status === 'success') ? (json.data.file_count ?? null) : null;
@@ -825,10 +842,9 @@ async function _loadAndRender(user) {
     if (contentBody) contentBody.innerHTML = _renderSkeleton();
 
     try {
-        const [dirData, fileData] = await Promise.all([
-            _fetchDir(_currentDisk, user, 0, FILE_PAGE),
-            _fetchFilePage(_currentDisk, user, 0, FILE_PAGE),
-        ]);
+        const detailData = await _fetchDetail(_currentDisk, user, 0, 0, FILE_PAGE);
+        const dirData = detailData.dir;
+        const fileData = detailData.file;
 
         const otherUser = _otherUsers.find(o => o.name === user);
         const noDirBreakdown = (dirData.total_dirs ?? dirData.dirs.length ?? 0) === 0 && (dirData.dirs?.length ?? 0) === 0;

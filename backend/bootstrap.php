@@ -17,9 +17,11 @@ require_once __DIR__ . '/handlers/treemap.php';
 require_once __DIR__ . '/handlers/users.php';
 require_once __DIR__ . '/handlers/dirs.php';
 require_once __DIR__ . '/handlers/files.php';
+require_once __DIR__ . '/handlers/detail.php';
 require_once __DIR__ . '/handlers/aggregate.php';
 require_once __DIR__ . '/handlers/group_config.php';
 require_once __DIR__ . '/handlers/admin.php';
+require_once __DIR__ . '/handlers/scan_status.php';
 
 require_once __DIR__ . '/router.php';
 
