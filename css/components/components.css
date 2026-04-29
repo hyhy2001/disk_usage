@@ -1,0 +1,2 @@
+/* Entry point — imports all partials in cascade order via parts/_index.css */
+@import './parts/_index.css';
