@@ -84,9 +84,10 @@ function _renderDirCard(dirData) {
     }).join('');
 
     const totalDirs   = dirData.total_dirs ?? dirData.dirs.length;
+    const totalDirsFull = dirData.total_dirs_full ?? totalDirs;
     const totalPages  = Math.max(1, Math.ceil(totalDirs / FILE_PAGE));
     const currentPage = _dirPage;
-    const badge       = `Page ${currentPage} of ${totalPages} · ${totalDirs.toLocaleString()} dirs`;
+    const badge       = `Page ${currentPage} of ${totalPages} · ${totalDirsFull.toLocaleString()} dirs`;
 
     return `
     <div class="ud-card glass-panel" id="ud-dir-card">
@@ -154,10 +155,11 @@ function _renderFileCard(fileData) {
     const files = fileData?.files || [];
     const grandTotal  = fileData?.total_used || 1;
     const totalFiles  = fileData?.total_files ?? files.length;
+    const totalFilesFull = fileData?.total_files_full ?? totalFiles;
     const totalPages  = Math.max(1, Math.ceil(totalFiles / FILE_PAGE));
     const currentPage = _filePage;
     const shown       = (fileData?.offset ?? 0) + files.length;
-    const badge       = files.length ? `Page ${currentPage} of ${totalPages} · ${totalFiles.toLocaleString()} files` : 'No files';
+    const badge       = files.length ? `Page ${currentPage} of ${totalPages} · ${totalFilesFull.toLocaleString()} files` : 'No files';
 
     const rows = files.length ? files.map(f => {
         const pct = Math.min((f.size / grandTotal) * 100, 100).toFixed(1);
@@ -1002,7 +1004,10 @@ async function _goToPageFile(root, page) {
         }
 
         // Update badge
-        if (badge) badge.textContent = `Page ${page} of ${_fileTotalPages} · ${totalFiles.toLocaleString()} files`;
+        if (badge) {
+            const fullTotal = fileData.total_files_full ?? totalFiles;
+            badge.textContent = `Page ${page} of ${_fileTotalPages} · ${fullTotal.toLocaleString()} files`;
+        }
 
         // Re-render pagination
         const pgWrap = root.querySelector('#ud-pagination-file');
@@ -1052,7 +1057,10 @@ async function _goToPageDir(root, page) {
             list.style.opacity = '';
         }
 
-        if (badge) badge.textContent = `Page ${page} of ${_dirTotalPages} · ${totalDirs.toLocaleString()} dirs`;
+        if (badge) {
+            const fullTotal = dirData.total_dirs_full ?? totalDirs;
+            badge.textContent = `Page ${page} of ${_dirTotalPages} · ${fullTotal.toLocaleString()} dirs`;
+        }
 
         const pgWrap = root.querySelector('#ud-pagination-dir');
         if (pgWrap) {

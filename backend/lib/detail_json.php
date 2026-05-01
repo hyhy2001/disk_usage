@@ -83,6 +83,16 @@ function api_detail_page_index($ctx) {
     return is_array($v) ? $v : false;
 }
 
+function api_detail_total_full($ctx, $kind) {
+    $page_idx = api_detail_page_index($ctx);
+    if (is_array($page_idx) && isset($page_idx[$kind]) && is_array($page_idx[$kind]) && isset($page_idx[$kind]['total_full'])) {
+        return (int)$page_idx[$kind]['total_full'];
+    }
+    if ($kind === 'dirs') return api_detail_summary_value($ctx, 'total_dirs', 'total_dirs', 0);
+    if ($kind === 'files') return api_detail_summary_value($ctx, 'total_files', 'total_files', 0);
+    return 0;
+}
+
 function api_detail_normalize_dir($obj) {
     if (!is_array($obj)) return array('path' => '', 'used' => 0);
     $path = isset($obj['path'])
@@ -227,7 +237,17 @@ function api_detail_get_dir_payload($disk_path, $who, $offset, $limit, $filter_q
     if (!$has_filters && is_array($page_idx) && isset($page_idx['dirs']) && is_array($page_idx['dirs']) && isset($page_idx['dirs']['total_ui'])) {
         $total = (int)$page_idx['dirs']['total_ui'];
     }
-    return array('date' => api_detail_date($ctx), 'user' => $who, 'total_dirs' => $total, 'total_used' => api_detail_summary_value($ctx, 'total_used', 'total_used', 0), 'offset' => $offset, 'limit' => $limit, 'has_more' => ($offset + count($result['rows'])) < $total, 'dirs' => $result['rows']);
+    return array(
+        'date' => api_detail_date($ctx),
+        'user' => $who,
+        'total_dirs' => $total,
+        'total_dirs_full' => api_detail_total_full($ctx, 'dirs'),
+        'total_used' => api_detail_summary_value($ctx, 'total_used', 'total_used', 0),
+        'offset' => $offset,
+        'limit' => $limit,
+        'has_more' => ($offset + count($result['rows'])) < $total,
+        'dirs' => $result['rows'],
+    );
 }
 
 function api_detail_file_parts($ctx) {
@@ -302,5 +322,15 @@ function api_detail_get_file_payload($disk_path, $who, $offset, $limit, $filter_
     if (is_array($page_idx) && isset($page_idx['files']) && is_array($page_idx['files']) && isset($page_idx['files']['total_ui'])) {
         $total = (int)$page_idx['files']['total_ui'];
     }
-    return array('date' => api_detail_date($ctx), 'user' => $who, 'total_files' => $total, 'total_used' => api_detail_summary_value($ctx, 'total_used', 'total_used', 0), 'offset' => $offset, 'limit' => $limit, 'has_more' => ($offset + count($result['rows'])) < $total, 'files' => $result['rows']);
+    return array(
+        'date' => api_detail_date($ctx),
+        'user' => $who,
+        'total_files' => $total,
+        'total_files_full' => api_detail_total_full($ctx, 'files'),
+        'total_used' => api_detail_summary_value($ctx, 'total_used', 'total_used', 0),
+        'offset' => $offset,
+        'limit' => $limit,
+        'has_more' => ($offset + count($result['rows'])) < $total,
+        'files' => $result['rows'],
+    );
 }
