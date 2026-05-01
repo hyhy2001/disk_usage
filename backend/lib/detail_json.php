@@ -83,6 +83,15 @@ function api_detail_page_index($ctx) {
     return is_array($v) ? $v : false;
 }
 
+function api_detail_full_index($ctx) {
+    if (!isset($ctx['manifest']['page_index_full']) || empty($ctx['manifest']['page_index_full'])) return false;
+    $rel = str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $ctx['manifest']['page_index_full']);
+    $path = $ctx['user_dir'] . DIRECTORY_SEPARATOR . $rel;
+    if (!is_file($path)) return false;
+    $v = api_detail_json_load($path);
+    return is_array($v) ? $v : false;
+}
+
 function api_detail_manifest_rel_path($ctx, $key, $default_rel) {
     if (isset($ctx['manifest'][$key]) && is_string($ctx['manifest'][$key]) && $ctx['manifest'][$key] !== '') {
         return $ctx['user_dir'] . DIRECTORY_SEPARATOR . str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $ctx['manifest'][$key]);
@@ -272,30 +281,29 @@ function api_detail_stream_dir_page_payload($ctx, $who, $offset, $limit) {
 
 function api_detail_stream_file_page_payload($ctx, $who, $offset, $limit) {
     $rows = array();
-    $seen = 0;
-    $user_dir = $ctx['user_dir'];
-
-    foreach (api_detail_file_parts($ctx) as $part) {
-        if (!is_array($part) || empty($part['path'])) continue;
-        $part_path = $user_dir . DIRECTORY_SEPARATOR . str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $part['path']);
-        $fh = @fopen($part_path, 'r');
-        if (!$fh) continue;
-        while (($line = fgets($fh)) !== false) {
-            $line = trim($line);
-            if ($line === '') continue;
-            if ($seen >= $offset && count($rows) < $limit) {
-                $obj = @json_decode($line, true);
-                if (is_array($obj)) $rows[] = api_detail_normalize_file($obj);
+    $full_index = api_detail_full_index($ctx);
+    if (is_array($full_index) && isset($full_index['path']) && isset($full_index['offsets']) && is_array($full_index['offsets'])) {
+        $sorted_path = $ctx['user_dir'] . DIRECTORY_SEPARATOR . str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $full_index['path']);
+        $page_size = isset($full_index['page_size']) ? (int)$full_index['page_size'] : $limit;
+        if (is_file($sorted_path)) {
+            $page = max(0, (int)floor($offset / max(1, $page_size)));
+            $start = isset($full_index['offsets'][$page]) ? $full_index['offsets'][$page] : 0;
+            $fh = @fopen($sorted_path, 'r');
+            if ($fh) {
+                @fseek($fh, (int)$start);
+                while (count($rows) < $limit && ($line = fgets($fh)) !== false) {
+                    $line = trim($line);
+                    if ($line === '') continue;
+                    $obj = @json_decode($line, true);
+                    if (is_array($obj)) $rows[] = api_detail_normalize_file($obj);
+                }
+                fclose($fh);
             }
-            $seen++;
-            if (count($rows) >= $limit) break;
         }
-        fclose($fh);
-        if (count($rows) >= $limit) break;
     }
 
     $total_full = api_detail_total_full($ctx, 'files');
-    $total = $total_full > 0 ? $total_full : $seen;
+    $total = $total_full > 0 ? $total_full : $offset + count($rows);
     return array(
         'date' => api_detail_date($ctx),
         'user' => $who,
