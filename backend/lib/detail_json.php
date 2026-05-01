@@ -83,6 +83,13 @@ function api_detail_page_index($ctx) {
     return is_array($v) ? $v : false;
 }
 
+function api_detail_manifest_rel_path($ctx, $key, $default_rel) {
+    if (isset($ctx['manifest'][$key]) && is_string($ctx['manifest'][$key]) && $ctx['manifest'][$key] !== '') {
+        return $ctx['user_dir'] . DIRECTORY_SEPARATOR . str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $ctx['manifest'][$key]);
+    }
+    return $ctx['user_dir'] . DIRECTORY_SEPARATOR . $default_rel;
+}
+
 function api_detail_total_full($ctx, $kind) {
     $page_idx = api_detail_page_index($ctx);
     if (is_array($page_idx) && isset($page_idx[$kind]) && is_array($page_idx[$kind]) && isset($page_idx[$kind]['total_full'])) {
@@ -343,6 +350,72 @@ function api_detail_sort_rows(&$rows, $kind) {
 }
 
 function api_detail_stream_file_payload($ctx, $who, $offset, $limit, $filter_q, $filter_ext, $filter_min, $filter_max) {
+    // Fast-path: when index artifacts are available, use them first.
+    $ext_index_path = api_detail_manifest_rel_path($ctx, 'ext_index', 'ext_index.json');
+    $size_bins_path = api_detail_manifest_rel_path($ctx, 'size_bins', 'size_bins.json');
+    $token_index_path = api_detail_manifest_rel_path($ctx, 'path_token_index', 'path_token_index.json');
+
+    $indexed_rows = null;
+    if (is_file($ext_index_path) || is_file($size_bins_path) || is_file($token_index_path)) {
+        $candidate_sets = array();
+
+        if ($filter_ext !== '' && is_file($ext_index_path)) {
+            $ext_idx = api_detail_json_load($ext_index_path);
+            if (is_array($ext_idx)) {
+                $rows = array();
+                foreach (array_filter(array_map('trim', explode(',', strtolower($filter_ext))), 'strlen') as $xt) {
+                    if (isset($ext_idx[$xt]) && is_array($ext_idx[$xt])) {
+                        foreach ($ext_idx[$xt] as $r) $rows[] = api_detail_normalize_file($r);
+                    }
+                }
+                $candidate_sets[] = $rows;
+            }
+        }
+
+        if ($filter_q !== '' && is_file($token_index_path)) {
+            $tok_idx = api_detail_json_load($token_index_path);
+            if (is_array($tok_idx)) {
+                $rows = array();
+                foreach (array_filter(array_map('trim', explode(',', strtolower($filter_q))), 'strlen') as $tok) {
+                    if (isset($tok_idx[$tok]) && is_array($tok_idx[$tok])) {
+                        foreach ($tok_idx[$tok] as $r) $rows[] = api_detail_normalize_file($r);
+                    }
+                }
+                $candidate_sets[] = $rows;
+            }
+        }
+
+        if (!empty($candidate_sets)) {
+            // Union then normalize de-dupe by path.
+            $seen = array();
+            $merged = array();
+            foreach ($candidate_sets as $set_rows) {
+                foreach ($set_rows as $row) {
+                    $p = isset($row['path']) ? (string)$row['path'] : '';
+                    if ($p === '' || isset($seen[$p])) continue;
+                    $seen[$p] = true;
+                    $merged[] = $row;
+                }
+            }
+            $indexed_rows = $merged;
+        }
+    }
+
+    if (is_array($indexed_rows)) {
+        $result = api_detail_filter_sort_slice($indexed_rows, 'file', $offset, $limit, $filter_q, $filter_ext, $filter_min, $filter_max);
+        return array(
+            'date' => api_detail_date($ctx),
+            'user' => $who,
+            'total_files' => $result['total'],
+            'total_files_full' => api_detail_total_full($ctx, 'files'),
+            'total_used' => api_detail_summary_value($ctx, 'total_used', 'total_used', 0),
+            'offset' => $offset,
+            'limit' => $limit,
+            'has_more' => ($offset + count($result['rows'])) < $result['total'],
+            'files' => $result['rows'],
+        );
+    }
+
     $matchers = api_detail_filter_matchers($filter_q);
     $ext_lookup = api_detail_ext_lookup($filter_ext);
     $keep = max(1, $offset + $limit);
