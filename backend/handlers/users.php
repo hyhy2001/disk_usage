@@ -15,6 +15,25 @@ function api_users_normalize_list($users) {
     return $out;
 }
 
+
+function api_users_from_detail_manifest($disk_path) {
+    $manifest_path = $disk_path . DIRECTORY_SEPARATOR . 'detail_users' . DIRECTORY_SEPARATOR . 'data_detail.json';
+    if (!is_file($manifest_path)) return array();
+    $raw = @file_get_contents($manifest_path);
+    if ($raw === false) return array();
+    $json = @json_decode($raw, true);
+    if (!is_array($json) || !isset($json['users']) || !is_array($json['users'])) return array();
+
+    $users = array();
+    foreach ($json['users'] as $u) {
+        if (!is_array($u) || !isset($u['username'])) continue;
+        $name = trim((string)$u['username']);
+        if ($name === '') continue;
+        $users[] = $name;
+    }
+    return api_users_normalize_list($users);
+}
+
 function api_users_from_latest_main_report($disk_path) {
     $info = api_get_latest_main_report_info($disk_path);
     $latest_file = isset($info['latest_file']) ? $info['latest_file'] : false;
@@ -108,17 +127,24 @@ function api_users_system_groups_from_latest_main_report($disk_path) {
 
 function api_handle_users($disk_path) {
     $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
+    $manifest_path = $detail_dir . DIRECTORY_SEPARATOR . 'data_detail.json';
     $disk_mtime = @filemtime($disk_path);
     $dir_mtime = @filemtime($detail_dir);
-    $cache_key = 'users:' . $disk_path . ':' . (is_int($disk_mtime) ? $disk_mtime : 0) . ':' . (is_int($dir_mtime) ? $dir_mtime : 0);
+    $manifest_mtime = @filemtime($manifest_path);
+    $cache_key = 'users:' . $disk_path . ':' . (is_int($disk_mtime) ? $disk_mtime : 0) . ':' . (is_int($dir_mtime) ? $dir_mtime : 0) . ':' . (is_int($manifest_mtime) ? $manifest_mtime : 0);
     $data = api_cache_get($cache_key, 30);
     if ($data === null) {
         $users = array();
 
-        // Fast path: user list from latest disk usage report.
-        $users = api_users_from_latest_main_report($disk_path);
+        // Fast path: user list from detail manifest (current pipeline source-of-truth).
+        $users = api_users_from_detail_manifest($disk_path);
 
-        // Fallback #1: user list from inode usage report.
+        // Fallback #1: user list from latest disk usage report.
+        if (count($users) === 0) {
+            $users = api_users_from_latest_main_report($disk_path);
+        }
+
+        // Fallback #2: user list from inode usage report.
         if (count($users) === 0) {
             $inode_file = find_file_by_pattern($disk_path, '/.*inode_usage_report.*\.json$/i');
             if ($inode_file && is_file($inode_file)) {
@@ -136,19 +162,12 @@ function api_handle_users($disk_path) {
             }
         }
 
-        // Fallback #2: user list from unified data_detail.db.
-        if (count($users) === 0 && is_dir($detail_dir)) {
-            $data_detail = $detail_dir . DIRECTORY_SEPARATOR . 'data_detail.db';
-            if (is_file($data_detail) && class_exists('SQLite3')) {
-                try {
-                    $db = defined('SQLITE3_OPEN_READONLY') ? new SQLite3($data_detail, SQLITE3_OPEN_READONLY) : new SQLite3($data_detail);
-                    $rs = @$db->query('SELECT username FROM user_meta ORDER BY username');
-                    while ($rs && ($row = $rs->fetchArray(SQLITE3_ASSOC)) !== false) {
-                        if (isset($row['username']) && $row['username'] !== '') $users[] = (string)$row['username'];
-                    }
-                    if ($rs) $rs->finalize();
-                    $db->close();
-                } catch (Exception $e) {
+        // Fallback #2: user list from detail manifest.
+        if (count($users) === 0 && is_file($manifest_path)) {
+            $manifest = api_detail_json_load($manifest_path);
+            if (is_array($manifest) && isset($manifest['users']) && is_array($manifest['users'])) {
+                foreach ($manifest['users'] as $u) {
+                    if (is_array($u) && isset($u['username']) && $u['username'] !== '') $users[] = (string)$u['username'];
                 }
             }
         }
