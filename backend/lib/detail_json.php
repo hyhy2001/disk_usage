@@ -226,17 +226,92 @@ function api_detail_filter_sort_slice($rows, $kind, $offset, $limit, $filter_q, 
     return array('total' => count($filtered), 'rows' => array_slice($filtered, $offset, $limit), 'has_more' => ($offset + $limit) < count($filtered));
 }
 
+function api_detail_stream_dir_page_payload($ctx, $who, $offset, $limit) {
+    $dir_rel = 'dirs.ndjson';
+    if (isset($ctx['manifest']['dirs']) && is_array($ctx['manifest']['dirs']) && !empty($ctx['manifest']['dirs']['path'])) {
+        $dir_rel = $ctx['manifest']['dirs']['path'];
+    }
+    $dir_path = $ctx['user_dir'] . DIRECTORY_SEPARATOR . str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $dir_rel);
+    $fh = @fopen($dir_path, 'r');
+    if (!$fh) return api_detail_empty_dir($who, $offset, $limit);
+
+    $rows = array();
+    $idx = 0;
+    while (($line = fgets($fh)) !== false) {
+        $line = trim($line);
+        if ($line === '') continue;
+        if ($idx >= $offset && count($rows) < $limit) {
+            $obj = @json_decode($line, true);
+            if (is_array($obj)) $rows[] = api_detail_normalize_dir($obj);
+        }
+        $idx++;
+    }
+    fclose($fh);
+
+    $total_full = api_detail_total_full($ctx, 'dirs');
+    $total = $total_full > 0 ? $total_full : $idx;
+    return array(
+        'date' => api_detail_date($ctx),
+        'user' => $who,
+        'total_dirs' => $total,
+        'total_dirs_full' => $total,
+        'total_used' => api_detail_summary_value($ctx, 'total_used', 'total_used', 0),
+        'offset' => $offset,
+        'limit' => $limit,
+        'has_more' => ($offset + count($rows)) < $total,
+        'dirs' => $rows,
+    );
+}
+
+function api_detail_stream_file_page_payload($ctx, $who, $offset, $limit) {
+    $rows = array();
+    $seen = 0;
+    $user_dir = $ctx['user_dir'];
+
+    foreach (api_detail_file_parts($ctx) as $part) {
+        if (!is_array($part) || empty($part['path'])) continue;
+        $part_path = $user_dir . DIRECTORY_SEPARATOR . str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $part['path']);
+        $fh = @fopen($part_path, 'r');
+        if (!$fh) continue;
+        while (($line = fgets($fh)) !== false) {
+            $line = trim($line);
+            if ($line === '') continue;
+            if ($seen >= $offset && count($rows) < $limit) {
+                $obj = @json_decode($line, true);
+                if (is_array($obj)) $rows[] = api_detail_normalize_file($obj);
+            }
+            $seen++;
+            if (count($rows) >= $limit) break;
+        }
+        fclose($fh);
+        if (count($rows) >= $limit) break;
+    }
+
+    $total_full = api_detail_total_full($ctx, 'files');
+    $total = $total_full > 0 ? $total_full : $seen;
+    return array(
+        'date' => api_detail_date($ctx),
+        'user' => $who,
+        'total_files' => $total,
+        'total_files_full' => $total,
+        'total_used' => api_detail_summary_value($ctx, 'total_used', 'total_used', 0),
+        'offset' => $offset,
+        'limit' => $limit,
+        'has_more' => ($offset + count($rows)) < $total,
+        'files' => $rows,
+    );
+}
+
 function api_detail_get_dir_payload($disk_path, $who, $offset, $limit, $filter_q, $filter_min, $filter_max) {
     $ctx = api_detail_find_user_context($disk_path, $who);
     if (!$ctx) return api_detail_empty_dir($who, $offset, $limit);
     $has_filters = ($filter_q !== '' || $filter_min > 0 || $filter_max > 0);
-    $rows = api_detail_dir_rows($ctx, !$has_filters);
-    $result = api_detail_filter_sort_slice($rows, 'dir', $offset, $limit, $filter_q, '', $filter_min, $filter_max);
-    $page_idx = api_detail_page_index($ctx);
-    $total = $result['total'];
-    if (!$has_filters && is_array($page_idx) && isset($page_idx['dirs']) && is_array($page_idx['dirs']) && isset($page_idx['dirs']['total_ui'])) {
-        $total = (int)$page_idx['dirs']['total_ui'];
+    if (!$has_filters) {
+        return api_detail_stream_dir_page_payload($ctx, $who, $offset, $limit);
     }
+    $rows = api_detail_dir_rows($ctx, false);
+    $result = api_detail_filter_sort_slice($rows, 'dir', $offset, $limit, $filter_q, '', $filter_min, $filter_max);
+    $total = $result['total'];
     return array(
         'date' => api_detail_date($ctx),
         'user' => $who,
@@ -315,22 +390,5 @@ function api_detail_get_file_payload($disk_path, $who, $offset, $limit, $filter_
     if (!$ctx) return api_detail_empty_file($who, $offset, $limit);
     $has_filters = ($filter_q !== '' || $filter_ext !== '' || $filter_min > 0 || $filter_max > 0);
     if ($has_filters) return api_detail_stream_file_payload($ctx, $who, $offset, $limit, $filter_q, $filter_ext, $filter_min, $filter_max);
-    $rows = api_detail_file_rows($ctx, true);
-    $result = api_detail_filter_sort_slice($rows, 'file', $offset, $limit, $filter_q, $filter_ext, $filter_min, $filter_max);
-    $page_idx = api_detail_page_index($ctx);
-    $total = $result['total'];
-    if (is_array($page_idx) && isset($page_idx['files']) && is_array($page_idx['files']) && isset($page_idx['files']['total_ui'])) {
-        $total = (int)$page_idx['files']['total_ui'];
-    }
-    return array(
-        'date' => api_detail_date($ctx),
-        'user' => $who,
-        'total_files' => $total,
-        'total_files_full' => api_detail_total_full($ctx, 'files'),
-        'total_used' => api_detail_summary_value($ctx, 'total_used', 'total_used', 0),
-        'offset' => $offset,
-        'limit' => $limit,
-        'has_more' => ($offset + count($result['rows'])) < $total,
-        'files' => $result['rows'],
-    );
+    return api_detail_stream_file_page_payload($ctx, $who, $offset, $limit);
 }
