@@ -66,16 +66,22 @@ function api_detail_summary_value($ctx, $key, $fallback_key, $default) {
 
 function api_detail_normalize_dir($obj) {
     if (!is_array($obj)) return array('path' => '', 'used' => 0);
-    $path = isset($obj['path']) ? $obj['path'] : (isset($obj['n']) ? $obj['n'] : '');
+    $path = isset($obj['path'])
+        ? $obj['path']
+        : (isset($obj['p']) ? $obj['p'] : (isset($obj['n']) ? $obj['n'] : ''));
     $used = isset($obj['used']) ? $obj['used'] : (isset($obj['s']) ? $obj['s'] : 0);
     return array('path' => (string)$path, 'used' => (int)$used);
 }
 
 function api_detail_normalize_file($obj) {
     if (!is_array($obj)) return array('path' => '', 'size' => 0, 'xt' => '');
-    $path = isset($obj['path']) ? $obj['path'] : (isset($obj['n']) ? $obj['n'] : '');
+    $path = isset($obj['path'])
+        ? $obj['path']
+        : (isset($obj['p']) ? $obj['p'] : (isset($obj['n']) ? $obj['n'] : ''));
     $size = isset($obj['size']) ? $obj['size'] : (isset($obj['s']) ? $obj['s'] : 0);
-    $xt = isset($obj['xt']) ? $obj['xt'] : (isset($obj['ext']) ? $obj['ext'] : pathinfo($path, PATHINFO_EXTENSION));
+    $xt = isset($obj['xt'])
+        ? $obj['xt']
+        : (isset($obj['x']) ? $obj['x'] : (isset($obj['ext']) ? $obj['ext'] : pathinfo($path, PATHINFO_EXTENSION)));
     return array('path' => (string)$path, 'size' => (int)$size, 'xt' => strtolower((string)$xt));
 }
 

@@ -69,7 +69,97 @@ function api_treemap_sort_items_by_size(&$items) {
     });
 }
 
+
+function api_treemap_read_bucket_children_by_path($index_dir, $path) {
+    if ($path === '' || $path === null) return false;
+    static $bucket_cache = array();
+
+    $shards_root = api_treemap_data_dir($index_dir) . DIRECTORY_SEPARATOR . 'shards';
+    if (!is_dir($shards_root)) return false;
+
+    if (!isset($bucket_cache[$index_dir])) $bucket_cache[$index_dir] = array();
+
+    $dirs = @scandir($shards_root);
+    if (!is_array($dirs)) return false;
+    foreach ($dirs as $prefix) {
+        if ($prefix === '.' || $prefix === '..') continue;
+        $bucket_path = $shards_root . DIRECTORY_SEPARATOR . $prefix . DIRECTORY_SEPARATOR . 'bucket.json';
+        if (!is_file($bucket_path)) continue;
+        if (!isset($bucket_cache[$index_dir][$bucket_path])) {
+            $bucket_cache[$index_dir][$bucket_path] = api_treemap_load_json_file($bucket_path);
+        }
+        $bucket = $bucket_cache[$index_dir][$bucket_path];
+        if (!is_array($bucket) || !isset($bucket[$path]) || !is_array($bucket[$path])) continue;
+        $items = $bucket[$path];
+        foreach ($items as &$item) api_treemap_normalize_item_fields($item);
+        unset($item);
+        return $items;
+    }
+    return false;
+}
+
+
+function api_treemap_read_bucket_children_by_shard_id_scan($index_dir, $target_shard_id) {
+    $shards_root = api_treemap_data_dir($index_dir) . DIRECTORY_SEPARATOR . 'shards';
+    if (!is_dir($shards_root)) return false;
+    $dirs = @scandir($shards_root);
+    if (!is_array($dirs)) return false;
+    $target_path = '';
+
+    foreach ($dirs as $prefix) {
+        if ($prefix === '.' || $prefix === '..') continue;
+        $bucket_path = $shards_root . DIRECTORY_SEPARATOR . $prefix . DIRECTORY_SEPARATOR . 'bucket.json';
+        if (!is_file($bucket_path)) continue;
+        $bucket = api_treemap_load_json_file($bucket_path);
+        if (!is_array($bucket)) continue;
+        foreach ($bucket as $parent_path => $children) {
+            if (!is_array($children)) continue;
+            foreach ($children as $child) {
+                if (!is_array($child)) continue;
+                $sid = isset($child['shard_id']) ? (string)$child['shard_id'] : (isset($child['id']) ? (string)$child['id'] : '');
+                if ($sid !== (string)$target_shard_id) continue;
+                $target_path = isset($child['path']) ? (string)$child['path'] : '';
+                break 3;
+            }
+        }
+    }
+
+    if ($target_path === '') return false;
+    return api_treemap_read_bucket_children_by_path($index_dir, $target_path);
+}
+
 function api_treemap_read_shard_from_json($index_dir, $shard_id) {
+    $data_dir = api_treemap_data_dir($index_dir);
+    $manifest_path = api_treemap_manifest_path($index_dir);
+
+    // v2 bucketed shards: shards/<prefix>/bucket.json with map[path] => [children]
+    if (is_file($manifest_path)) {
+        $manifest = api_treemap_load_json_file($manifest_path);
+        if (is_array($manifest) && isset($manifest['shard_path_template']) && strpos((string)$manifest['shard_path_template'], 'bucket.json') !== false) {
+            $prefix = substr((string)$shard_id, 0, 2);
+            $bucket_path = $data_dir . DIRECTORY_SEPARATOR . 'shards' . DIRECTORY_SEPARATOR . $prefix . DIRECTORY_SEPARATOR . 'bucket.json';
+            $bucket = api_treemap_load_json_file($bucket_path);
+            if (is_array($bucket)) {
+                foreach ($bucket as $parent_path => $children) {
+                    if (!is_array($children)) continue;
+                    foreach ($children as $child) {
+                        if (!is_array($child)) continue;
+                        $cid = isset($child['shard_id']) ? (string)$child['shard_id'] : (isset($child['id']) ? (string)$child['id'] : '');
+                        if ($cid !== (string)$shard_id) continue;
+                        $items = $children;
+                        foreach ($items as &$item) api_treemap_normalize_item_fields($item);
+                        unset($item);
+                        return $items;
+                    }
+                }
+            }
+            $scan_items = api_treemap_read_bucket_children_by_shard_id_scan($index_dir, $shard_id);
+            if ($scan_items !== false) return $scan_items;
+            return false;
+        }
+    }
+
+    // legacy shards: shards/<prefix>/<shard_id>.json
     $shard_file = api_treemap_shard_path($index_dir, $shard_id);
     if (!is_file($shard_file)) return false;
 
@@ -207,6 +297,20 @@ function api_handle_treemap($disk_path) {
     if ($items === false) {
         $items = api_treemap_read_shard_from_json($index_dir, $shard_id);
         if ($items !== false) $source = 'json_shard';
+    }
+    if ($items === false && isset($index['children']) && is_array($index['children'])) {
+        foreach ($index['children'] as $node) {
+            if (!is_array($node)) continue;
+            $node_sid = isset($node['shard_id']) ? (string)$node['shard_id'] : '';
+            if ($node_sid !== (string)$shard_id) continue;
+            $node_path = isset($node['path']) ? (string)$node['path'] : '';
+            $by_path = api_treemap_read_bucket_children_by_path($index_dir, $node_path);
+            if ($by_path !== false) {
+                $items = $by_path;
+                $source = 'json_shard';
+            }
+            break;
+        }
     }
     if ($items === false) $items = array();
 
