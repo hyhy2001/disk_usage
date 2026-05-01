@@ -612,7 +612,7 @@ function renderExplorer(rootNode, meta) {
 
     rootNode.__tmParent = null;
     const rootState = getNodeState(rootNode);
-    rootState.source = (meta && meta.db_available) ? 'sqlite_db/json_shard' : 'index';
+    rootState.source = (meta && (meta.shard_available || meta.db_available)) ? 'json_shard' : 'index';
 
     _currentNode = rootNode;
 
