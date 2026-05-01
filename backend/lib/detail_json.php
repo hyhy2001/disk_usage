@@ -74,6 +74,15 @@ function api_detail_summary_value($ctx, $key, $fallback_key, $default) {
     return $default;
 }
 
+function api_detail_page_index($ctx) {
+    if (!isset($ctx['manifest']['page_index']) || empty($ctx['manifest']['page_index'])) return false;
+    $rel = str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $ctx['manifest']['page_index']);
+    $path = $ctx['user_dir'] . DIRECTORY_SEPARATOR . $rel;
+    if (!is_file($path)) return false;
+    $v = api_detail_json_load($path);
+    return is_array($v) ? $v : false;
+}
+
 function api_detail_normalize_dir($obj) {
     if (!is_array($obj)) return array('path' => '', 'used' => 0);
     $path = isset($obj['path'])
@@ -211,10 +220,13 @@ function api_detail_get_dir_payload($disk_path, $who, $offset, $limit, $filter_q
     $ctx = api_detail_find_user_context($disk_path, $who);
     if (!$ctx) return api_detail_empty_dir($who, $offset, $limit);
     $has_filters = ($filter_q !== '' || $filter_min > 0 || $filter_max > 0);
-    $rows = api_detail_dir_rows($ctx, !$has_filters && $offset === 0);
+    $rows = api_detail_dir_rows($ctx, !$has_filters);
     $result = api_detail_filter_sort_slice($rows, 'dir', $offset, $limit, $filter_q, '', $filter_min, $filter_max);
-    $total_meta = api_detail_summary_value($ctx, 'total_dirs', 'total_dirs', $result['total']);
-    $total = $has_filters ? $result['total'] : max($total_meta, $result['total']);
+    $page_idx = api_detail_page_index($ctx);
+    $total = $result['total'];
+    if (!$has_filters && is_array($page_idx) && isset($page_idx['dirs']) && is_array($page_idx['dirs']) && isset($page_idx['dirs']['total_ui'])) {
+        $total = (int)$page_idx['dirs']['total_ui'];
+    }
     return array('date' => api_detail_date($ctx), 'user' => $who, 'total_dirs' => $total, 'total_used' => api_detail_summary_value($ctx, 'total_used', 'total_used', 0), 'offset' => $offset, 'limit' => $limit, 'has_more' => ($offset + count($result['rows'])) < $total, 'dirs' => $result['rows']);
 }
 
@@ -283,9 +295,12 @@ function api_detail_get_file_payload($disk_path, $who, $offset, $limit, $filter_
     if (!$ctx) return api_detail_empty_file($who, $offset, $limit);
     $has_filters = ($filter_q !== '' || $filter_ext !== '' || $filter_min > 0 || $filter_max > 0);
     if ($has_filters) return api_detail_stream_file_payload($ctx, $who, $offset, $limit, $filter_q, $filter_ext, $filter_min, $filter_max);
-    $rows = api_detail_file_rows($ctx, $offset === 0);
+    $rows = api_detail_file_rows($ctx, true);
     $result = api_detail_filter_sort_slice($rows, 'file', $offset, $limit, $filter_q, $filter_ext, $filter_min, $filter_max);
-    $total_meta = api_detail_summary_value($ctx, 'total_files', 'total_files', $result['total']);
-    $total = max($total_meta, $result['total']);
+    $page_idx = api_detail_page_index($ctx);
+    $total = $result['total'];
+    if (is_array($page_idx) && isset($page_idx['files']) && is_array($page_idx['files']) && isset($page_idx['files']['total_ui'])) {
+        $total = (int)$page_idx['files']['total_ui'];
+    }
     return array('date' => api_detail_date($ctx), 'user' => $who, 'total_files' => $total, 'total_used' => api_detail_summary_value($ctx, 'total_used', 'total_used', 0), 'offset' => $offset, 'limit' => $limit, 'has_more' => ($offset + count($result['rows'])) < $total, 'files' => $result['rows']);
 }
