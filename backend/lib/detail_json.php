@@ -60,6 +60,11 @@ function api_detail_summary_value($ctx, $key, $fallback_key, $default) {
     if (isset($ctx['manifest']['summary']) && is_array($ctx['manifest']['summary']) && isset($ctx['manifest']['summary'][$key])) {
         return (int)$ctx['manifest']['summary'][$key];
     }
+    if (isset($ctx['manifest']['summary']) && is_array($ctx['manifest']['summary'])) {
+        if ($key === 'total_dirs' && isset($ctx['manifest']['summary']['dirs'])) return (int)$ctx['manifest']['summary']['dirs'];
+        if ($key === 'total_files' && isset($ctx['manifest']['summary']['files'])) return (int)$ctx['manifest']['summary']['files'];
+        if ($key === 'total_used' && isset($ctx['manifest']['summary']['used'])) return (int)$ctx['manifest']['summary']['used'];
+    }
     if (isset($ctx['entry'][$fallback_key])) return (int)$ctx['entry'][$fallback_key];
     // Support compact root manifest keys from current check_disk output:
     // entry.dirs / entry.files / entry.used
