@@ -2,7 +2,8 @@
 // userDetailRenderer.js — Renders per-user detail reports (dirs + files)
 
 import { fmt, fmtDateSec }                  from '../utils/formatters.js';
-import { AppState, showToast }             from '../core/main.js';
+import { streamExportGzip }                 from '../utils/csvExport.js';
+import { AppState, showToast, showProgressToast, updateProgressToast, closeProgressToast } from '../core/main.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _selectedUser   = localStorage.getItem('ud_selected_user') || null;
@@ -16,8 +17,24 @@ let _dirTotalPages  = 1;
 let _fileTotalExact = null; // exact total from lazy count (filtered mode)
 let _dirTotalExact  = null; // exact total from lazy count (filtered mode)
 const FILE_PAGE     = 500;  // rows per page
-let _currentFilters = JSON.parse(localStorage.getItem('ud_filters') || 'null') || { query: '', ext: '', minSize: 0, maxSize: 0 };
+let _currentFilters = JSON.parse(localStorage.getItem('ud_filters') || 'null') || { query: '', ext: '', minSize: 0, maxSize: 0, nodeType: 'all' };
+if (_currentFilters.nodeType !== 'dir' && _currentFilters.nodeType !== 'file') _currentFilters.nodeType = 'all';
 let _allUserNames   = [];
+let _fileCursorByPage = { 1: 0 };
+let _dirCursorByPage  = { 1: 0 };
+
+function _hasActiveFilters() {
+    return !!(
+        (_currentFilters.query && String(_currentFilters.query).trim() !== '') ||
+        (_currentFilters.ext && String(_currentFilters.ext).trim() !== '') ||
+        ((_currentFilters.minSize || 0) > 0) ||
+        ((_currentFilters.maxSize || 0) > 0)
+    );
+}
+
+function _hasExtFilter() {
+    return !!(_currentFilters.ext && String(_currentFilters.ext).trim() !== '');
+}
 
 // ── Debounce utility ──────────────────────────────────────────────────────────
 function _debounce(fn, ms) {
@@ -43,14 +60,44 @@ function _extColor(ext) {
     return map[ext] || '#475569';
 }
 
+function _normalizeDirRow(d) {
+    if (!d || typeof d !== 'object') return { path: '', used: 0 };
+    return {
+        path: String(d.path || d.p || d.n || ''),
+        used: Number(d.used ?? d.s ?? d.size ?? 0) || 0,
+    };
+}
+
+function _normalizeFileRow(f) {
+    if (!f || typeof f !== 'object') return { path: '', size: 0, used: 0, xt: '' };
+    const path = String(f.path || f.p || f.n || '');
+    const size = Number(f.size ?? f.s ?? f.used ?? 0) || 0;
+    const xt = String(f.xt || f.x || f.ext || _ext(path) || '').toLowerCase();
+    return { path, size, used: size, xt };
+}
+
+function _normalizeDirPayload(dir) {
+    const src = (dir && typeof dir === 'object') ? dir : {};
+    const dirs = Array.isArray(src.dirs)
+        ? src.dirs.map(_normalizeDirRow).filter(r => r.path !== '')
+        : [];
+    return Object.assign({}, src, { dirs });
+}
+
+function _normalizeFilePayload(file) {
+    const src = (file && typeof file === 'object') ? file : {};
+    const files = Array.isArray(src.files)
+        ? src.files.map(_normalizeFileRow).filter(r => r.path !== '')
+        : [];
+    return Object.assign({}, src, { files });
+}
+
 function _shortPath(path, maxLen = 55) {
     if (path.length <= maxLen) return path;
     const parts = path.split('/');
-    // Keep last 3 segments, prefix with …
     return '\u2026/' + parts.slice(-3).join('/');
 }
 
-// Map a 0-100 linear slider value to an exponential byte size (up to ~100GB).
 function _sliderToSize(val) {
     if (val <= 0) return 0;
     const maxLog = Math.log(100 * 1024 * 1024 * 1024);
@@ -68,7 +115,23 @@ function _sizeToSlider(size) {
 // ── Render helpers ────────────────────────────────────────────────────────────
 
 function _renderDirCard(dirData) {
-    if (!dirData || !dirData.dirs?.length) return '';
+    if (!dirData || !dirData.dirs?.length) {
+        return `
+        <div class="ud-card glass-panel" id="ud-dir-card">
+            <div class="ud-card-header">
+                <span class="ud-card-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    Top Directories
+                </span>
+                <div class="ud-card-actions">
+                    <span class="ud-card-badge" id="ud-dir-badge">0 dirs</span>
+                </div>
+            </div>
+            <div class="ud-path-list" id="ud-dir-list">
+                <div class="ud-empty-row">No directory data available for this user.</div>
+            </div>
+        </div>`;
+    }
     const total = dirData.total_used || 1;
     const rows  = dirData.dirs.map(d => {
         const pct = Math.min((d.used / total) * 100, 100).toFixed(1);
@@ -87,7 +150,8 @@ function _renderDirCard(dirData) {
     const totalDirsFull = dirData.total_dirs_full ?? totalDirs;
     const totalPages  = Math.max(1, Math.ceil(totalDirs / FILE_PAGE));
     const currentPage = _dirPage;
-    const badge       = `Page ${currentPage} of ${totalPages} · ${totalDirsFull.toLocaleString()} dirs`;
+    const displayTotal = _hasActiveFilters() ? totalDirs : totalDirsFull;
+    const badge       = `Page ${currentPage} of ${totalPages} · ${displayTotal.toLocaleString()} dirs`;
 
     return `
     <div class="ud-card glass-panel" id="ud-dir-card">
@@ -108,6 +172,30 @@ function _renderDirCard(dirData) {
         ${_renderPagination(currentPage, totalPages, 'dir')}
     </div>`;
 }
+
+function _renderDirCardDisabled(reason) {
+    const isExt = reason === 'ext';
+    const badge = isExt ? 'Disabled by extension filter' : 'Hidden by type filter';
+    const msg = isExt
+        ? 'Top directories are hidden when file extension filter is active.'
+        : 'Directory list is hidden while node type is set to files.';
+    return `
+    <div class="ud-card glass-panel" id="ud-dir-card">
+        <div class="ud-card-header">
+            <span class="ud-card-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                Top Directories
+            </span>
+            <div class="ud-card-actions">
+                <span class="ud-card-badge" id="ud-dir-badge">${badge}</span>
+            </div>
+        </div>
+        <div class="ud-path-list" id="ud-dir-list">
+            <div class="ud-empty-row">${msg}</div>
+        </div>
+    </div>`;
+}
+
 
 function _renderPagination(current, total, type) {
     if (total <= 1) return '';
@@ -159,7 +247,8 @@ function _renderFileCard(fileData) {
     const totalPages  = Math.max(1, Math.ceil(totalFiles / FILE_PAGE));
     const currentPage = _filePage;
     const shown       = (fileData?.offset ?? 0) + files.length;
-    const badge       = files.length ? `Page ${currentPage} of ${totalPages} · ${totalFilesFull.toLocaleString()} files` : 'No files';
+    const displayTotal = _hasActiveFilters() ? totalFiles : totalFilesFull;
+    const badge       = files.length ? `Page ${currentPage} of ${totalPages} · ${displayTotal.toLocaleString()} files` : 'No files';
 
     const rows = files.length ? files.map(f => {
         const pct = Math.min((f.size / grandTotal) * 100, 100).toFixed(1);
@@ -244,6 +333,7 @@ function _renderFilterBar() {
     const badgeHtml = activeAdv > 0 ? `<span style="background:var(--sky-500); color:#fff; border-radius:50%; width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">${activeAdv}</span>` : '';
     const minSizePair = _formatBytesForInput(_currentFilters.minSize);
     const maxSizePair = _formatBytesForInput(_currentFilters.maxSize);
+    const nodeType = (_currentFilters.nodeType === 'dir' || _currentFilters.nodeType === 'file') ? _currentFilters.nodeType : 'all';
 
     const selectedLabel = _selectedUser || 'Select User...';
     const opts = _allUserNames.map(name =>
@@ -296,6 +386,15 @@ function _renderFilterBar() {
             </button>
             <div id="ud-filter-options-dropdown" style="display: none; position: absolute; top: calc(100% + 8px); right: 0; width: min(260px, calc(100vw - 24px)); max-width: calc(100vw - 16px); box-sizing: border-box; padding: 16px; flex-direction: column; gap: 16px; z-index: 1000; box-shadow: 0 12px 40px rgba(0,0,0,0.7); border: 1px solid var(--border-color); border-radius: 10px; background-color: var(--bg-base); background-image: linear-gradient(var(--bg-surface-elevated, #1e293b), var(--bg-surface-elevated, #1e293b)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);">
                 
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Node Type</label>
+                    <select id="ud-filter-node-type" style="height: 34px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-primary); font-size: 0.85rem; outline: none; cursor: pointer;">
+                        <option value="all" ${nodeType === 'all' ? 'selected' : ''}>All</option>
+                        <option value="dir" ${nodeType === 'dir' ? 'selected' : ''}>Directories</option>
+                        <option value="file" ${nodeType === 'file' ? 'selected' : ''}>Files</option>
+                    </select>
+                </div>
+
                 <div style="display: flex; flex-direction: column; gap: 6px;">
                     <label style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">File Extension</label>
                     <div id="ud-filter-ext-container" style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; min-height: 34px; max-height: 85px; overflow-y: auto; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-elevated); cursor: text;">
@@ -368,6 +467,7 @@ function _attachFilterEvents(contentEl, root) {
     const minSizeUnitInput = contentEl.querySelector('#ud-filter-min-size-unit');
     const maxSizeValInput = contentEl.querySelector('#ud-filter-max-size-val');
     const maxSizeUnitInput = contentEl.querySelector('#ud-filter-max-size-unit');
+    const nodeTypeInput = contentEl.querySelector('#ud-filter-node-type');
     const importBtn = contentEl.querySelector('#ud-filter-import');
     const exportBtn = contentEl.querySelector('#ud-filter-export');
     const fileInput = contentEl.querySelector('#ud-filter-file-input');
@@ -617,7 +717,8 @@ function _attachFilterEvents(contentEl, root) {
             
             _currentFilters.minSize = Math.floor(minSizeBytes);
             _currentFilters.maxSize = Math.floor(maxSizeBytes);
-            
+            _currentFilters.nodeType = (nodeTypeInput && (nodeTypeInput.value === 'dir' || nodeTypeInput.value === 'file')) ? nodeTypeInput.value : 'all';
+
             localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
 
             if (optionsDropdown) optionsDropdown.style.display = 'none';
@@ -627,7 +728,7 @@ function _attachFilterEvents(contentEl, root) {
     
     if (resetBtn) {
         resetBtn.addEventListener('click', () => {
-            _currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0 };
+            _currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0, nodeType: 'all' };
             localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
             qInput.value = '';
             extInput.value = '';
@@ -643,6 +744,7 @@ function _attachFilterEvents(contentEl, root) {
             if (minSizeUnitInput) minSizeUnitInput.value = 'MB';
             if (maxSizeValInput) maxSizeValInput.value = '';
             if (maxSizeUnitInput) maxSizeUnitInput.value = 'MB';
+            if (nodeTypeInput) nodeTypeInput.value = 'all';
 
             if (optionsDropdown) optionsDropdown.style.display = 'none';
             if (_selectedUser) _loadAndRender(_selectedUser);
@@ -674,6 +776,7 @@ function _attachFilterEvents(contentEl, root) {
                     if (parsed.ext !== undefined) _currentFilters.ext = parsed.ext;
                     if (parsed.minSize !== undefined) _currentFilters.minSize = parsed.minSize;
                     if (parsed.maxSize !== undefined) _currentFilters.maxSize = parsed.maxSize;
+                    if (parsed.nodeType !== undefined) _currentFilters.nodeType = (parsed.nodeType === 'dir' || parsed.nodeType === 'file') ? parsed.nodeType : 'all';
                     localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
                     if (_selectedUser) _loadAndRender(_selectedUser);
                 } catch (err) {
@@ -695,7 +798,8 @@ function _attachFilterEvents(contentEl, root) {
 // ── API fetch ─────────────────────────────────────────────────────────────────
 
 async function _fetchApiText(url, options) {
-    const res = await fetch(url, options);
+    const finalOptions = Object.assign({ cache: 'no-store' }, options || {});
+    const res = await fetch(url, finalOptions);
     if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     return res.text();
 }
@@ -713,7 +817,7 @@ function _parseApiJson(text) {
     }
 }
 
-async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE) {
+async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE, cursorMode = false, cursor = 0, approxMode = false, skipRows = 0) {
     if (_abortCtrl) _abortCtrl.abort();
     _abortCtrl = new AbortController();
     const b64User = btoa(unescape(encodeURIComponent(user)));
@@ -721,11 +825,17 @@ async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE) {
     if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
-
+    if (cursorMode) {
+        url += '&export_stream=1';
+        url += `&cursor=${Math.max(0, Number(cursor) || 0)}`;
+        url += `&skip_rows=${Math.max(0, Number(skipRows) || 0)}`;
+    } else if (approxMode) {
+        url += '&approx_total=1';
+    }
     const text = await _fetchApiText(url, { signal: _abortCtrl.signal });
     const json = _parseApiJson(text);
     if (json.status !== 'success') throw new Error(json.message || 'API error');
-    return json.data.dir;
+    return _normalizeDirPayload(json.data.dir);
 }
 
 async function _fetchDetail(diskId, user, dirOffset = 0, fileOffset = 0, limit = FILE_PAGE) {
@@ -737,25 +847,33 @@ async function _fetchDetail(diskId, user, dirOffset = 0, fileOffset = 0, limit =
     if (_currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
-
+    if (_currentFilters.nodeType && _currentFilters.nodeType !== 'all') url += `&node_type=${encodeURIComponent(_currentFilters.nodeType)}`;
     const text = await _fetchApiText(url, { signal: _abortCtrl.signal });
     const json = _parseApiJson(text);
     if (json.status !== 'success') throw new Error(json.message || 'API error');
     return json.data;
 }
 
-async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE) {
+async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE, cursorMode = false, cursor = 0, approxMode = false, skipRows = 0) {
     const b64User = btoa(unescape(encodeURIComponent(user)));
     let url = `api.php?id=${encodeURIComponent(diskId)}&type=files&user_b64=${encodeURIComponent(b64User)}&offset=${offset}&limit=${limit}`;
     if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
     if (_currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
+    if (_currentFilters.nodeType && _currentFilters.nodeType !== 'all') url += `&node_type=${encodeURIComponent(_currentFilters.nodeType)}`;
+    if (cursorMode) {
+        url += '&export_stream=1';
+        url += `&cursor=${Math.max(0, Number(cursor) || 0)}`;
+        url += `&skip_rows=${Math.max(0, Number(skipRows) || 0)}`;
+    } else if (approxMode) {
+        url += '&approx_total=1';
+    }
 
     const text = await _fetchApiText(url);
     const json = _parseApiJson(text);
     if (json.status !== 'success') throw new Error(json.message || 'API error');
-    return json.data.file;
+    return _normalizeFilePayload(json.data.file);
 }
 
 async function _fetchUserList(diskId) {
@@ -801,6 +919,49 @@ async function _fetchFileCount(diskId, user) {
     }
 }
 
+async function _buildExactCursorMap(kind, diskId, user, root) {
+    const isDir = kind === 'dir';
+    let cursor = 0;
+    let page = 1;
+    let total = 0;
+    const pageMap = { 1: 0 };
+
+    if (isDir) _dirCursorByPage = { 1: 0 };
+    else _fileCursorByPage = { 1: 0 };
+
+    while (true) {
+        if (_selectedUser !== user || _currentDisk !== diskId) return;
+        const payload = await _fetchExportPage(isDir ? 'dirs' : 'files', diskId, user, 0, FILE_PAGE, cursor);
+        const rows = isDir ? (payload?.dirs || []) : (payload?.files || []);
+        total += rows.length;
+
+        const hasMore = !!payload?.has_more;
+        const nextCursor = Number(payload?.next_cursor ?? cursor ?? 0);
+        if (hasMore && nextCursor > cursor) {
+            page += 1;
+            pageMap[page] = nextCursor;
+            if (isDir) _dirCursorByPage[page] = nextCursor;
+            else _fileCursorByPage[page] = nextCursor;
+            cursor = nextCursor;
+        } else {
+            break;
+        }
+    }
+
+    if (_selectedUser !== user || _currentDisk !== diskId) return;
+    const pages = Math.max(1, Math.ceil(total / FILE_PAGE));
+    if (isDir) {
+        _dirCursorByPage = pageMap;
+        _dirTotalExact = total;
+        _dirTotalPages = pages;
+    } else {
+        _fileCursorByPage = pageMap;
+        _fileTotalExact = total;
+        _fileTotalPages = pages;
+    }
+    _applyLazyCount(root, isDir ? 'dir' : 'file', total);
+}
+
 // Update badge + pagination in-place after accurate count arrives
 function _applyLazyCount(root, type, exactCount) {
     if (!root || exactCount === null || exactCount === undefined) return;
@@ -820,13 +981,50 @@ function _applyLazyCount(root, type, exactCount) {
     }
 
     if (badge) badge.textContent = `Page ${curPage} of ${pages} · ${total.toLocaleString()} ${label}`;
-    if (pgWrap) pgWrap.outerHTML  = _renderPagination(curPage, pages, type);
+    if (pgWrap) {
+        pgWrap.outerHTML = _renderPagination(curPage, pages, type);
+    } else if (pages > 1) {
+        const card = root.querySelector(type === 'dir' ? '#ud-dir-card' : '#ud-file-card');
+        if (card) card.insertAdjacentHTML('beforeend', _renderPagination(curPage, pages, type));
+    }
 }
 
 
 // ── Core render ───────────────────────────────────────────────────────────────
 
 function _getRoot() { return document.getElementById('ud-root'); }
+
+function _bestCursorStart(pageMap, targetPage) {
+    let bestPage = 1;
+    let bestCursor = 0;
+    if (!pageMap || typeof pageMap !== 'object') return { page: bestPage, cursor: bestCursor };
+
+    for (const [k, v] of Object.entries(pageMap)) {
+        const page = Number(k);
+        const cursor = Number(v);
+        if (!Number.isFinite(page) || !Number.isFinite(cursor)) continue;
+        if (page <= targetPage && page >= bestPage) {
+            bestPage = page;
+            bestCursor = Math.max(0, cursor);
+        }
+    }
+    return { page: bestPage, cursor: bestCursor };
+}
+
+function _visibleFilterSummary() {
+    return {
+        query: String(_currentFilters.query || '').trim(),
+        ext: String(_currentFilters.ext || '').trim(),
+        minSize: Number(_currentFilters.minSize || 0) || 0,
+        maxSize: Number(_currentFilters.maxSize || 0) || 0,
+        nodeType: (_currentFilters.nodeType === 'dir' || _currentFilters.nodeType === 'file') ? _currentFilters.nodeType : 'all',
+    };
+}
+
+function _isEffectivelyUnfiltered() {
+    const f = _visibleFilterSummary();
+    return !f.query && !f.ext && f.minSize <= 0 && f.maxSize <= 0 && f.nodeType === 'all';
+}
 
 async function _loadAndRender(user) {
     const root = _getRoot();
@@ -839,6 +1037,8 @@ async function _loadAndRender(user) {
     _dirTotalPages  = 1;
     _fileTotalExact = null;
     _dirTotalExact  = null;
+    _fileCursorByPage = { 1: 0 };
+    _dirCursorByPage  = { 1: 0 };
 
     const toolbar = root.querySelector('#ud-unified-toolbar');
     if (toolbar) {
@@ -850,9 +1050,27 @@ async function _loadAndRender(user) {
     if (contentBody) contentBody.innerHTML = _renderSkeleton();
 
     try {
-        const detailData = await _fetchDetail(_currentDisk, user, 0, 0, FILE_PAGE);
-        const dirData = detailData.dir;
-        const fileData = detailData.file;
+        let detailData = await _fetchDetail(_currentDisk, user, 0, 0, FILE_PAGE);
+        let dirData = _normalizeDirPayload(detailData.dir);
+        let fileData = _normalizeFilePayload(detailData.file);
+
+        const suspiciousEmpty = _isEffectivelyUnfiltered()
+            && (Number(dirData.total_dirs ?? 0) <= 1)
+            && (Number(fileData.total_files ?? 0) <= 1)
+            && (dirData.dirs?.length ?? 0) === 0
+            && (fileData.files?.length ?? 0) === 0;
+
+        if (suspiciousEmpty) {
+            _currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0, nodeType: 'all' };
+            localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
+            if (toolbar) {
+                toolbar.innerHTML = _renderFilterBar();
+                _attachFilterEvents(toolbar, root);
+            }
+            detailData = await _fetchDetail(_currentDisk, user, 0, 0, FILE_PAGE);
+            dirData = _normalizeDirPayload(detailData.dir);
+            fileData = _normalizeFilePayload(detailData.file);
+        }
 
         const otherUser = _otherUsers.find(o => o.name === user);
         const noDirBreakdown = (dirData.total_dirs ?? dirData.dirs.length ?? 0) === 0 && (dirData.dirs?.length ?? 0) === 0;
@@ -870,13 +1088,19 @@ async function _loadAndRender(user) {
             return;
         }
 
+        const hasExtFilter = _hasExtFilter();
+        const dirHiddenByType = (_currentFilters.nodeType === 'file');
+        const dirDisabled = hasExtFilter || dirHiddenByType;
+        const dirDisableReason = hasExtFilter ? 'ext' : (dirHiddenByType ? 'type' : '');
         _fileTotalPages = Math.max(1, Math.ceil((fileData.total_files ?? fileData.files.length) / FILE_PAGE));
-        _dirTotalPages  = Math.max(1, Math.ceil((dirData.total_dirs ?? dirData.dirs.length) / FILE_PAGE));
+        _dirTotalPages  = dirDisabled
+            ? 1
+            : Math.max(1, Math.ceil((dirData.total_dirs ?? dirData.dirs.length) / FILE_PAGE));
 
         if (contentBody) {
             contentBody.innerHTML = `
                 <div class="ud-grid">
-                    ${_renderDirCard(dirData)}
+                    ${dirDisabled ? _renderDirCardDisabled(dirDisableReason) : _renderDirCard(dirData)}
                     ${_renderFileCard(fileData)}
                 </div>`;
             _attachContentEvents(contentBody, root);
@@ -888,23 +1112,15 @@ async function _loadAndRender(user) {
         if (hasFilters) {
             const capturedUser = user;
             const capturedDisk = _currentDisk;
-            // Show spinner in badges while counting
+
             const dirBadge  = root.querySelector('#ud-dir-badge');
             const fileBadge = root.querySelector('#ud-file-badge');
-            if (dirBadge  && dirData.has_more)  dirBadge.textContent  += ' …';
-            if (fileBadge && fileData.has_more) fileBadge.textContent += ' …';
+            if (!dirDisabled && dirBadge) dirBadge.textContent += ' …';
+            if (fileBadge) fileBadge.textContent += ' …';
 
-            if (dirData.has_more) {
-                _fetchDirCount(capturedDisk, capturedUser).then(n => {
-                    if (n !== null && _selectedUser === capturedUser && _currentDisk === capturedDisk)
-                        _applyLazyCount(root, 'dir', n);
-                }).catch(() => {});
-            }
-            if (fileData.has_more) {
-                _fetchFileCount(capturedDisk, capturedUser).then(n => {
-                    if (n !== null && _selectedUser === capturedUser && _currentDisk === capturedDisk)
-                        _applyLazyCount(root, 'file', n);
-                }).catch(() => {});
+            _buildExactCursorMap('file', capturedDisk, capturedUser, root).catch(() => {});
+            if (!dirDisabled) {
+                _buildExactCursorMap('dir', capturedDisk, capturedUser, root).catch(() => {});
             }
         }
     } catch (err) {
@@ -964,7 +1180,7 @@ function _attachContentEvents(contentEl, root) {
     contentEl.querySelector('#ud-export-files-user')?.addEventListener('click', () => _udExportFiles(false));
 }
 
-async function _goToPageFile(root, page) {
+async function _goToPageFile(root, page, allowFallback = true) {
     if (!_currentDisk || !_selectedUser) return;
     if (page < 1 || page > _fileTotalPages) return;
 
@@ -976,17 +1192,46 @@ async function _goToPageFile(root, page) {
     if (pager) pager.style.pointerEvents = 'none';
 
     try {
-        const offset   = (page - 1) * FILE_PAGE;
-        const fileData = await _fetchFilePage(_currentDisk, _selectedUser, offset, FILE_PAGE);
-        _filePage      = page;
-        const fallbackTotal = fileData.total_files ?? fileData.files.length;
+        const offset = (page - 1) * FILE_PAGE;
+        const hasFilters = _hasActiveFilters();
+        let fileData;
+        let usedCursorPage = null;
+        if (hasFilters) {
+            const start = _bestCursorStart(_fileCursorByPage, page);
+            usedCursorPage = start.page;
+            const skipRows = Math.max(0, (page - start.page) * FILE_PAGE);
+            fileData = await _fetchFilePage(_currentDisk, _selectedUser, 0, FILE_PAGE, true, start.cursor, true, skipRows);
+            if (_fileCursorByPage[page] === undefined) _fileCursorByPage[page] = start.cursor;
+        } else {
+            fileData = await _fetchFilePage(_currentDisk, _selectedUser, offset, FILE_PAGE, false, 0, false, 0);
+        }
+        if (hasFilters) {
+            const next = Number(fileData?.next_cursor ?? 0);
+            if (next > 0) _fileCursorByPage[page + 1] = next;
+        }
+        const rows = Array.isArray(fileData?.files) ? fileData.files.map(_normalizeFileRow) : [];
+        const fallbackTotal = fileData.total_files ?? rows.length;
         const totalFiles = _fileTotalExact ?? fallbackTotal;
-        _fileTotalPages = Math.max(1, Math.ceil(totalFiles / FILE_PAGE));
+        const computedTotalPages = Math.max(1, Math.ceil(totalFiles / FILE_PAGE));
+
+        // Guard against stale/overestimated totals from backend indexes.
+        // If requested page is empty, clamp UI back to last page that can contain rows.
+        if (allowFallback && page > 1 && rows.length === 0) {
+            const maxReachablePage = Math.max(1, Math.ceil((offset + rows.length) / FILE_PAGE));
+            const safePage = Math.min(page - 1, computedTotalPages, maxReachablePage);
+            _fileTotalPages = Math.max(1, safePage);
+            if (safePage !== page) {
+                return _goToPageFile(root, safePage, false);
+            }
+        }
+
+        _filePage = page;
+        _fileTotalPages = computedTotalPages;
 
         // Re-render file card rows + pagination in-place
         if (list) {
             const grandTotal = fileData.total_used || 1;
-            list.innerHTML = fileData.files.map(f => {
+            list.innerHTML = rows.map(f => {
                 const pct = Math.min((f.size / grandTotal) * 100, 100).toFixed(1);
                 const ext = _ext(f.path);
                 const clr = _extColor(ext);
@@ -1006,7 +1251,8 @@ async function _goToPageFile(root, page) {
         // Update badge
         if (badge) {
             const fullTotal = fileData.total_files_full ?? totalFiles;
-            badge.textContent = `Page ${page} of ${_fileTotalPages} · ${fullTotal.toLocaleString()} files`;
+            const displayTotal = _hasActiveFilters() ? totalFiles : fullTotal;
+            badge.textContent = `Page ${page} of ${_fileTotalPages} · ${displayTotal.toLocaleString()} files`;
         }
 
         // Re-render pagination
@@ -1021,8 +1267,9 @@ async function _goToPageFile(root, page) {
     }
 }
 
-async function _goToPageDir(root, page) {
+async function _goToPageDir(root, page, allowFallback = true) {
     if (!_currentDisk || !_selectedUser) return;
+    if (_hasExtFilter() || _currentFilters.nodeType === 'file') return;
     if (page < 1 || page > _dirTotalPages) return;
 
     // Dim the list while loading
@@ -1033,16 +1280,42 @@ async function _goToPageDir(root, page) {
     if (pager) pager.style.pointerEvents = 'none';
 
     try {
-        const offset  = (page - 1) * FILE_PAGE;
-        const dirData = await _fetchDir(_currentDisk, _selectedUser, offset, FILE_PAGE);
-        _dirPage      = page;
-        const fallbackTotal = dirData.total_dirs ?? dirData.dirs.length;
+        const offset = (page - 1) * FILE_PAGE;
+        const hasFilters = _hasActiveFilters();
+        let dirData;
+        if (hasFilters) {
+            const start = _bestCursorStart(_dirCursorByPage, page);
+            const skipRows = Math.max(0, (page - start.page) * FILE_PAGE);
+            dirData = await _fetchDir(_currentDisk, _selectedUser, 0, FILE_PAGE, true, start.cursor, true, skipRows);
+            if (_dirCursorByPage[page] === undefined) _dirCursorByPage[page] = start.cursor;
+        } else {
+            dirData = await _fetchDir(_currentDisk, _selectedUser, offset, FILE_PAGE, false, 0, false, 0);
+        }
+        if (hasFilters) {
+            const next = Number(dirData?.next_cursor ?? 0);
+            if (next > 0) _dirCursorByPage[page + 1] = next;
+        }
+        const rows = Array.isArray(dirData?.dirs) ? dirData.dirs.map(_normalizeDirRow) : [];
+        const fallbackTotal = dirData.total_dirs ?? rows.length;
         const totalDirs = _dirTotalExact ?? fallbackTotal;
-        _dirTotalPages = Math.max(1, Math.ceil(totalDirs / FILE_PAGE));
+        const computedTotalPages = Math.max(1, Math.ceil(totalDirs / FILE_PAGE));
+
+        // Guard against stale/overestimated totals from backend indexes.
+        if (allowFallback && page > 1 && rows.length === 0) {
+            const maxReachablePage = Math.max(1, Math.ceil((offset + rows.length) / FILE_PAGE));
+            const safePage = Math.min(page - 1, computedTotalPages, maxReachablePage);
+            _dirTotalPages = Math.max(1, safePage);
+            if (safePage !== page) {
+                return _goToPageDir(root, safePage, false);
+            }
+        }
+
+        _dirPage = page;
+        _dirTotalPages = computedTotalPages;
 
         if (list) {
             const grandTotal = dirData.total_used || 1;
-            list.innerHTML = dirData.dirs.map(d => {
+            list.innerHTML = rows.map(d => {
                 const pct = Math.min((d.used / grandTotal) * 100, 100).toFixed(1);
                 const cls = parseFloat(pct) > 70 ? 'ud-fill-rose' : parseFloat(pct) > 40 ? 'ud-fill-amber' : 'ud-fill-sky';
                 return `
@@ -1059,7 +1332,8 @@ async function _goToPageDir(root, page) {
 
         if (badge) {
             const fullTotal = dirData.total_dirs_full ?? totalDirs;
-            badge.textContent = `Page ${page} of ${_dirTotalPages} · ${fullTotal.toLocaleString()} dirs`;
+            const displayTotal = _hasActiveFilters() ? totalDirs : fullTotal;
+            badge.textContent = `Page ${page} of ${_dirTotalPages} · ${displayTotal.toLocaleString()} dirs`;
         }
 
         const pgWrap = root.querySelector('#ud-pagination-dir');
@@ -1155,9 +1429,15 @@ async function _renderRoot(diskDir) {
         _attachFilterEvents(toolbar, root);
     }
 
-    // Restore previously selected user
+    // Restore previously selected user; auto-select the first one if nothing stored
     if (_selectedUser && _allUserNames.includes(_selectedUser)) {
         _loadAndRender(_selectedUser);
+    } else if (total > 0) {
+        // No stored selection — pick the first user and load immediately
+        const firstUser = _allUserNames[0];
+        localStorage.setItem('ud_selected_user', firstUser);
+        _selectedUser = firstUser;
+        _loadAndRender(firstUser);
     }
 }
 
@@ -1207,30 +1487,35 @@ const UD_BTN_SPINNER_SVG = `
     </svg>
 </span>`;
 
-function _buildUserCsvExportUrl(kind) {
-    const b64User = btoa(unescape(encodeURIComponent(_selectedUser)));
-    const params = new URLSearchParams({
-        id: _currentDisk,
-        type: kind === 'dirs' ? 'dirs_csv' : 'files_csv',
-        user_b64: b64User,
-        filter_query: _currentFilters.query || '',
-        filter_ext: _currentFilters.ext || '',
-        filter_min_size: _currentFilters.minSize || 0,
-        filter_max_size: _currentFilters.maxSize || 0
-    });
-    return 'api.php?' + params.toString();
+async function _fetchExportPage(kind, diskId, user, offset, limit, cursor = null) {
+    const b64User = btoa(unescape(encodeURIComponent(user)));
+    let url = `api.php?id=${encodeURIComponent(diskId)}&type=${kind === 'dirs' ? 'dirs' : 'files'}&user_b64=${encodeURIComponent(b64User)}&offset=${offset}&limit=${limit}`;
+    if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
+    if (cursor !== null) {
+        url += '&export_stream=1';
+        url += `&cursor=${Math.max(0, Number(cursor) || 0)}`;
+    } else if (kind !== 'dirs') {
+        url += '&approx_total=1';
+    }
+    if (kind !== 'dirs' && _currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
+    if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
+    if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
+    const text = await _fetchApiText(url, {});
+    const json = _parseApiJson(text);
+    if (json.status !== 'success') throw new Error(json.message || 'API error');
+    if (kind === 'dirs') return _normalizeDirPayload(json.data.dir);
+    return _normalizeFilePayload(json.data.file);
 }
 
-function _downloadUserCsvExport(kind) {
-    const a = document.createElement('a');
-    a.href = _buildUserCsvExportUrl(kind);
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => a.remove(), 1000);
+function _exportFileName(kind) {
+    const safeUser = String(_selectedUser || 'user').replace(/[^A-Za-z0-9._-]+/g, '_');
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    return `${kind}_${safeUser}_${ts}`;
 }
 
-function _startUserCsvExport(kind) {
+async function _startUserCsvExport(kind) {
     if (!_currentDisk || !_selectedUser) return;
 
     const btn = document.querySelector(kind === 'dirs' ? '#ud-export-dirs-user' : '#ud-export-files-user');
@@ -1240,15 +1525,106 @@ function _startUserCsvExport(kind) {
         btn.innerHTML = UD_BTN_SPINNER_SVG;
     }
 
-    _downloadUserCsvExport(kind);
-    showToast('Export Started', 'CSV export started. If all export slots are busy, the server will queue this download automatically.', 'info');
+    const toastId = `ud-export-${kind}`;
+    showProgressToast(toastId, `Exporting ${kind === 'dirs' ? 'Top Dirs' : 'Top Files'} (.csv.gz)`);
 
-    setTimeout(() => {
+    try {
+        const PAGE = kind === 'files' ? 20000 : 5000;
+        let offset = 0;
+        let finished = false;
+        let totalHint = null;
+        let fileCursor = kind === 'files' ? 0 : null;
+        let dirCursor = kind === 'dirs' ? 0 : null;
+
+        const headers = kind === 'dirs'
+            ? ['User', 'Path', 'Used (bytes)']
+            : ['User', 'Path', 'Size (bytes)', 'Extension'];
+
+        if (kind === 'dirs' && _hasExtFilter()) {
+            finished = true;
+            totalHint = 0;
+            updateProgressToast(toastId, 100, '0/0 rows');
+        }
+
+        const ok = await streamExportGzip(
+            _exportFileName(kind),
+            headers,
+            async () => {
+                if (finished) return { rows: [], isLast: true };
+
+                const payload = await _fetchExportPage(kind, _currentDisk, _selectedUser, offset, PAGE, kind === 'dirs' ? dirCursor : fileCursor);
+                const rows = kind === 'dirs' ? (payload?.dirs || []) : (payload?.files || []);
+                if (kind === 'files') {
+                    fileCursor = Number(payload?.next_cursor ?? fileCursor ?? 0);
+                } else if (kind === 'dirs') {
+                    dirCursor = Number(payload?.next_cursor ?? dirCursor ?? 0);
+                }
+                totalHint = kind === 'dirs'
+                    ? (payload?.total_dirs ?? totalHint ?? 0)
+                    : (payload?.total_files ?? totalHint ?? 0);
+
+                offset += rows.length;
+                const hasMore = !!payload?.has_more;
+                finished = (rows.length === 0) || !hasMore;
+
+                const pct = totalHint > 0 ? Math.min(100, Math.round((offset / totalHint) * 100)) : (finished ? 100 : 0);
+                updateProgressToast(toastId, pct, `${offset.toLocaleString()}/${(totalHint || 0).toLocaleString()} rows`);
+
+                const mapped = rows.map(r => {
+                    if (kind === 'dirs') {
+                        return {
+                            user: _selectedUser,
+                            path: r?.path || '',
+                            used: Number(r?.used || 0),
+                        };
+                    }
+                    return {
+                        user: _selectedUser,
+                        path: r?.path || '',
+                        size: Number(r?.size || 0),
+                        xt: r?.xt || '',
+                    };
+                });
+
+                return { rows: mapped, isLast: finished };
+            },
+            (row, header) => {
+                if (kind === 'dirs') {
+                    if (header === 'User') return row.user;
+                    if (header === 'Path') return row.path;
+                    if (header === 'Used (bytes)') return row.used;
+                    return '';
+                }
+                if (header === 'User') return row.user;
+                if (header === 'Path') return row.path;
+                if (header === 'Size (bytes)') return row.size;
+                if (header === 'Extension') return row.xt;
+                return '';
+            }
+        );
+
+        if (!ok) {
+            closeProgressToast(toastId);
+            showToast('Export Not Supported', 'Your browser does not support stream gzip export. Please use a Chromium-based browser.', 'warning');
+            return;
+        }
+
+        updateProgressToast(toastId, 100, 'Completed');
+        setTimeout(() => closeProgressToast(toastId), 500);
+        showToast('Export Completed', `${kind === 'dirs' ? 'Top Dirs' : 'Top Files'} exported as .csv.gz`, 'success');
+    } catch (err) {
+        closeProgressToast(toastId);
+        if (err?.message === 'AbortError') {
+            showToast('Export Cancelled', 'Save dialog was closed.', 'info');
+        } else {
+            showToast('Export Failed', err?.message || 'Unexpected error during export.', 'error');
+        }
+    } finally {
         if (btn) {
             btn.disabled = false;
             btn.innerHTML = originalBtnHTML;
         }
-    }, 2500);
+    }
 }
 
 async function _udExportDirs() {
@@ -1273,6 +1649,8 @@ export async function initUserDetailTab(diskId, otherUsers = []) {
 
     if (isNewDisk) {
         _selectedUser = null;
+        _currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0, nodeType: 'all' };
+        localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
         if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null; }
     }
 
@@ -1288,6 +1666,8 @@ export function resetUserDetailTab() {
     _currentDisk  = null;
     _fileTotalExact = null;
     _dirTotalExact  = null;
+    _fileCursorByPage = { 1: 0 };
+    _dirCursorByPage  = { 1: 0 };
     if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null; }
     const root = _getRoot();
     if (root) root.innerHTML = '';

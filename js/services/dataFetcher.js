@@ -1,9 +1,9 @@
 import { UINodes, AppState, animateValue, bytesToTB, showToast } from '../core/main.js';
 import { DataStore } from '../core/dataStore.js';
 import { ChartManager } from '../renderers/chartManager.js';
-import { initRouter, navigateTo } from '../core/router.js';
+import { initRouter, navigateTo, setRouteContext } from '../core/router.js';
 import { renderDetailTables, initScaleToggle, resetDashboardToEmpty } from '../renderers/detailRenderer.js';
-import { initUserDetailTab, resetUserDetailTab } from '../renderers/userDetailRenderer.js';
+import { initUserDetailTab, resetUserDetailTab } from '../renderers/userDetailRenderer.js?v=81';
 import { fmt, smartFmtTick } from '../utils/formatters.js';
 import { saveFilters, loadFilters } from '../utils/filterStorage.js';
 
@@ -709,6 +709,13 @@ class DataFetcher {
                 if (tabs) tabs.style.display = ''; // Restore subtabs visibility
 
                 const activeCfg = this.disksConfig?.find(d => d.id === id);
+                if (activeCfg) {
+                    setRouteContext({
+                        space: 'storageos',
+                        team: String(activeCfg.team || 'team').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                        disk: String(activeCfg.id || 'disk').toLowerCase(),
+                    });
+                }
                 const titleEl = document.getElementById('shared-page-title');
                 if (titleEl && activeCfg) {
                     titleEl.textContent = activeCfg.name;
@@ -772,11 +779,11 @@ class DataFetcher {
 
 
                 const activeTabBtn = document.querySelector('.tab-btn.active');
-                if (activeTabBtn && activeTabBtn.id === 'nav-detail') {
-                    navigateTo('detail');
-                } else {
-                    navigateTo('overview');
-                }
+                let desiredPage = 'overview';
+                if (activeTabBtn && activeTabBtn.id === 'nav-detail') desiredPage = 'detail';
+                else if (activeTabBtn && activeTabBtn.id === 'nav-overview') desiredPage = 'overview';
+                else desiredPage = (loadFilters().activePage === 'detail') ? 'detail' : 'overview';
+                navigateTo(desiredPage);
             };
 
             // Setup render context function
@@ -871,6 +878,8 @@ class DataFetcher {
 
                     const tIdx = parseInt(teamGroup.dataset.tidx);
                     const teamNode = rawD[tIdx];
+                    const teamSlug = String(teamNode?.name || 'team').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+                    setRouteContext({ space: 'storageos', team: teamSlug || 'team', disk: '' });
 
                     this._activeDisk = null;
                     saveFilters({ activeDisk: null, activeTeamTIdx: tIdx });
@@ -885,6 +894,16 @@ class DataFetcher {
                     }
                 });
             });
+
+            const hashRaw = String(window.location.hash || '').replace(/^#/, '');
+            const hashClean = (hashRaw.startsWith('/') ? hashRaw : `/${hashRaw}`).replace(/\/+$/, '') || '/';
+            if (hashClean === '/') {
+                const firstTeam = projectContainer.querySelector('.disk-team-group');
+                if (firstTeam) {
+                    firstTeam.click();
+                    return;
+                }
+            }
 
             const savedFilters = loadFilters();
             const savedDisk = savedFilters.activeDisk;

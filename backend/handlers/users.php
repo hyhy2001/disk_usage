@@ -164,10 +164,13 @@ function api_handle_users($disk_path) {
 
         // Fallback #2: user list from detail manifest.
         if (count($users) === 0 && is_file($manifest_path)) {
-            $manifest = api_detail_json_load($manifest_path);
-            if (is_array($manifest) && isset($manifest['users']) && is_array($manifest['users'])) {
-                foreach ($manifest['users'] as $u) {
-                    if (is_array($u) && isset($u['username']) && $u['username'] !== '') $users[] = (string)$u['username'];
+            $raw = @file_get_contents($manifest_path);
+            if ($raw !== false) {
+                $manifest = @json_decode($raw, true);
+                if (is_array($manifest) && isset($manifest['users']) && is_array($manifest['users'])) {
+                    foreach ($manifest['users'] as $u) {
+                        if (is_array($u) && isset($u['username']) && $u['username'] !== '') $users[] = (string)$u['username'];
+                    }
                 }
             }
         }

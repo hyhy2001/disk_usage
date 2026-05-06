@@ -2,6 +2,7 @@
 import { AppState } from '../core/main.js';
 import { fmt, fmtDate } from '../utils/formatters.js';
 import { saveFilters, loadFilters } from '../utils/filterStorage.js';
+import { getDetailTabFromUrl, replaceRoute } from '../core/router.js';
 import { renderInodesTab } from './inodeRenderer.js';
 
 let _store = null;
@@ -388,7 +389,7 @@ function resetFilters() {
 // ── Tab switching ──────────────────────────────────────────────────────────
 
 function initDetailTabs() {
-    const savedTab = loadFilters().activeTab;
+    const savedTab = getDetailTabFromUrl() || loadFilters().activeTab;
 
     document.querySelectorAll('.detail-tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -400,6 +401,7 @@ function initDetailTabs() {
             document.querySelectorAll('.detail-tab-pane').forEach(p => p.classList.remove('active'));
             document.getElementById(`tab-pane-${target}`)?.classList.add('active');
             saveFilters({ activeTab: target });
+            replaceRoute('detail', target);
             if (target === 'history') {
                 requestAnimationFrame(() => {
                     applyFilters();

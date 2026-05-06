@@ -95,38 +95,6 @@ function api_cache_set($key, $data) {
     }
 }
 
-function api_cache_remember($key, $ttl_seconds, $builder, $lock_wait_seconds, $peer_wait_seconds) {
-    $cached = api_cache_get($key, $ttl_seconds);
-    if ($cached !== null) return $cached;
-
-    $lock = api_cache_lock_acquire($key, $lock_wait_seconds);
-    if ($lock) {
-        // Re-check after lock to avoid duplicate rebuild.
-        $cached = api_cache_get($key, $ttl_seconds);
-        if ($cached !== null) {
-            api_cache_lock_release($lock);
-            return $cached;
-        }
-
-        $data = call_user_func($builder);
-        if ($data !== null) api_cache_set($key, $data);
-        api_cache_lock_release($lock);
-        return $data;
-    }
-
-    // Could not lock: wait briefly for peer to populate cache.
-    $deadline = microtime(true) + max(0.1, (float)$peer_wait_seconds);
-    do {
-        usleep(60000); // 60ms poll interval
-        $cached = api_cache_get($key, $ttl_seconds);
-        if ($cached !== null) return $cached;
-    } while (microtime(true) < $deadline);
-
-    // Last resort: rebuild without lock.
-    $data = call_user_func($builder);
-    if ($data !== null) api_cache_set($key, $data);
-    return $data;
-}
 
 function api_cache_maybe_cleanup() {
     // Lightweight probabilistic cleanup to keep temp cache folder healthy.

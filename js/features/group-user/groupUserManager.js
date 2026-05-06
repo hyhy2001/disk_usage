@@ -175,7 +175,8 @@ function normalizeAndSaveLocal() {
 }
 
 async function fetchJson(url, options = {}) {
-    const res = await fetch(url, options);
+    const finalOptions = Object.assign({ cache: 'no-store' }, options || {});
+    const res = await fetch(url, finalOptions);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
     try {

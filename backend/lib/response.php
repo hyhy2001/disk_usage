@@ -13,10 +13,6 @@ function b64_error($message, $code) {
     exit;
 }
 
-function json_success($data) {
-    echo json_encode($data);
-    exit;
-}
 
 /**
  * Issue ETag/Cache-Control headers based on the source file's mtime/size and any

@@ -1,28 +1,40 @@
 <?php
 
+function api_dispatch_global_type($type, $root_dir) {
+    $global_routes = array(
+        'disks' => 'api_handle_disks',
+        'team' => 'api_handle_team',
+        'health' => 'api_handle_health',
+        'group_config' => 'api_handle_group_config',
+        'admin' => 'api_handle_admin',
+    );
+    if (!isset($global_routes[$type])) return false;
+    call_user_func($global_routes[$type], $root_dir);
+    return true;
+}
+
+function api_dispatch_disk_type($type, $disk_path) {
+    $disk_routes = array(
+        'permissions' => 'api_handle_permissions',
+        'treemap' => 'api_handle_treemap_simple',
+        'treemap_search' => 'api_handle_treemap_search_simple',
+        'meta' => 'api_handle_meta',
+        'users' => 'api_handle_users',
+        'dirs' => 'api_handle_dirs',
+        'files' => 'api_handle_files',
+        'detail' => 'api_handle_detail_simple',
+        'scan_status' => 'api_handle_scan_status',
+    );
+    if (!isset($disk_routes[$type])) return false;
+    call_user_func($disk_routes[$type], $disk_path);
+    return true;
+}
+
 function api_dispatch_request($root_dir) {
     $req_id = sanitize_name(param('id', ''));
-    $type   = param('type', '');
+    $type   = (string)param('type', '');
 
-    if ($type === 'disks') {
-        api_handle_disks($root_dir);
-    }
-
-    if ($type === 'team') {
-        api_handle_team($root_dir);
-    }
-
-    if ($type === 'health') {
-        api_handle_health($root_dir);
-    }
-
-    if ($type === 'group_config') {
-        api_handle_group_config($root_dir);
-    }
-
-    if ($type === 'admin') {
-        api_handle_admin($root_dir);
-    }
+    if (api_dispatch_global_type($type, $root_dir)) return;
 
     if ($req_id === '') {
         http_response_code(400);
@@ -49,40 +61,7 @@ function api_dispatch_request($root_dir) {
 
     header('Content-Type: text/plain; charset=utf-8');
 
-    $type = param('type', '');
-    if ($type === 'permissions') {
-        api_handle_permissions($disk_path);
-    }
-    if ($type === 'treemap') {
-        api_handle_treemap($disk_path);
-    }
-    if ($type === 'treemap_search') {
-        api_handle_treemap_search($disk_path);
-    }
-    if ($type === 'meta') {
-        api_handle_meta($disk_path);
-    }
-    if ($type === 'users') {
-        api_handle_users($disk_path);
-    }
-    if ($type === 'dirs') {
-        api_handle_dirs($disk_path);
-    }
-    if ($type === 'dirs_csv') {
-        api_handle_dirs_csv($disk_path);
-    }
-    if ($type === 'files') {
-        api_handle_files($disk_path);
-    }
-    if ($type === 'files_csv') {
-        api_handle_files_csv($disk_path);
-    }
-    if ($type === 'detail') {
-        api_handle_detail($disk_path);
-    }
-    if ($type === 'scan_status') {
-        api_handle_scan_status($disk_path);
-    }
+    if (api_dispatch_disk_type($type, $disk_path)) return;
 
     api_handle_aggregate($disk_path);
 }

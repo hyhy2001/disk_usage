@@ -20,10 +20,3 @@ function sanitize_name($raw) {
     $raw = str_replace(array('../', '..\\'), '', $raw);
     return preg_replace('/[^a-zA-Z0-9_\-\.\@\$\s]/', '', $raw);
 }
-
-function matches_wildcard($string, $wildcard) {
-    if ($wildcard === '') return true;
-    if (strpos($wildcard, '*') === false) $wildcard = '*' . $wildcard . '*';
-    $regex = '/^' . str_replace('\*', '.*', preg_quote($wildcard, '/')) . '$/i';
-    return preg_match($regex, $string);
-}

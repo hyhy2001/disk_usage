@@ -193,7 +193,7 @@ async function _fetchPage(page) {
     if (pgWrap) pgWrap.style.pointerEvents = 'none';
 
     try {
-        const res  = await fetch(url, { signal: _abortCtrl.signal });
+        const res  = await fetch(url, { signal: _abortCtrl.signal, cache: 'no-store' });
         const text = await res.text();
         let json;
         try { json = JSON.parse(text); } catch { json = JSON.parse(atob(text)); }
@@ -464,7 +464,8 @@ async function _exportCsv(useFilters, btn) {
                 const res  = await fetch('api.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: params.toString()
+                    body: params.toString(),
+                    cache: 'no-store'
                 });
                 
                 const text = await res.text();
