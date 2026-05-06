@@ -17,8 +17,7 @@ let _dirTotalPages  = 1;
 let _fileTotalExact = null; // exact total from lazy count (filtered mode)
 let _dirTotalExact  = null; // exact total from lazy count (filtered mode)
 const FILE_PAGE     = 500;  // rows per page
-let _currentFilters = JSON.parse(localStorage.getItem('ud_filters') || 'null') || { query: '', ext: '', minSize: 0, maxSize: 0, nodeType: 'all' };
-if (_currentFilters.nodeType !== 'dir' && _currentFilters.nodeType !== 'file') _currentFilters.nodeType = 'all';
+let _currentFilters = JSON.parse(localStorage.getItem('ud_filters') || 'null') || { query: '', ext: '', minSize: 0, maxSize: 0 };
 let _allUserNames   = [];
 let _fileCursorByPage = { 1: 0 };
 let _dirCursorByPage  = { 1: 0 };
@@ -333,7 +332,6 @@ function _renderFilterBar() {
     const badgeHtml = activeAdv > 0 ? `<span style="background:var(--sky-500); color:#fff; border-radius:50%; width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">${activeAdv}</span>` : '';
     const minSizePair = _formatBytesForInput(_currentFilters.minSize);
     const maxSizePair = _formatBytesForInput(_currentFilters.maxSize);
-    const nodeType = (_currentFilters.nodeType === 'dir' || _currentFilters.nodeType === 'file') ? _currentFilters.nodeType : 'all';
 
     const selectedLabel = _selectedUser || 'Select User...';
     const opts = _allUserNames.map(name =>
@@ -385,15 +383,6 @@ function _renderFilterBar() {
                 Filters ${badgeHtml}
             </button>
             <div id="ud-filter-options-dropdown" style="display: none; position: absolute; top: calc(100% + 8px); right: 0; width: min(260px, calc(100vw - 24px)); max-width: calc(100vw - 16px); box-sizing: border-box; padding: 16px; flex-direction: column; gap: 16px; z-index: 1000; box-shadow: 0 12px 40px rgba(0,0,0,0.7); border: 1px solid var(--border-color); border-radius: 10px; background-color: var(--bg-base); background-image: linear-gradient(var(--bg-surface-elevated, #1e293b), var(--bg-surface-elevated, #1e293b)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);">
-                
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Node Type</label>
-                    <select id="ud-filter-node-type" style="height: 34px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-elevated); color: var(--text-primary); font-size: 0.85rem; outline: none; cursor: pointer;">
-                        <option value="all" ${nodeType === 'all' ? 'selected' : ''}>All</option>
-                        <option value="dir" ${nodeType === 'dir' ? 'selected' : ''}>Directories</option>
-                        <option value="file" ${nodeType === 'file' ? 'selected' : ''}>Files</option>
-                    </select>
-                </div>
 
                 <div style="display: flex; flex-direction: column; gap: 6px;">
                     <label style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">File Extension</label>
@@ -467,11 +456,10 @@ function _attachFilterEvents(contentEl, root) {
     const minSizeUnitInput = contentEl.querySelector('#ud-filter-min-size-unit');
     const maxSizeValInput = contentEl.querySelector('#ud-filter-max-size-val');
     const maxSizeUnitInput = contentEl.querySelector('#ud-filter-max-size-unit');
-    const nodeTypeInput = contentEl.querySelector('#ud-filter-node-type');
     const importBtn = contentEl.querySelector('#ud-filter-import');
     const exportBtn = contentEl.querySelector('#ud-filter-export');
     const fileInput = contentEl.querySelector('#ud-filter-file-input');
-    
+
     const optionsBtn = contentEl.querySelector('#ud-filter-options-btn');
     const optionsDropdown = contentEl.querySelector('#ud-filter-options-dropdown');
 
@@ -717,7 +705,6 @@ function _attachFilterEvents(contentEl, root) {
             
             _currentFilters.minSize = Math.floor(minSizeBytes);
             _currentFilters.maxSize = Math.floor(maxSizeBytes);
-            _currentFilters.nodeType = (nodeTypeInput && (nodeTypeInput.value === 'dir' || nodeTypeInput.value === 'file')) ? nodeTypeInput.value : 'all';
 
             localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
 
@@ -728,7 +715,7 @@ function _attachFilterEvents(contentEl, root) {
     
     if (resetBtn) {
         resetBtn.addEventListener('click', () => {
-            _currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0, nodeType: 'all' };
+            _currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0 };
             localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
             qInput.value = '';
             extInput.value = '';
@@ -744,7 +731,6 @@ function _attachFilterEvents(contentEl, root) {
             if (minSizeUnitInput) minSizeUnitInput.value = 'MB';
             if (maxSizeValInput) maxSizeValInput.value = '';
             if (maxSizeUnitInput) maxSizeUnitInput.value = 'MB';
-            if (nodeTypeInput) nodeTypeInput.value = 'all';
 
             if (optionsDropdown) optionsDropdown.style.display = 'none';
             if (_selectedUser) _loadAndRender(_selectedUser);
@@ -776,7 +762,6 @@ function _attachFilterEvents(contentEl, root) {
                     if (parsed.ext !== undefined) _currentFilters.ext = parsed.ext;
                     if (parsed.minSize !== undefined) _currentFilters.minSize = parsed.minSize;
                     if (parsed.maxSize !== undefined) _currentFilters.maxSize = parsed.maxSize;
-                    if (parsed.nodeType !== undefined) _currentFilters.nodeType = (parsed.nodeType === 'dir' || parsed.nodeType === 'file') ? parsed.nodeType : 'all';
                     localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
                     if (_selectedUser) _loadAndRender(_selectedUser);
                 } catch (err) {
@@ -850,7 +835,6 @@ async function _fetchDetail(diskId, user, dirOffset = 0, fileOffset = 0, limit =
     if (_currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
-    if (_currentFilters.nodeType && _currentFilters.nodeType !== 'all') url += `&node_type=${encodeURIComponent(_currentFilters.nodeType)}`;
     const t0 = performance.now();
     const text = await _fetchApiText(url, { signal: _abortCtrl.signal });
     const t1 = performance.now();
@@ -867,7 +851,6 @@ async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE, curso
     if (_currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
-    if (_currentFilters.nodeType && _currentFilters.nodeType !== 'all') url += `&node_type=${encodeURIComponent(_currentFilters.nodeType)}`;
     if (cursorMode) {
         url += '&export_stream=1';
         url += `&cursor=${Math.max(0, Number(cursor) || 0)}`;
@@ -1026,13 +1009,12 @@ function _visibleFilterSummary() {
         ext: String(_currentFilters.ext || '').trim(),
         minSize: Number(_currentFilters.minSize || 0) || 0,
         maxSize: Number(_currentFilters.maxSize || 0) || 0,
-        nodeType: (_currentFilters.nodeType === 'dir' || _currentFilters.nodeType === 'file') ? _currentFilters.nodeType : 'all',
     };
 }
 
 function _isEffectivelyUnfiltered() {
     const f = _visibleFilterSummary();
-    return !f.query && !f.ext && f.minSize <= 0 && f.maxSize <= 0 && f.nodeType === 'all';
+    return !f.query && !f.ext && f.minSize <= 0 && f.maxSize <= 0;
 }
 
 async function _loadAndRender(user) {
@@ -1070,7 +1052,7 @@ async function _loadAndRender(user) {
             && (fileData.files?.length ?? 0) === 0;
 
         if (suspiciousEmpty) {
-            _currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0, nodeType: 'all' };
+            _currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0 };
             localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
             if (toolbar) {
                 toolbar.innerHTML = _renderFilterBar();
@@ -1098,9 +1080,8 @@ async function _loadAndRender(user) {
         }
 
         const hasExtFilter = _hasExtFilter();
-        const dirHiddenByType = (_currentFilters.nodeType === 'file');
-        const dirDisabled = hasExtFilter || dirHiddenByType;
-        const dirDisableReason = hasExtFilter ? 'ext' : (dirHiddenByType ? 'type' : '');
+        const dirDisabled = hasExtFilter;
+        const dirDisableReason = hasExtFilter ? 'ext' : '';
         _fileTotalPages = Math.max(1, Math.ceil((fileData.total_files ?? fileData.files.length) / FILE_PAGE));
         _dirTotalPages  = dirDisabled
             ? 1
@@ -1116,7 +1097,6 @@ async function _loadAndRender(user) {
         }
 
         // Lazy count: only when real filters are active.
-        // (nodeType='all' should not trigger this path, or pagination can be overwritten.)
         const hasFilters = _hasActiveFilters();
         if (hasFilters) {
             const capturedUser = user;
@@ -1278,7 +1258,7 @@ async function _goToPageFile(root, page, allowFallback = true) {
 
 async function _goToPageDir(root, page, allowFallback = true) {
     if (!_currentDisk || !_selectedUser) return;
-    if (_hasExtFilter() || _currentFilters.nodeType === 'file') return;
+    if (_hasExtFilter()) return;
     if (page < 1 || page > _dirTotalPages) return;
 
     // Dim the list while loading
@@ -1658,7 +1638,7 @@ export async function initUserDetailTab(diskId, otherUsers = []) {
 
     if (isNewDisk) {
         _selectedUser = null;
-        _currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0, nodeType: 'all' };
+        _currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0 };
         localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
         if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null; }
     }
