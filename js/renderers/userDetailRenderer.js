@@ -1096,9 +1096,10 @@ async function _loadAndRender(user) {
             _attachContentEvents(contentBody, root);
         }
 
-        // Lazy count: only when real filters are active.
+        // Skip lazy count for keyword filter because exact recount can overwrite valid pagination.
         const hasFilters = _hasActiveFilters();
-        if (hasFilters) {
+        const hasKeywordFilter = !!String(_currentFilters.query || '').trim();
+        if (hasFilters && !hasKeywordFilter) {
             const capturedUser = user;
             const capturedDisk = _currentDisk;
 
