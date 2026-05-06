@@ -1115,9 +1115,9 @@ async function _loadAndRender(user) {
             _attachContentEvents(contentBody, root);
         }
 
-        // Lazy count: if has_more and filters are active, accurate totals aren't
-        // known yet. Fire background count requests and patch badge + pagination.
-        const hasFilters = !!(Object.values(_currentFilters).some(v => v && v !== 0));
+        // Lazy count: only when real filters are active.
+        // (nodeType='all' should not trigger this path, or pagination can be overwritten.)
+        const hasFilters = _hasActiveFilters();
         if (hasFilters) {
             const capturedUser = user;
             const capturedDisk = _currentDisk;
