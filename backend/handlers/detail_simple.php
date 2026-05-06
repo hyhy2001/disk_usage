@@ -125,7 +125,7 @@ function api_detail_simple_collect_rows($ctx, $kind, $offset, $limit, $filters) 
         }
     }
 
-    if (function_exists('shell_exec') && !$has_glob) {
+    if (function_exists('shell_exec') && !$has_glob && empty($filters['ext'])) {
         $cmd = array();
         $cmd[] = escapeshellarg('/www/wwwroot/disk.hydev.me/check_disk/src/native_index/query_cli');
         $cmd[] = escapeshellarg($ctx['detail_dir']);
