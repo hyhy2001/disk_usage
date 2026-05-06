@@ -145,11 +145,11 @@ function _renderDirCard(dirData) {
         </div>`;
     }).join('');
 
-    const totalDirs   = dirData.total_dirs ?? dirData.dirs.length;
-    const totalDirsFull = dirData.total_dirs_full ?? totalDirs;
+    const totalDirs   = Math.max(0, dirData.total_dirs ?? dirData.dirs.length);
+    const totalDirsFull = Math.max(0, dirData.total_dirs_full ?? totalDirs);
     const totalPages  = Math.max(1, Math.ceil(totalDirs / FILE_PAGE));
     const currentPage = _dirPage;
-    const displayTotal = _hasActiveFilters() ? totalDirs : totalDirsFull;
+    const displayTotal = Math.max(0, _hasActiveFilters() ? totalDirs : totalDirsFull);
     const badge       = `Page ${currentPage} of ${totalPages} · ${displayTotal.toLocaleString()} dirs`;
 
     return `
@@ -241,12 +241,12 @@ function _renderPagination(current, total, type) {
 function _renderFileCard(fileData) {
     const files = fileData?.files || [];
     const grandTotal  = fileData?.total_used || 1;
-    const totalFiles  = fileData?.total_files ?? files.length;
-    const totalFilesFull = fileData?.total_files_full ?? totalFiles;
+    const totalFiles  = Math.max(0, fileData?.total_files ?? files.length);
+    const totalFilesFull = Math.max(0, fileData?.total_files_full ?? totalFiles);
     const totalPages  = Math.max(1, Math.ceil(totalFiles / FILE_PAGE));
     const currentPage = _filePage;
     const shown       = (fileData?.offset ?? 0) + files.length;
-    const displayTotal = _hasActiveFilters() ? totalFiles : totalFilesFull;
+    const displayTotal = Math.max(0, _hasActiveFilters() ? totalFiles : totalFilesFull);
     const badge       = files.length ? `Page ${currentPage} of ${totalPages} · ${displayTotal.toLocaleString()} files` : 'No files';
 
     const rows = files.length ? files.map(f => {
@@ -1200,8 +1200,8 @@ async function _goToPageFile(root, page, allowFallback = true) {
             if (next > 0) _fileCursorByPage[page + 1] = next;
         }
         const rows = Array.isArray(fileData?.files) ? fileData.files.map(_normalizeFileRow) : [];
-        const fallbackTotal = fileData.total_files ?? rows.length;
-        const totalFiles = _fileTotalExact ?? fallbackTotal;
+        const fallbackTotal = Math.max(0, fileData.total_files ?? rows.length);
+        const totalFiles = Math.max(0, _fileTotalExact ?? fallbackTotal);
         const computedTotalPages = Math.max(1, Math.ceil(totalFiles / FILE_PAGE));
 
         // Guard against stale/overestimated totals from backend indexes.
@@ -1240,8 +1240,8 @@ async function _goToPageFile(root, page, allowFallback = true) {
 
         // Update badge
         if (badge) {
-            const fullTotal = fileData.total_files_full ?? totalFiles;
-            const displayTotal = _hasActiveFilters() ? totalFiles : fullTotal;
+            const fullTotal = Math.max(0, fileData.total_files_full ?? totalFiles);
+            const displayTotal = Math.max(0, _hasActiveFilters() ? totalFiles : fullTotal);
             badge.textContent = `Page ${page} of ${_fileTotalPages} · ${displayTotal.toLocaleString()} files`;
         }
 
@@ -1286,8 +1286,8 @@ async function _goToPageDir(root, page, allowFallback = true) {
             if (next > 0) _dirCursorByPage[page + 1] = next;
         }
         const rows = Array.isArray(dirData?.dirs) ? dirData.dirs.map(_normalizeDirRow) : [];
-        const fallbackTotal = dirData.total_dirs ?? rows.length;
-        const totalDirs = _dirTotalExact ?? fallbackTotal;
+        const fallbackTotal = Math.max(0, dirData.total_dirs ?? rows.length);
+        const totalDirs = Math.max(0, _dirTotalExact ?? fallbackTotal);
         const computedTotalPages = Math.max(1, Math.ceil(totalDirs / FILE_PAGE));
 
         // Guard against stale/overestimated totals from backend indexes.
@@ -1321,8 +1321,8 @@ async function _goToPageDir(root, page, allowFallback = true) {
         }
 
         if (badge) {
-            const fullTotal = dirData.total_dirs_full ?? totalDirs;
-            const displayTotal = _hasActiveFilters() ? totalDirs : fullTotal;
+            const fullTotal = Math.max(0, dirData.total_dirs_full ?? totalDirs);
+            const displayTotal = Math.max(0, _hasActiveFilters() ? totalDirs : fullTotal);
             badge.textContent = `Page ${page} of ${_dirTotalPages} · ${displayTotal.toLocaleString()} dirs`;
         }
 
