@@ -203,7 +203,7 @@ function api_detail_simple_total_used($ctx) {
 function api_handle_dirs($disk_path) {
     $who = sanitize_name(get_b64_param('user', ''));
     $offset = get_int('offset', 0, 0, PHP_INT_MAX);
-    $limit = get_int('limit', 500, 1, 5000);
+    $limit = get_int('limit', 500, 1, 50000);
     $count_only = (param('count_only', '0') === '1');
 
     $ctx = api_detail_simple_find_ctx($disk_path, $who);
@@ -232,7 +232,7 @@ function api_handle_dirs($disk_path) {
 function api_handle_files($disk_path) {
     $who = sanitize_name(get_b64_param('user', ''));
     $offset = get_int('offset', 0, 0, PHP_INT_MAX);
-    $limit = get_int('limit', 500, 1, 5000);
+    $limit = get_int('limit', 500, 1, 50000);
     $count_only = (param('count_only', '0') === '1');
 
     $ctx = api_detail_simple_find_ctx($disk_path, $who);
@@ -262,7 +262,7 @@ function api_handle_detail_simple($disk_path) {
     $who = sanitize_name(get_b64_param('user', ''));
     $dir_offset = get_int('dir_offset', 0, 0, PHP_INT_MAX);
     $file_offset = get_int('file_offset', 0, 0, PHP_INT_MAX);
-    $limit = get_int('limit', 500, 1, 5000);
+    $limit = get_int('limit', 500, 1, 50000);
     $node_type = strtolower(trim(param('node_type', 'all')));
     if ($node_type !== 'dir' && $node_type !== 'file') $node_type = 'all';
 

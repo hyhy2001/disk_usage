@@ -1519,7 +1519,7 @@ async function _startUserCsvExport(kind) {
     showProgressToast(toastId, `Exporting ${kind === 'dirs' ? 'Top Dirs' : 'Top Files'} (.csv.gz)`);
 
     try {
-        const PAGE = kind === 'files' ? 20000 : 5000;
+        const PAGE = kind === 'files' ? 50000 : 20000;
         let offset = 0;
         let finished = false;
         let totalHint = null;
