@@ -832,7 +832,10 @@ async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE, cursorMode
     } else if (approxMode) {
         url += '&approx_total=1';
     }
+    const t0 = performance.now();
     const text = await _fetchApiText(url, { signal: _abortCtrl.signal });
+    const t1 = performance.now();
+    console.log(`[Detail User] fetchDir: offset=${offset} limit=${limit} time=${(t1-t0).toFixed(0)}ms`);
     const json = _parseApiJson(text);
     if (json.status !== 'success') throw new Error(json.message || 'API error');
     return _normalizeDirPayload(json.data.dir);
@@ -848,7 +851,10 @@ async function _fetchDetail(diskId, user, dirOffset = 0, fileOffset = 0, limit =
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
     if (_currentFilters.nodeType && _currentFilters.nodeType !== 'all') url += `&node_type=${encodeURIComponent(_currentFilters.nodeType)}`;
+    const t0 = performance.now();
     const text = await _fetchApiText(url, { signal: _abortCtrl.signal });
+    const t1 = performance.now();
+    console.log(`[Detail User] fetchDetail: dirOffset=${dirOffset} fileOffset=${fileOffset} limit=${limit} time=${(t1-t0).toFixed(0)}ms`);
     const json = _parseApiJson(text);
     if (json.status !== 'success') throw new Error(json.message || 'API error');
     return json.data;
@@ -870,7 +876,10 @@ async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE, curso
         url += '&approx_total=1';
     }
 
+    const t0 = performance.now();
     const text = await _fetchApiText(url);
+    const t1 = performance.now();
+    console.log(`[Detail User] fetchFilePage: offset=${offset} limit=${limit} time=${(t1-t0).toFixed(0)}ms`);
     const json = _parseApiJson(text);
     if (json.status !== 'success') throw new Error(json.message || 'API error');
     return _normalizeFilePayload(json.data.file);
