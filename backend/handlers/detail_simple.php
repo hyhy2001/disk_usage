@@ -136,7 +136,11 @@ function api_detail_simple_collect_rows($ctx, $kind, $offset, $limit, $filters) 
     if ($who !== '') { $cmd[] = '--user'; $cmd[] = escapeshellarg($who); }
     $cmd[] = '--type';
     $cmd[] = $is_file ? 'file' : 'dir';
-    if (!empty($filters['q'])) { $cmd[] = '--kw'; $cmd[] = escapeshellarg($filters['q']); }
+    if (!empty($filters['q'])) {
+        $kw_cli = str_replace(',', '|', (string)$filters['q']);
+        $cmd[] = '--kw';
+        $cmd[] = escapeshellarg($kw_cli);
+    }
     if ($is_file && !empty($filters['ext'])) { $cmd[] = '--ext'; $cmd[] = escapeshellarg($filters['ext']); }
     if (isset($filters['min']) && (int)$filters['min'] > 0) { $cmd[] = '--min'; $cmd[] = escapeshellarg((string)(int)$filters['min']); }
     if (isset($filters['max']) && (int)$filters['max'] > 0) { $cmd[] = '--max'; $cmd[] = escapeshellarg((string)(int)$filters['max']); }
