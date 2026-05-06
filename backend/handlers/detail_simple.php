@@ -125,99 +125,54 @@ function api_detail_simple_collect_rows($ctx, $kind, $offset, $limit, $filters) 
         }
     }
 
-    if (function_exists('shell_exec') && !$has_glob) {
-        $cmd = array();
-        $cmd[] = escapeshellarg('/www/wwwroot/disk.hydev.me/check_disk/src/native_index/query_cli');
-        $cmd[] = escapeshellarg($ctx['detail_dir']);
-        if ($who !== '') { $cmd[] = '--user'; $cmd[] = escapeshellarg($who); }
-        $cmd[] = '--type';
-        $cmd[] = $is_file ? 'file' : 'dir';
-        if (!empty($filters['q'])) { $cmd[] = '--kw'; $cmd[] = escapeshellarg($filters['q']); }
-        if ($is_file && !empty($filters['ext'])) { $cmd[] = '--ext'; $cmd[] = escapeshellarg($filters['ext']); }
-        if (isset($filters['min']) && (int)$filters['min'] > 0) { $cmd[] = '--min'; $cmd[] = escapeshellarg((string)(int)$filters['min']); }
-        if (isset($filters['max']) && (int)$filters['max'] > 0) { $cmd[] = '--max'; $cmd[] = escapeshellarg((string)(int)$filters['max']); }
-        $cmd[] = '--offset'; $cmd[] = escapeshellarg((string)(int)$offset);
-        $cmd[] = '--limit';  $cmd[] = escapeshellarg((string)(int)$limit);
-        $cmd[] = '--sort';   $cmd[] = 'size_desc';
-        $cmd[] = '--fields'; $cmd[] = $is_file ? 'path,size,ext' : 'path,size';
-        $cmd[] = '--json';
-        $cmd[] = '--docs';
-
-        $raw = @shell_exec(implode(' ', $cmd) . ' 2>&1');
-        $json = @json_decode((string)$raw, true);
-        if (is_array($json) && isset($json['docs']) && is_array($json['docs'])) {
-            $rows = array();
-            foreach ($json['docs'] as $doc) {
-                if (!is_array($doc)) continue;
-                if ($is_file) {
-                    $path = isset($doc['path']) ? (string)$doc['path'] : '';
-                    $row = array(
-                        'path' => $path,
-                        'size' => isset($doc['size']) ? (int)$doc['size'] : 0,
-                        'xt' => isset($doc['ext']) ? strtolower((string)$doc['ext']) : api_detail_simple_ext($path),
-                    );
-                } else {
-                    $row = array(
-                        'path' => isset($doc['path']) ? (string)$doc['path'] : '',
-                        'used' => isset($doc['size']) ? (int)$doc['size'] : 0,
-                    );
-                }
-                if (api_detail_simple_match($row, $is_file, $filters)) $rows[] = $row;
-            }
-
-            $total = isset($json['matched']) ? (int)$json['matched'] : count($rows);
-            if ($total < 0) $total = 0;
-            return array('rows' => $rows, 'total' => $total, 'has_more' => ($offset + count($rows)) < $total);
-        }
+    // If glob wildcard: query_cli doesn't support it, return empty
+    if ($has_glob) {
+        return array('rows' => array(), 'total' => 0, 'has_more' => false);
     }
 
-    $manifest = $ctx['manifest'];
-    $user_dir = $ctx['user_dir'];
-    $path_dict = api_detail_simple_path_dict($ctx['detail_dir']);
+    $cmd = array();
+    $cmd[] = escapeshellarg('/www/wwwroot/disk.hydev.me/check_disk/src/native_index/query_cli');
+    $cmd[] = escapeshellarg($ctx['detail_dir']);
+    if ($who !== '') { $cmd[] = '--user'; $cmd[] = escapeshellarg($who); }
+    $cmd[] = '--type';
+    $cmd[] = $is_file ? 'file' : 'dir';
+    if (!empty($filters['q'])) { $cmd[] = '--kw'; $cmd[] = escapeshellarg($filters['q']); }
+    if ($is_file && !empty($filters['ext'])) { $cmd[] = '--ext'; $cmd[] = escapeshellarg($filters['ext']); }
+    if (isset($filters['min']) && (int)$filters['min'] > 0) { $cmd[] = '--min'; $cmd[] = escapeshellarg((string)(int)$filters['min']); }
+    if (isset($filters['max']) && (int)$filters['max'] > 0) { $cmd[] = '--max'; $cmd[] = escapeshellarg((string)(int)$filters['max']); }
+    $cmd[] = '--offset'; $cmd[] = escapeshellarg((string)(int)$offset);
+    $cmd[] = '--limit';  $cmd[] = escapeshellarg((string)(int)$limit);
+    $cmd[] = '--sort';   $cmd[] = 'size_desc';
+    $cmd[] = '--fields'; $cmd[] = $is_file ? 'path,size,ext' : 'path,size';
+    $cmd[] = '--json';
+    $cmd[] = '--docs';
 
-    $parts = array();
-    if (isset($manifest[$kind]) && is_array($manifest[$kind]) && isset($manifest[$kind]['parts']) && is_array($manifest[$kind]['parts'])) {
-        $parts = $manifest[$kind]['parts'];
+    $raw = @shell_exec(implode(' ', $cmd) . ' 2>&1');
+    $json = @json_decode((string)$raw, true);
+    if (!is_array($json) || !isset($json['docs']) || !is_array($json['docs'])) {
+        return array('rows' => array(), 'total' => 0, 'has_more' => false);
     }
 
     $rows = array();
-    $total = 0;
-    foreach ($parts as $part) {
-        if (!is_array($part) || empty($part['path'])) continue;
-        $part_path = $user_dir . DIRECTORY_SEPARATOR . str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $part['path']);
-        $fh = @fopen($part_path, 'r');
-        if (!$fh) continue;
-
-        while (($line = fgets($fh)) !== false) {
-            $line = trim($line);
-            if ($line === '') continue;
-            $obj = @json_decode($line, true);
-            if (!is_array($obj)) continue;
-
-            $gid = isset($obj['gid']) ? (int)$obj['gid'] : -1;
-            $path = isset($obj['path']) ? (string)$obj['path'] : (isset($obj['p']) ? (string)$obj['p'] : (isset($path_dict[$gid]) ? (string)$path_dict[$gid] : ''));
-
-            if ($is_file) {
-                $row = array(
-                    'path' => $path,
-                    'size' => isset($obj['size']) ? (int)$obj['size'] : (isset($obj['s']) ? (int)$obj['s'] : 0),
-                    'xt' => isset($obj['xt']) ? strtolower((string)$obj['xt']) : (isset($obj['ext']) ? strtolower((string)$obj['ext']) : api_detail_simple_ext($path)),
-                );
-            } else {
-                $row = array(
-                    'path' => $path,
-                    'used' => isset($obj['used']) ? (int)$obj['used'] : (isset($obj['s']) ? (int)$obj['s'] : 0),
-                );
-            }
-
-            if (!api_detail_simple_match($row, $is_file, $filters)) continue;
-            $total++;
-            if ($total <= $offset) continue;
-            if (count($rows) < $limit) $rows[] = $row;
+    foreach ($json['docs'] as $doc) {
+        if (!is_array($doc)) continue;
+        if ($is_file) {
+            $path = isset($doc['path']) ? (string)$doc['path'] : '';
+            $rows[] = array(
+                'path' => $path,
+                'size' => isset($doc['size']) ? (int)$doc['size'] : 0,
+                'xt'   => isset($doc['ext']) ? strtolower((string)$doc['ext']) : api_detail_simple_ext($path),
+            );
+        } else {
+            $rows[] = array(
+                'path' => isset($doc['path']) ? (string)$doc['path'] : '',
+                'used' => isset($doc['size']) ? (int)$doc['size'] : 0,
+            );
         }
-        @fclose($fh);
     }
 
+    $total = isset($json['matched']) ? (int)$json['matched'] : count($rows);
+    if ($total < 0) $total = 0;
     return array('rows' => $rows, 'total' => $total, 'has_more' => ($offset + count($rows)) < $total);
 }
 
