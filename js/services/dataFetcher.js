@@ -484,9 +484,20 @@ class DataFetcher {
                     </div>
                 </div>
             `;
-            // Insert overlay inside workspace canvas so it only covers the content area
-            const canvas = document.getElementById('workspace-canvas') || document.body;
-            canvas.appendChild(overlay);
+            document.body.appendChild(overlay);
+        }
+        const canvas = document.getElementById('workspace-canvas');
+        if (canvas) {
+            const rect = canvas.getBoundingClientRect();
+            overlay.style.left = `${Math.max(0, rect.left)}px`;
+            overlay.style.width = `${Math.max(0, rect.width)}px`;
+            overlay.style.top = '0px';
+            overlay.style.bottom = '0px';
+        } else {
+            overlay.style.left = '0px';
+            overlay.style.width = '100vw';
+            overlay.style.top = '0px';
+            overlay.style.bottom = '0px';
         }
         const msgEl = overlay.querySelector('.disk-scan-message');
         if (msgEl) msgEl.textContent = message || 'Disk scan in progress. Please wait.';
