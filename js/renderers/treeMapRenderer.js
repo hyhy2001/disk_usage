@@ -9,7 +9,6 @@ let _searchQuery = '';
 let _searchRenderToken = 0;
 let _searchDebounceTimer = null;
 let _searchOutsideClickBound = false;
-let _nodeTypeFilter = 'all';
 
 let _searchState = {
     q: '',
@@ -158,7 +157,7 @@ function renderBreadcrumb(node) {
     holder.innerHTML = html;
 
     holder.querySelectorAll('.tmx-crumb-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', async function() {
             const idx = parseInt(btn.getAttribute('data-idx') || '-1', 10);
             if (isNaN(idx) || idx < 0 || idx >= chain.length) return;
             const target = chain[idx];
@@ -174,12 +173,11 @@ function renderBreadcrumb(node) {
             }
 
             if (target.__tmVirtual) {
-                _searchQuery = target.path || target.name || '';
-                // Force a fresh fetch for the breadcrumb-selected segment.
-                // If we set state.q equal here, renderCurrentNode may skip fetching.
+                _searchQuery = '';
                 resetSearchState('');
                 const input = document.getElementById('tmx-search-input');
-                if (input) input.value = _searchQuery;
+                if (input) input.value = '';
+                _currentNode = await resolveVirtualNode(target);
                 renderCurrentNode();
                 return;
             }
@@ -193,7 +191,7 @@ function renderBreadcrumb(node) {
 async function fetchShardPage(shardId, offset, limit) {
     if (!shardId || !_diskId) return { items: [], total: 0, has_more: false, source: 'none' };
 
-    const key = _nodeTypeFilter + ':' + shardId + ':' + offset + ':' + limit;
+    const key = shardId + ':' + offset + ':' + limit;
     if (_pageCache[key]) return _pageCache[key];
     if (_inflight[key]) return _inflight[key];
 
@@ -203,8 +201,7 @@ async function fetchShardPage(shardId, offset, limit) {
                 'api.php?id=' + encodeURIComponent(_diskId) +
                 '&type=treemap&shard_id=' + encodeURIComponent(shardId) +
                 '&offset=' + encodeURIComponent(offset) +
-                '&limit=' + encodeURIComponent(limit) +
-                '&node_type=' + encodeURIComponent(_nodeTypeFilter),
+                '&limit=' + encodeURIComponent(limit),
                 { cache: 'no-store' }
             );
             const text = await res.text();
@@ -234,7 +231,7 @@ async function fetchShardPage(shardId, offset, limit) {
 async function fetchSearchPage(query, offset, limit) {
     if (!_diskId || !query) return { items: [], total: 0, has_more: false, source: 'none' };
 
-    const key = _nodeTypeFilter + ':' + query + ':' + offset + ':' + limit;
+    const key = query + ':' + offset + ':' + limit;
     if (_searchPageCache[key]) return _searchPageCache[key];
     if (_searchInflight[key]) return _searchInflight[key];
 
@@ -244,8 +241,7 @@ async function fetchSearchPage(query, offset, limit) {
                 'api.php?id=' + encodeURIComponent(_diskId) +
                 '&type=treemap_search&q=' + encodeURIComponent(query) +
                 '&offset=' + encodeURIComponent(offset) +
-                '&limit=' + encodeURIComponent(limit) +
-                '&node_type=' + encodeURIComponent(_nodeTypeFilter),
+                '&limit=' + encodeURIComponent(limit),
                 { cache: 'no-store' }
             );
             const text = await res.text();
@@ -354,8 +350,52 @@ function mapSearchHitToNode(hit) {
         owner: hit.owner || '',
         has_children: !!hit.has_children,
         shard_id: hit.shard_id || '',
-        __tmParent: _rootNode || null
+        __tmParent: null
     };
+}
+
+function buildLinkedVirtualChainForPath(path) {
+    // Build chain up to the PARENT of path (not including path itself)
+    const trimmed = String(path || '').replace(/\/$/, '');
+    const lastSlash = trimmed.lastIndexOf('/');
+    const parentPath = lastSlash <= 0 ? '/' : trimmed.substring(0, lastSlash);
+
+    if (!parentPath || parentPath === '/') {
+        return _rootNode || null;
+    }
+
+    const parts = parentPath.split('/').filter(function(p) { return p !== ''; });
+    let parent = _rootNode || null;
+    let acc = '';
+    for (let i = 0; i < parts.length; i++) {
+        acc += '/' + parts[i];
+        parent = {
+            name: parts[i],
+            path: acc,
+            __tmVirtual: true,
+            __tmParent: parent
+        };
+    }
+    return parent || _rootNode || null;
+}
+
+async function resolveVirtualNode(node) {
+    // If node has no shard_id, try to find it via search API
+    if (!node || node.shard_id || !node.path) return node;
+    const path = node.path;
+    // Use exact segment match from search results
+    const data = await fetchSearchPage(path.split('/').pop() || path, 0, 50);
+    const items = Array.isArray(data.items) ? data.items : [];
+    const match = items.find(function(item) { return item.path === path; });
+    if (match && match.shard_id) {
+        node.shard_id = match.shard_id;
+        node.has_children = !!match.has_children;
+        node.value = match.value || node.value || 0;
+        node.owner = match.owner || node.owner || '';
+        node.type = match.type || node.type || 'directory';
+        if (match.name) node.name = match.name;
+    }
+    return node;
 }
 
 function hideSearchDropdown() {
@@ -367,6 +407,7 @@ function hideSearchDropdown() {
 
 function pickSearchHit(hit) {
     const node = mapSearchHitToNode(hit);
+    node.__tmParent = buildLinkedVirtualChainForPath(hit.path);
     _searchQuery = '';
     resetSearchState('');
     const input = document.getElementById('tmx-search-input');
@@ -594,11 +635,6 @@ function renderExplorer(rootNode, meta) {
                     '<button class="user-bar-btn" id="tm-root-btn" data-tooltip="Jump to disk root"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg> Root</button>' +
                 '</div>' +
                 '<div class="treemap-toolbar-right">' +
-                    '<select id="tm-node-type" class="ud-export-btn" style="height:32px; padding:0 8px; margin-right:8px;">' +
-                        '<option value="all">All</option>' +
-                        '<option value="dir">Directories</option>' +
-                        '<option value="file">Files</option>' +
-                    '</select>' +
                     '<span class="treemap-meta" id="tm-meta"></span>' +
                 '</div>' +
             '</div>' +
@@ -642,29 +678,6 @@ function renderExplorer(rootNode, meta) {
     if (rootBtn) {
         rootBtn.addEventListener('click', function() {
             _currentNode = rootNode;
-            renderCurrentNode();
-        });
-    }
-
-    const nodeTypeSel = document.getElementById('tm-node-type');
-    if (nodeTypeSel) {
-        nodeTypeSel.value = _nodeTypeFilter;
-        nodeTypeSel.addEventListener('change', function() {
-            const v = nodeTypeSel.value === 'dir' || nodeTypeSel.value === 'file' ? nodeTypeSel.value : 'all';
-            if (v === _nodeTypeFilter) return;
-            _nodeTypeFilter = v;
-            Object.keys(_pageCache).forEach(function(k) { delete _pageCache[k]; });
-            Object.keys(_inflight).forEach(function(k) { delete _inflight[k]; });
-            Object.keys(_searchPageCache).forEach(function(k) { delete _searchPageCache[k]; });
-            Object.keys(_searchInflight).forEach(function(k) { delete _searchInflight[k]; });
-            if (_searchQuery.trim()) {
-                resetSearchState('');
-            } else if (_currentNode && _currentNode.__tmState) {
-                _currentNode.__tmState.children = [];
-                _currentNode.__tmState.offset = 0;
-                _currentNode.__tmState.total = 0;
-                _currentNode.__tmState.hasMore = false;
-            }
             renderCurrentNode();
         });
     }

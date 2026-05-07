@@ -37,6 +37,9 @@ class DataFetcher {
         this._toastHistory = new Map(); // toastKey -> lastShownAtMs
         this._groupUserConfig = null;
         this._scanStatusTimer = null; // ID of the status polling timer
+        this._scanLocked = false;
+        this._teamCardPollTimer = null; // ID of team card polling timer
+        this._currentTeamName = null; // Name of current team being polled
 
         // Initialize charts
         AppState.chartManagerInstance = new ChartManager();
@@ -50,6 +53,7 @@ class DataFetcher {
         const permTab = document.querySelector('.detail-tab-btn[data-tab="permissions"]');
         if (permTab) {
             permTab.addEventListener('click', () => {
+                if (this._scanLocked) return;
                 if (!this._permissionsLoaded && this._activeDisk) {
                     this._fetchPermissions();
                 }
@@ -60,6 +64,7 @@ class DataFetcher {
         const treeMapTab = document.querySelector('.detail-tab-btn[data-tab="treemap"]');
         if (treeMapTab) {
             treeMapTab.addEventListener('click', () => {
+                if (this._scanLocked) return;
                 if (!this._treeMapLoaded && this._activeDisk) {
                     this._fetchTreeMap();
                 }
@@ -70,6 +75,7 @@ class DataFetcher {
         const userDetailTab = document.querySelector('.detail-tab-btn[data-tab="user-detail"]');
         if (userDetailTab) {
             userDetailTab.addEventListener('click', () => {
+                if (this._scanLocked) return;
                 if (this._activeDisk) {
                     const snapshot = this.dataStore?.latestSnapshot;
                     // Merge user_usage + other_usage so picker shows all known users
@@ -93,6 +99,18 @@ class DataFetcher {
                     navigateTo('overview');
                 }
             });
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) return;
+            if (this._activeDisk) {
+                const status = this._fetchScanStatus(this._activeDisk);
+                void status;
+                return;
+            }
+            if (this._currentTeamName) {
+                this._startTeamCardPolling(this._currentTeamName);
+            }
         });
 
         // Team Overview Grid/List View Toggle
@@ -200,6 +218,7 @@ class DataFetcher {
     }
 
     async _fetchDiskMeta(diskId, signal) {
+        if (this._scanLocked) return null;
         try {
             const json = await this._fetchJson(`api.php?id=${encodeURIComponent(diskId)}&type=meta`, { signal, cacheTimeMs: 15000 });
             if (json?.status !== 'success' || !json?.data) return null;
@@ -222,6 +241,137 @@ class DataFetcher {
         return null;
     }
 
+    async _fetchTeamScanStatuses(teamName) {
+        try {
+            const json = await this._fetchJson(`api.php?type=team_scan_status&name=${encodeURIComponent(teamName)}`, { cacheTimeMs: 0 });
+            if (json?.status === 'success' && Array.isArray(json.data)) {
+                return json.data;
+            }
+        } catch (_e) {
+            // Ignore errors on background poll
+        }
+        return null;
+    }
+
+    _stopTeamCardPolling() {
+        if (this._teamCardPollTimer) {
+            clearInterval(this._teamCardPollTimer);
+            this._teamCardPollTimer = null;
+        }
+    }
+
+    _setTeamCardScanState(card, status) {
+        if (!card || !status) return;
+
+        let badge = card.querySelector('.card-scan-badge');
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.className = 'card-scan-badge';
+            const header = card.querySelector('.card-header');
+            if (header) header.appendChild(badge);
+        }
+
+        const isScanning = !!status.running || (!!status.stage && status.stage !== 'done' && status.stage !== 'error');
+        const isError = status.stage === 'error';
+
+        const usedPill = card.querySelector('.disk-path');
+        const statValues = card.querySelectorAll('.extended-stat .value');
+
+        const _buildTooltip = (s) => {
+            const lines = [];
+            const stageLabel = {
+                scan: 'Scanning files', report: 'Building report',
+                detail: 'Building user details', treemap: 'Building treemap',
+                sync: 'Syncing', done: 'Completed', error: 'Error',
+            };
+            lines.push(`<b>Stage:</b> ${stageLabel[s.stage] || s.stage || 'unknown'}`);
+            if (s.message) lines.push(`<b>Status:</b> ${s.message}`);
+            if (s.error) lines.push(`<b>Error:</b> ${s.error}`);
+            if (s.host) lines.push(`<b>Host:</b> ${s.host}`);
+            if (s.pid) lines.push(`<b>PID:</b> ${s.pid}`);
+            if (s.started_at) {
+                const d = new Date(s.started_at * 1000);
+                lines.push(`<b>Started:</b> ${d.toLocaleTimeString('en-GB')}`);
+            }
+            if (s.updated_at) {
+                const elapsed = Math.max(0, (s.updated_at - (s.started_at || s.updated_at)));
+                if (elapsed > 0) lines.push(`<b>Elapsed:</b> ${elapsed}s`);
+            }
+            return `<div style='text-align:left; line-height:1.6;'>${lines.join('<br>')}</div>`;
+        };
+
+        if (isScanning) {
+            const stageMeta = this._getScanStageMeta(status.stage, status.message);
+            badge.innerHTML = `<span class="scan-dot scanning"></span><span class="scan-label">${stageMeta.statusText}</span>`;
+            badge.setAttribute('data-tooltip', _buildTooltip(status));
+            badge.setAttribute('data-tooltip-pos', 'top');
+            badge.style.display = 'flex';
+
+            if (usedPill) {
+                if (!usedPill.dataset.originalText) usedPill.dataset.originalText = usedPill.textContent;
+                usedPill.textContent = '...';
+            }
+            statValues.forEach((el) => {
+                if (!el.dataset.originalText) el.dataset.originalText = el.textContent;
+                el.textContent = '...';
+            });
+            return;
+        }
+
+        if (isError) {
+            const errMsg = status.error || status.message || 'Scan failed';
+            badge.innerHTML = `<span class="scan-dot error"></span><span class="scan-label">${errMsg}</span>`;
+            badge.setAttribute('data-tooltip', _buildTooltip(status));
+            badge.setAttribute('data-tooltip-pos', 'top');
+            badge.style.display = 'flex';
+            return;
+        }
+
+        badge.removeAttribute('data-tooltip');
+        badge.removeAttribute('data-tooltip-pos');
+        badge.style.display = 'none';
+        if (usedPill && usedPill.dataset.originalText) {
+            usedPill.textContent = usedPill.dataset.originalText;
+        }
+        statValues.forEach((el) => {
+            if (el.dataset.originalText) {
+                el.textContent = el.dataset.originalText;
+            }
+        });
+    }
+
+    _startTeamCardPolling(teamName) {
+        this._stopTeamCardPolling();
+        if (!teamName) return;
+
+        const run = async () => {
+            if (document.hidden) return;
+            if (!this._currentTeamName || this._currentTeamName !== teamName) {
+                this._stopTeamCardPolling();
+                return;
+            }
+
+            const statuses = await this._fetchTeamScanStatuses(teamName);
+            if (!statuses) return;
+
+            const byDiskId = new Map();
+            statuses.forEach((s) => {
+                const id = (s && s._disk_id) ? String(s._disk_id) : '';
+                if (id) byDiskId.set(id, s);
+            });
+
+            const cards = document.querySelectorAll('.team-disk-card[data-id]');
+            cards.forEach((card) => {
+                const diskId = card.getAttribute('data-id') || '';
+                const status = byDiskId.get(diskId) || { running: false, stage: 'done' };
+                this._setTeamCardScanState(card, status);
+            });
+        };
+
+        run();
+        this._teamCardPollTimer = setInterval(run, 5000);
+    }
+
     _startStatusPolling(diskId) {
         this._stopStatusPolling();
         // Poll every 3 seconds
@@ -230,6 +380,7 @@ class DataFetcher {
                 this._stopStatusPolling();
                 return;
             }
+            if (document.hidden) return;
             const status = await this._fetchScanStatus(diskId);
             // Insert banner into workspace actions area (near sync button)
             const anchor = document.querySelector('.workspace-actions');
@@ -244,24 +395,110 @@ class DataFetcher {
             }
             const bannerText = banner ? banner.querySelector('.scan-status-banner-text') : null;
 
-            if (status && status.running) {
-                const stage = status.stage ? `[${status.stage}] ` : '';
-                const msg = status.message || 'Scanning filesystem';
-                UINodes.statusText.textContent = `Disk scan in progress — ${msg}`;
+            // Show overlay when scan is running OR stage is not 'done'
+            const isScanning = (status && status.running) || (status && status.stage && status.stage !== 'done');
+
+            if (isScanning) {
+                const stageMeta = this._getScanStageMeta(status?.stage, status?.message);
+                UINodes.statusText.textContent = stageMeta.statusText;
                 UINodes.statusDot.classList.add('scanning');
                 UINodes.statusDot.style.backgroundColor = '';
-                UINodes.statusDot.title = `Stage: ${status.stage}`;
+                UINodes.statusDot.title = `Stage: ${status.stage || 'unknown'}`;
                 if (banner && bannerText) {
                     banner.classList.remove('hidden');
-                    bannerText.textContent = `${stage}${msg}`;
+                    bannerText.textContent = stageMeta.bannerText;
                 }
-            } else if (status && !status.running && !AppState.isProcessing) {
-                UINodes.statusText.textContent = "System Optimized";
-                UINodes.statusDot.classList.remove('scanning');
-                UINodes.statusDot.title = '';
+                this._showScanOverlay(stageMeta.overlayText);
+            } else if (!AppState.isProcessing) {
+                if (status) {
+                    const isError = status.stage === 'error';
+                    UINodes.statusText.textContent = isError ? (status.message || 'Disk scan failed') : 'System Optimized';
+                    UINodes.statusDot.classList.remove('scanning');
+                    UINodes.statusDot.title = status.stage ? `Stage: ${status.stage}` : '';
+                    if (isError) {
+                        UINodes.statusDot.style.backgroundColor = 'var(--rose-500)';
+                    }
+                }
                 if (banner) banner.classList.add('hidden');
+                this._hideScanOverlay();
             }
         }, 3000);
+    }
+
+
+    _getScanStageMeta(stage, message) {
+        const msg = (message || '').trim();
+        const map = {
+            scan: {
+                label: 'Scanning files',
+                overlay: 'Disk scan in progress. Scanning filesystem, please wait.',
+            },
+            report: {
+                label: 'Building summary report',
+                overlay: 'Disk scan in progress. Building summary reports, please wait.',
+            },
+            detail: {
+                label: 'Building user details',
+                overlay: 'Disk scan in progress. Building user detail reports, please wait.',
+            },
+            treemap: {
+                label: 'Building treemap',
+                overlay: 'Disk scan in progress. Building treemap data, please wait.',
+            },
+            sync: {
+                label: 'Syncing reports',
+                overlay: 'Disk scan in progress. Syncing reports to the remote server, please wait.',
+            },
+            error: {
+                label: 'Scan failed',
+                overlay: 'Disk scan failed.',
+            },
+            done: {
+                label: 'Completed',
+                overlay: 'Disk scan completed.',
+            },
+        };
+        const meta = map[stage] || {
+            label: stage ? `Processing ${stage}` : 'Processing',
+            overlay: 'Disk scan in progress. Please wait.',
+        };
+        return {
+            statusText: msg ? `${meta.label} — ${msg}` : meta.label,
+            bannerText: msg ? `[${stage || 'processing'}] ${msg}` : meta.label,
+            overlayText: meta.overlay,
+        };
+    }
+
+    _showScanOverlay(message) {
+        let overlay = document.getElementById('disk-scan-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'disk-scan-overlay';
+            overlay.className = 'disk-scan-overlay';
+            overlay.innerHTML = `
+                <div class="disk-scan-overlay-content">
+                    <div class="disk-scan-spinner"></div>
+                    <div class="disk-scan-message">Disk scan in progress. Please wait.</div>
+                    <div class="disk-scan-progress">
+                        <div class="disk-scan-progress-bar"></div>
+                    </div>
+                </div>
+            `;
+            // Insert overlay at document body level to cover all disk content
+            document.body.appendChild(overlay);
+        }
+        const msgEl = overlay.querySelector('.disk-scan-message');
+        if (msgEl) msgEl.textContent = message || 'Disk scan in progress. Please wait.';
+        this._scanLocked = true;
+        overlay.classList.add('visible');
+    }
+
+    _hideScanOverlay() {
+        this._scanLocked = false;
+        const overlay = document.getElementById('disk-scan-overlay');
+        if (overlay) {
+            overlay.classList.remove('visible');
+        }
     }
 
     _stopStatusPolling() {
@@ -269,6 +506,7 @@ class DataFetcher {
             clearInterval(this._scanStatusTimer);
             this._scanStatusTimer = null;
         }
+        this._hideScanOverlay();
     }
 
     _applyAggregatePayload(jsonResponse, { fromCache = false, silentToast = false } = {}) {
@@ -699,7 +937,7 @@ class DataFetcher {
                 saveFilters({ activeDisk: id });
                 // Keep disk activation lightweight; user list loads on demand in detail tab.
 
-                // Start polling scan status whenever the active disk changes
+                // Start active-disk polling while team polling continues
                 this._startStatusPolling(id);
 
                 // Hiding empty state constraints & show features
@@ -953,6 +1191,9 @@ class DataFetcher {
         if (!restoreDiskId) {
             this._activeDisk = null;
         }
+        // Stop active-disk polling; team card polling will be (re)started after cards render
+        this._stopStatusPolling();
+        this._stopTeamCardPolling();
 
         // Reset Header
         const titleEl = document.getElementById('shared-page-title');
@@ -1051,6 +1292,10 @@ class DataFetcher {
             });
 
             grid.innerHTML = cardsHTML;
+
+            // Start realtime scan status polling for all cards in team
+            this._currentTeamName = teamName;
+            this._startTeamCardPolling(teamName);
 
             // Apply sorting initially once cards are loaded
             if (typeof this.applySort === 'function') {
@@ -1181,6 +1426,11 @@ class DataFetcher {
             return;
         }
 
+        if (this._scanLocked) {
+            UINodes.statusText.textContent = "Disk scan in progress — please wait until scan completes.";
+            return;
+        }
+
         const inflight = this._inflightSyncByDisk.get(diskId);
         if (inflight) {
             UINodes.statusText.textContent = "Sync already running...";
@@ -1261,6 +1511,7 @@ class DataFetcher {
     }
 
     async _fetchPermissions() {
+        if (this._scanLocked) return;
         const diskId = this._activeDisk;
         if (!diskId) return;
         const permBody = document.getElementById('permissions-body');
@@ -1320,6 +1571,7 @@ class DataFetcher {
     }
 
     async _fetchTreeMap() {
+        if (this._scanLocked) return;
         const diskId = this._activeDisk;
         if (!diskId) return;
 

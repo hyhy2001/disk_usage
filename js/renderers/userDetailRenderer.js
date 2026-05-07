@@ -6,7 +6,7 @@ import { streamExportGzip }                 from '../utils/csvExport.js';
 import { AppState, showToast, showProgressToast, updateProgressToast, closeProgressToast } from '../core/main.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let _selectedUser   = localStorage.getItem('ud_selected_user') || null;
+let _selectedUser   = null;
 let _currentDisk    = null;
 let _abortCtrl      = null;
 let _otherUsers     = [];   // [{ name, used }] from snapshot
@@ -29,6 +29,17 @@ function _hasActiveFilters() {
         ((_currentFilters.minSize || 0) > 0) ||
         ((_currentFilters.maxSize || 0) > 0)
     );
+}
+
+function _emitFilterConfigEvent(action) {
+    document.dispatchEvent(new CustomEvent('userDetailFilterConfigChanged', {
+        detail: {
+            action,
+            diskId: _currentDisk,
+            user: _selectedUser,
+            filters: Object.assign({}, _currentFilters),
+        },
+    }));
 }
 
 function _hasExtFilter() {
@@ -707,6 +718,7 @@ function _attachFilterEvents(contentEl, root) {
             _currentFilters.maxSize = Math.floor(maxSizeBytes);
 
             localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
+            _emitFilterConfigEvent('apply');
 
             if (optionsDropdown) optionsDropdown.style.display = 'none';
             if (_selectedUser) _loadAndRender(_selectedUser);
@@ -717,6 +729,7 @@ function _attachFilterEvents(contentEl, root) {
         resetBtn.addEventListener('click', () => {
             _currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0 };
             localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
+            _emitFilterConfigEvent('reset');
             qInput.value = '';
             extInput.value = '';
             
@@ -763,6 +776,7 @@ function _attachFilterEvents(contentEl, root) {
                     if (parsed.minSize !== undefined) _currentFilters.minSize = parsed.minSize;
                     if (parsed.maxSize !== undefined) _currentFilters.maxSize = parsed.maxSize;
                     localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
+                    _emitFilterConfigEvent('import');
                     if (_selectedUser) _loadAndRender(_selectedUser);
                 } catch (err) {
                     alert('Invalid JSON config file');
@@ -1041,9 +1055,10 @@ async function _loadAndRender(user) {
     if (contentBody) contentBody.innerHTML = _renderSkeleton();
 
     try {
-        let detailData = await _fetchDetail(_currentDisk, user, 0, 0, FILE_PAGE);
-        let dirData = _normalizeDirPayload(detailData.dir);
-        let fileData = _normalizeFilePayload(detailData.file);
+        let [dirData, fileData] = await Promise.all([
+            _fetchDir(_currentDisk, user, 0, FILE_PAGE),
+            _fetchFilePage(_currentDisk, user, 0, FILE_PAGE)
+        ]);
 
         const suspiciousEmpty = _isEffectivelyUnfiltered()
             && (Number(dirData.total_dirs ?? 0) <= 1)
@@ -1058,9 +1073,10 @@ async function _loadAndRender(user) {
                 toolbar.innerHTML = _renderFilterBar();
                 _attachFilterEvents(toolbar, root);
             }
-            detailData = await _fetchDetail(_currentDisk, user, 0, 0, FILE_PAGE);
-            dirData = _normalizeDirPayload(detailData.dir);
-            fileData = _normalizeFilePayload(detailData.file);
+            [dirData, fileData] = await Promise.all([
+                _fetchDir(_currentDisk, user, 0, FILE_PAGE),
+                _fetchFilePage(_currentDisk, user, 0, FILE_PAGE)
+            ]);
         }
 
         const otherUser = _otherUsers.find(o => o.name === user);
@@ -1419,15 +1435,9 @@ async function _renderRoot(diskDir) {
         _attachFilterEvents(toolbar, root);
     }
 
-    // Restore previously selected user; auto-select the first one if nothing stored
+    // Restore previously selected user if still valid; otherwise wait for user to pick
     if (_selectedUser && _allUserNames.includes(_selectedUser)) {
         _loadAndRender(_selectedUser);
-    } else if (total > 0) {
-        // No stored selection — pick the first user and load immediately
-        const firstUser = _allUserNames[0];
-        localStorage.setItem('ud_selected_user', firstUser);
-        _selectedUser = firstUser;
-        _loadAndRender(firstUser);
     }
 }
 

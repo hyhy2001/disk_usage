@@ -1202,6 +1202,61 @@
     color: var(--rose-400, #fb7185);
 }
 
+.team-disk-card .card-scan-badge {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    margin-left: 24px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(59, 130, 246, 0.12);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    line-height: 1.2;
+    max-width: calc(100% - 24px);
+}
+
+.team-disk-card .card-scan-badge .scan-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.team-disk-card .card-scan-badge .scan-dot.scanning {
+    background: var(--amber-400, #fbbf24);
+    animation: team-scan-pulse 1.6s ease-in-out infinite;
+}
+
+.team-disk-card .card-scan-badge .scan-dot.error {
+    background: var(--rose-400, #fb7185);
+}
+
+.team-disk-card .card-scan-badge .scan-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@keyframes team-scan-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
+
+:root[data-theme='light'] .team-disk-card .card-scan-badge {
+    background: rgba(59, 130, 246, 0.09);
+    color: #334155;
+}
+
+:root[data-theme='light'] .team-disk-card .card-scan-badge .scan-dot.scanning {
+    background: #d97706;
+}
+
+:root[data-theme='light'] .team-disk-card .card-scan-badge .scan-dot.error {
+    background: #e11d48;
+}
+
 /* Extended stats that only show when the column is wide enough */
 .extended-disk-stats {
     display: none;

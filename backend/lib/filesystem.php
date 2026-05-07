@@ -82,7 +82,6 @@ function api_is_main_report_json_filename($filename) {
     if (strpos($fl, 'inode_usage') !== false) return false;
 
     return strpos($fl, 'disk_usage_report') !== false
-        || strpos($fl, 'usage_report') !== false
         || strpos($filename, 'report_') === 0
         || preg_match('/^report[_-]/i', $filename);
 }

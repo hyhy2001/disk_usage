@@ -4,6 +4,7 @@ function api_dispatch_global_type($type, $root_dir) {
     $global_routes = array(
         'disks' => 'api_handle_disks',
         'team' => 'api_handle_team',
+        'team_scan_status' => 'api_handle_team_scan_status',
         'health' => 'api_handle_health',
         'group_config' => 'api_handle_group_config',
         'admin' => 'api_handle_admin',
@@ -16,13 +17,13 @@ function api_dispatch_global_type($type, $root_dir) {
 function api_dispatch_disk_type($type, $disk_path) {
     $disk_routes = array(
         'permissions' => 'api_handle_permissions',
-        'treemap' => 'api_handle_treemap_simple',
-        'treemap_search' => 'api_handle_treemap_search_simple',
+        'treemap' => 'api_handle_treemap',
+        'treemap_search' => 'api_handle_treemap_search',
         'meta' => 'api_handle_meta',
         'users' => 'api_handle_users',
         'dirs' => 'api_handle_dirs',
         'files' => 'api_handle_files',
-        'detail' => 'api_handle_detail_simple',
+        'detail' => 'api_handle_detail',
         'scan_status' => 'api_handle_scan_status',
     );
     if (!isset($disk_routes[$type])) return false;
