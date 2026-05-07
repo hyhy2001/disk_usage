@@ -384,7 +384,7 @@
 
 /* ── Disk scan overlay ──────────────────────────────────────────── */
 .disk-scan-overlay {
-    position: fixed;
+    position: absolute;
     inset: 0;
     z-index: 9000;
     background: rgba(6, 12, 18, 0.72);

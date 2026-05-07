@@ -484,8 +484,9 @@ class DataFetcher {
                     </div>
                 </div>
             `;
-            // Insert overlay at document body level to cover all disk content
-            document.body.appendChild(overlay);
+            // Insert overlay inside workspace canvas so it only covers the content area
+            const canvas = document.getElementById('workspace-canvas') || document.body;
+            canvas.appendChild(overlay);
         }
         const msgEl = overlay.querySelector('.disk-scan-message');
         if (msgEl) msgEl.textContent = message || 'Disk scan in progress. Please wait.';
