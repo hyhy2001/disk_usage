@@ -23,17 +23,7 @@ function api_resolve_disk_status($status_file) {
 
     $status = array_merge($empty, $status);
 
-    // If marked running but PID no longer alive, treat as stale
-    if (!empty($status['running']) && !empty($status['pid'])) {
-        $pid = (int)$status['pid'];
-        if ($pid > 0 && !@file_exists('/proc/' . $pid)) {
-            $status['running']     = false;
-            $status['stage']       = 'done';
-            $status['message']     = 'Stale: process no longer running';
-            $status['finished_at'] = $status['updated_at'];
-        }
-    }
-
+    // Trust the status file content as-is; scan process manages its own state.
     return array(
         'running'     => !empty($status['running']),
         'stage'       => (string)$status['stage'],
