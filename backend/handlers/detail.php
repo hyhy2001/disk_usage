@@ -130,7 +130,7 @@ function api_detail_collect_rows($ctx, $kind, $offset, $limit, $filters) {
     }
 
     $cmd = array();
-    $cmd[] = escapeshellarg('/www/wwwroot/disk.hydev.me/disk_usage/backend/lib/query_cli');
+    $cmd[] = escapeshellarg(__DIR__ . '/../lib/query_cli');
     $cmd[] = escapeshellarg($ctx['detail_dir']);
     if ($who !== '') { $cmd[] = '--user'; $cmd[] = escapeshellarg($who); }
     $cmd[] = '--type';

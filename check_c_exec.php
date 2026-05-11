@@ -1,7 +1,7 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
 
-$binary = '/www/wwwroot/disk.hydev.me/check_disk/src/native_index/query_cli';
+$binary = __DIR__ . '/../check_disk/src/native_index/query_cli';
 $arg = '--help';
 
 function is_disabled($fn) {
