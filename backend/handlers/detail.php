@@ -115,6 +115,7 @@ function api_detail_match($row, $is_file, $filters) {
 
 function api_detail_collect_rows($ctx, $kind, $offset, $limit, $filters) {
     $is_file = ($kind === 'files');
+    $t_start = microtime(true);
 
     $who = isset($ctx['entry']['username']) ? (string)$ctx['entry']['username'] : '';
     $has_glob = false;
@@ -150,8 +151,25 @@ function api_detail_collect_rows($ctx, $kind, $offset, $limit, $filters) {
     $cmd[] = '--json';
     $cmd[] = '--docs';
 
+    $t_exec = microtime(true);
     $raw = @shell_exec(implode(' ', $cmd) . ' 2>&1');
+    $t_exec_done = microtime(true);
+
     $json = @json_decode((string)$raw, true);
+    $t_decode_done = microtime(true);
+
+    $raw_len = strlen((string)$raw);
+    $exec_ms  = round(($t_exec_done  - $t_exec)  * 1000, 1);
+    $dec_ms   = round(($t_decode_done - $t_exec_done) * 1000, 1);
+    $total_ms = round(($t_decode_done - $t_start) * 1000, 1);
+    error_log(sprintf(
+        '[detail.php] kind=%s user=%s offset=%d limit=%d q=%s | exec=%.1fms decode=%.1fms total=%.1fms raw_bytes=%d ok=%s',
+        $kind, $who, $offset, $limit,
+        (!empty($filters['q']) ? $filters['q'] : ''),
+        $exec_ms, $dec_ms, $total_ms, $raw_len,
+        (is_array($json) && isset($json['docs'])) ? 'yes' : 'no'
+    ));
+
     if (!is_array($json) || !isset($json['docs']) || !is_array($json['docs'])) {
         return array('rows' => array(), 'total' => 0, 'has_more' => false);
     }
