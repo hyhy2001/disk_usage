@@ -1,31 +1,142 @@
 <?php
+// permissions.php — Disk-permission issues report.
+//
+// Two storage backends supported, in priority order:
+//
+//   1. SQLite `permission_issues.db` (preferred — produced by check_disk
+//      Rust scanner v3+). Pagination + filtering done by SQL → constant
+//      memory regardless of dataset size, no full-file scan per request.
+//
+//   2. JSON `permission_issues*.json` (legacy — produced by older scanner
+//      versions). Streaming parser scans the whole file every request;
+//      used as a fallback when the DB doesn't exist yet.
+//
+// Both backends return the same JSON shape so the frontend never needs
+// to know which one served the request.
 
-function api_handle_permissions($disk_path) {
-    $offset      = get_int('offset', 0,   0,    PHP_INT_MAX);
-    $limit       = get_int('limit',  100, 1,    5000);
-    $users_raw   = trim(param('users', ''));
-    $user_filter = ($users_raw !== '') ? explode(',', $users_raw) : array();
-    $item_type   = trim(param('item_type', ''));
-    $path_query  = trim(param('path', ''));
+function api_perm_db_path($disk_path) {
+    $p = $disk_path . DIRECTORY_SEPARATOR . DU_PERMISSION_DB_FILENAME;
+    return is_file($p) ? $p : false;
+}
 
-    $perm_file  = null;
-    $perm_mtime = 0;
-    $dh = @opendir($disk_path);
-    while ($dh && ($f = readdir($dh)) !== false) {
-        if (substr($f, -5) !== '.json') continue;
-        $fl = strtolower($f);
-        if (strpos($fl, 'permission_issue') !== false) {
-            $fp = $disk_path . DIRECTORY_SEPARATOR . $f;
-            $d = get_json_date($fp);
-            if ($d > $perm_mtime) { $perm_file = $fp; $perm_mtime = $d; }
+function api_perm_open_db($disk_path) {
+    static $cache = array();
+    $key = (string)$disk_path;
+    if (array_key_exists($key, $cache)) return $cache[$key];
+
+    $db = api_perm_db_path($disk_path);
+    if (!$db) return $cache[$key] = false;
+
+    try {
+        $pdo = new PDO('sqlite:' . $db);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        // Same read-only PRAGMA bundle used by the other SQLite handlers.
+        $pdo->exec('PRAGMA query_only=1');
+        $pdo->exec('PRAGMA journal_mode=OFF');
+        $pdo->exec('PRAGMA locking_mode=EXCLUSIVE');
+        $pdo->exec('PRAGMA mmap_size=0');
+        $pdo->exec('PRAGMA cache_size=-32768');
+        $pdo->exec('PRAGMA temp_store=MEMORY');
+    } catch (Exception $e) {
+        return $cache[$key] = false;
+    }
+    return $cache[$key] = $pdo;
+}
+
+function api_perm_meta($pdo, $key) {
+    static $cache = array();
+    $oid = spl_object_hash($pdo);
+    if (!isset($cache[$oid])) {
+        $cache[$oid] = array();
+        try {
+            foreach ($pdo->query('SELECT key, value FROM meta')->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $cache[$oid][(string)$r['key']] = (string)$r['value'];
+            }
+        } catch (Exception $e) {}
+    }
+    return isset($cache[$oid][$key]) ? $cache[$oid][$key] : '';
+}
+
+// Build WHERE clause + bind values from request filters.
+// $user_filter: array of usernames (empty = no filter)
+// $item_type:   'file' | 'directory' | '' (empty = no filter)
+// $path_query:  substring filter on path (case-insensitive)
+function api_perm_build_where($user_filter, $item_type, $path_query, &$bind) {
+    $clauses = array();
+    if (!empty($user_filter)) {
+        $place = implode(',', array_fill(0, count($user_filter), '?'));
+        $clauses[] = 'user IN (' . $place . ')';
+        foreach ($user_filter as $u) $bind[] = (string)$u;
+    }
+    if ($item_type !== '') {
+        $clauses[] = 'item_type = ?';
+        $bind[] = $item_type;
+    }
+    if ($path_query !== '') {
+        $clauses[] = 'path LIKE ? COLLATE NOCASE';
+        $bind[] = '%' . $path_query . '%';
+    }
+    return empty($clauses) ? '1' : implode(' AND ', $clauses);
+}
+
+// Aggregated user/error counts. UNFILTERED — these reflect the whole
+// dataset so the sidebar always shows the true totals regardless of
+// what the user has filtered down to in the main list.
+function api_perm_summaries($pdo) {
+    $user_summary = array();
+    $error_summary = array();
+    try {
+        foreach ($pdo->query('SELECT user, COUNT(*) AS c FROM issues GROUP BY user')->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $user_summary[(string)$r['user']] = (int)$r['c'];
         }
-    }
-    if ($dh) closedir($dh);
+        foreach ($pdo->query('SELECT error, COUNT(*) AS c FROM issues GROUP BY error')->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $error_summary[(string)$r['error']] = (int)$r['c'];
+        }
+    } catch (Exception $e) {}
+    return array($user_summary, $error_summary);
+}
 
-    if (!$perm_file) {
-        b64_success(null);
+function api_handle_permissions_db($pdo, $offset, $limit, $user_filter, $item_type, $path_query) {
+    $bind = array();
+    $where = api_perm_build_where($user_filter, $item_type, $path_query, $bind);
+
+    try {
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM issues WHERE ' . $where);
+        $stmt->execute($bind);
+        $total = (int)$stmt->fetchColumn();
+
+        $stmt = $pdo->prepare(
+            'SELECT user, item_type AS type, error, path FROM issues '
+            . 'WHERE ' . $where . ' ORDER BY id LIMIT ? OFFSET ?'
+        );
+        $bind2 = $bind;
+        $bind2[] = (int)$limit;
+        $bind2[] = (int)$offset;
+        $stmt->execute($bind2);
+        $page = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        // Log full error server-side; return generic message to client.
+        error_log('permission DB query failed: ' . $e->getMessage());
+        b64_error('Permission DB query failed.', 500);
     }
 
+    list($user_summary, $error_summary) = api_perm_summaries($pdo);
+
+    b64_success(array(
+        'date'          => (int)api_perm_meta($pdo, 'date'),
+        'directory'     => api_perm_meta($pdo, 'directory'),
+        'total'         => $total,
+        'offset'        => $offset,
+        'limit'         => $limit,
+        'has_more'      => ($offset + count($page)) < $total,
+        'items'         => $page,
+        'user_summary'  => $user_summary,
+        'error_summary' => $error_summary,
+    ));
+}
+
+// JSON fallback — kept for backward compatibility with older scanner output.
+function api_handle_permissions_json($perm_file, $offset, $limit, $user_filter, $item_type, $path_query) {
     $fh = @fopen($perm_file, 'r');
     if (!$fh) {
         b64_error('Cannot read permission file.', 500);
@@ -139,4 +250,27 @@ function api_handle_permissions($disk_path) {
         'user_summary'  => $user_summary,
         'error_summary' => $error_summary,
     ));
+}
+
+function api_handle_permissions($disk_path) {
+    $offset      = get_int('offset', 0,   0,    PHP_INT_MAX);
+    $limit       = get_int('limit',  100, 1,    5000);
+    $users_raw   = trim(param('users', ''));
+    $user_filter = ($users_raw !== '') ? explode(',', $users_raw) : array();
+    $item_type   = trim(param('item_type', ''));
+    $path_query  = trim(param('path', ''));
+
+    // Prefer SQLite when available — constant memory + indexed filters.
+    $pdo = api_perm_open_db($disk_path);
+    if ($pdo) {
+        api_handle_permissions_db($pdo, $offset, $limit, $user_filter, $item_type, $path_query);
+        return;
+    }
+
+    // Fallback to streaming JSON parser.
+    $perm_file = find_file_by_pattern($disk_path, DU_PERMISSION_REPORT_PATTERN);
+    if (!$perm_file) {
+        b64_success(null);
+    }
+    api_handle_permissions_json($perm_file, $offset, $limit, $user_filter, $item_type, $path_query);
 }

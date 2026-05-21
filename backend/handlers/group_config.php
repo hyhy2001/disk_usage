@@ -7,6 +7,8 @@ function api_group_cfg_storage_dir() {
 }
 
 function api_group_cfg_user_identity() {
+    // Priority 1: real HTTP auth identity (set by nginx/Apache, SSO proxies).
+    // Each authenticated user gets their own config — secure default.
     $candidates = array(
         isset($_SERVER['REMOTE_USER']) ? $_SERVER['REMOTE_USER'] : '',
         isset($_SERVER['PHP_AUTH_USER']) ? $_SERVER['PHP_AUTH_USER'] : '',
@@ -19,9 +21,47 @@ function api_group_cfg_user_identity() {
         if ($v !== '') return sanitize_name($v);
     }
 
-    $ip = isset($_SERVER['REMOTE_ADDR']) ? trim((string)$_SERVER['REMOTE_ADDR']) : '';
-    if ($ip !== '') return 'ip_' . sanitize_name($ip);
-    return 'anonymous';
+    // Priority 2: per-browser cookie. Persistent UUID stored in a cookie
+    // on first visit. Survives across IP changes (laptop moving between
+    // wifi/4G), and stays distinct between two users sharing one IP
+    // (NAT/office). Cookie name `du_uid`.
+    if (isset($_COOKIE['du_uid'])) {
+        $uid = trim((string)$_COOKIE['du_uid']);
+        // Only accept the cookie if it looks like one we issued — 32 hex
+        // chars. Anything else is treated as missing and gets reissued.
+        if (strlen($uid) === 32 && preg_match('/^[0-9a-f]{32}$/i', $uid)) {
+            return 'cookie_' . $uid;
+        }
+    }
+
+    // Issue a new cookie. Use openssl_random_pseudo_bytes if available,
+    // fall back to mt_rand (still 128 bits combined).
+    $raw = function_exists('openssl_random_pseudo_bytes')
+        ? openssl_random_pseudo_bytes(16)
+        : pack('N4', mt_rand(), mt_rand(), mt_rand(), mt_rand());
+    $uid = bin2hex($raw);
+
+    // 1-year cookie, HttpOnly so JS can't read it (defense in depth — the
+    // value is only used server-side anyway), SameSite=Lax so it travels on
+    // top-level navigations but not cross-site requests.
+    $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+    $expires = time() + (365 * 24 * 60 * 60);
+    if (PHP_VERSION_ID >= 70300) {
+        @setcookie('du_uid', $uid, array(
+            'expires'  => $expires,
+            'path'     => '/',
+            'secure'   => $secure,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ));
+    } else {
+        // PHP 5.4–7.2 setcookie() signature without options array. Append
+        // SameSite via the path field as a hack — works on most browsers.
+        @setcookie('du_uid', $uid, $expires, '/; SameSite=Lax', '', $secure, true);
+    }
+    // Make the new value visible inside this same request too.
+    $_COOKIE['du_uid'] = $uid;
+    return 'cookie_' . $uid;
 }
 
 function api_group_cfg_path_for_user($user_key) {
@@ -83,16 +123,7 @@ function api_group_cfg_sanitize($payload) {
 
 function api_group_cfg_load($user_key) {
     $fp = api_group_cfg_path_for_user($user_key);
-    if (!is_file($fp)) {
-        return api_group_cfg_sanitize(array('groups' => array()));
-    }
-
-    $raw = @file_get_contents($fp);
-    if ($raw === false || $raw === '') {
-        return api_group_cfg_sanitize(array('groups' => array()));
-    }
-
-    $parsed = @json_decode($raw, true);
+    $parsed = api_load_json_file($fp);
     return api_group_cfg_sanitize($parsed);
 }
 

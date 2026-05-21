@@ -330,7 +330,7 @@
         </div>
         <div class="cfg-hero-text">
             <h1>Config Generator</h1>
-            <p>Generate <code>disk_checker_config.json</code> — fill in the form and download.</p>
+            <p>Generate <code>disk_checker_config.json</code> (scanner) and <code>disks.json</code> (dashboard) — fill the forms and download.</p>
         </div>
         <a href="index.html" class="cfg-home-link">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -694,11 +694,23 @@ document.querySelectorAll('.cfg-tab').forEach(tab => {
 });
 
 // ─── DASHBOARD CONFIG (disks.json) ────────────────────────────────────────────
+// Each team groups one or more disks. `path` is a directory (relative to the
+// dashboard's working dir, OR absolute) that contains the scanner outputs:
+//   <path>/detail_users/data_detail.db
+//   <path>/tree_map_data/treemap.db
+//   <path>/disk_usage_report.json (or any *_disk_usage_report.json)
 let djTeams = [
     {
         name: 'Backend Team',
         disks: [
-            { id: 'disk_test', name: 'Primary Storage', path: 'reports_test' }
+            { id: 'disk_test', name: 'Primary Storage', path: '_demo_out' },
+            { id: 'disk_261',  name: 'Disk Storage',    path: '_demo_out' }
+        ]
+    },
+    {
+        name: 'Frontend Team',
+        disks: [
+            { id: 'disk_844', name: 'Disk Storage', path: '_demo_out' }
         ]
     }
 ];
@@ -762,7 +774,7 @@ function djRender() {
                     <div class="cfg-card-row" style="margin-bottom: 6px">
                         <div class="field"><label>Disk ID</label><input class="dj-input-required" type="text" value="${escAttr(d.id)}" placeholder="disk_1" oninput="djUpdate('d', ${tIdx}, ${dIdx}, 'id', this.value)"></div>
                         <div class="field"><label>Disk Name</label><input class="dj-input-required" type="text" value="${escAttr(d.name)}" placeholder="Primary Storage" oninput="djUpdate('d', ${tIdx}, ${dIdx}, 'name', this.value)"></div>
-                        <div class="field"><label>Server Path</label><input class="dj-input-required" type="text" value="${escAttr(d.path)}" placeholder="/www/wwwroot" oninput="djUpdate('d', ${tIdx}, ${dIdx}, 'path', this.value)"></div>
+                        <div class="field"><label>Reports Path</label><input class="dj-input-required" type="text" value="${escAttr(d.path)}" placeholder="_demo_out or /var/reports" oninput="djUpdate('d', ${tIdx}, ${dIdx}, 'path', this.value)"></div>
                         <button class="btn btn-danger" onclick="djRemove('d', ${tIdx}, ${dIdx})" title="Remove Disk" style="margin-bottoM:14px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                     </div>
                 `).join('')}
@@ -790,7 +802,7 @@ window.djAdd = function(type, tIdx) {
     if (type === 't') {
         djTeams.push({ name: 'New Team', disks: [] });
     } else if (type === 'd') {
-        djTeams[tIdx].disks.push({ id: 'disk_' + Math.floor(Math.random()*1000), name: 'Disk Storage', path: '/reports' });
+        djTeams[tIdx].disks.push({ id: 'disk_' + Math.floor(Math.random()*1000), name: 'Disk Storage', path: '_demo_out' });
     }
     djRender();
 };

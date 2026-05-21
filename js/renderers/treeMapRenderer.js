@@ -613,6 +613,14 @@ function renderExplorer(rootNode, meta) {
     const body = document.getElementById('treemap-body');
     if (!body) return;
 
+    // Reset event-delegation flags whenever we re-render the explorer.
+    // body.innerHTML below replaces #tmx-list with a fresh element, so any
+    // listener previously attached to the old node is detached. The flag
+    // tells renderList() to re-bind on the new element. Without this, a
+    // disk switch leaves clicks dead because the listener is on a node
+    // that no longer exists in the DOM.
+    _listDelegationBound = false;
+
     if (!rootNode) {
         body.innerHTML =
             '<div class="empty-state">' +
@@ -622,7 +630,7 @@ function renderExplorer(rootNode, meta) {
                     '</svg>' +
                 '</div>' +
                 '<h3>No Tree Data</h3>' +
-                '<p>No <code>tree_map_report.json</code> found for this disk.</p>' +
+                '<p>No <code>treemap.db</code> found for this disk.</p>' +
             '</div>';
         return;
     }

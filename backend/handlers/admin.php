@@ -1,15 +1,15 @@
 <?php
 
 function api_admin_db_dir($root_dir) {
-    return $root_dir . DIRECTORY_SEPARATOR . 'database';
+    return $root_dir . DIRECTORY_SEPARATOR . DU_ADMIN_DB_DIRNAME;
 }
 
 function api_admin_db_path($root_dir) {
-    return api_admin_db_dir($root_dir) . DIRECTORY_SEPARATOR . 'admin.db';
+    return api_admin_db_dir($root_dir) . DIRECTORY_SEPARATOR . DU_ADMIN_DB_FILENAME;
 }
 
 function api_admin_db_legacy_path($root_dir) {
-    return api_admin_db_dir($root_dir) . DIRECTORY_SEPARATOR . 'admin.sqlite';
+    return api_admin_db_dir($root_dir) . DIRECTORY_SEPARATOR . DU_ADMIN_DB_LEGACY_FILE;
 }
 
 function api_admin_ensure_db($root_dir) {
@@ -51,9 +51,75 @@ function api_admin_ensure_db($root_dir) {
                 created_at TEXT NOT NULL
             )'
         );
+        // Rate-limit table for login throttling. One row per failed attempt;
+        // success wipes the row set for that IP.
+        $pdo->exec(
+            'CREATE TABLE IF NOT EXISTS login_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ip TEXT NOT NULL,
+                ts INTEGER NOT NULL
+            )'
+        );
+        $pdo->exec('CREATE INDEX IF NOT EXISTS ix_login_attempts_ip ON login_attempts(ip, ts)');
         return $pdo;
     } catch (Exception $e) {
-        b64_error('Failed to open admin database: ' . $e->getMessage(), 500);
+        // Don't leak SQLite/PDO error details to the client — log them
+        // server-side and return a generic 500 instead.
+        error_log('admin db open failed: ' . $e->getMessage());
+        b64_error('Failed to open admin database.', 500);
+    }
+}
+
+// Rate-limit constants. 5 failed attempts within 5 minutes locks an IP for
+// the rest of the window. Successful login wipes that IP's attempt history.
+function api_admin_rate_limit_config() {
+    return array('window_seconds' => 300, 'max_attempts' => 5);
+}
+
+function api_admin_client_ip() {
+    $ip = isset($_SERVER['REMOTE_ADDR']) ? trim((string)$_SERVER['REMOTE_ADDR']) : '';
+    return $ip === '' ? 'unknown' : $ip;
+}
+
+// Returns array(allowed, attempts_in_window). Allowed = false → caller should 429.
+function api_admin_rate_limit_check($pdo) {
+    $cfg = api_admin_rate_limit_config();
+    $ip = api_admin_client_ip();
+    $cutoff = time() - (int)$cfg['window_seconds'];
+    try {
+        // Cheap janitor: drop expired rows for THIS IP only (avoids unbounded growth).
+        $stmt = $pdo->prepare('DELETE FROM login_attempts WHERE ip = ? AND ts < ?');
+        $stmt->execute(array($ip, $cutoff));
+
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM login_attempts WHERE ip = ?');
+        $stmt->execute(array($ip));
+        $count = (int)$stmt->fetchColumn();
+    } catch (Exception $e) {
+        error_log('rate_limit_check failed: ' . $e->getMessage());
+        // Fail open on DB error — better than locking out the legitimate
+        // admin from a stuck DB. The login itself still requires correct creds.
+        return array(true, 0);
+    }
+    return array($count < $cfg['max_attempts'], $count);
+}
+
+function api_admin_rate_limit_record_failure($pdo) {
+    $ip = api_admin_client_ip();
+    try {
+        $stmt = $pdo->prepare('INSERT INTO login_attempts(ip, ts) VALUES (?, ?)');
+        $stmt->execute(array($ip, time()));
+    } catch (Exception $e) {
+        error_log('rate_limit_record_failure failed: ' . $e->getMessage());
+    }
+}
+
+function api_admin_rate_limit_clear($pdo) {
+    $ip = api_admin_client_ip();
+    try {
+        $stmt = $pdo->prepare('DELETE FROM login_attempts WHERE ip = ?');
+        $stmt->execute(array($ip));
+    } catch (Exception $e) {
+        error_log('rate_limit_clear failed: ' . $e->getMessage());
     }
 }
 
@@ -247,6 +313,19 @@ function api_admin_handle_login($root_dir) {
     }
 
     $pdo = api_admin_ensure_db($root_dir);
+
+    // Throttle before doing any password comparison — defense-in-depth
+    // against brute force. Returns 429 with retry hint when limit hit.
+    list($allowed, $attempts) = api_admin_rate_limit_check($pdo);
+    if (!$allowed) {
+        $cfg = api_admin_rate_limit_config();
+        b64_error(
+            'Too many failed login attempts. Please try again in '
+                . (int)$cfg['window_seconds'] . ' seconds.',
+            429
+        );
+    }
+
     $account = api_admin_get_first_account($pdo);
     if (!$account) {
         b64_error('Admin setup has not been completed yet.', 409);
@@ -256,12 +335,17 @@ function api_admin_handle_login($root_dir) {
     $password = (string)get_b64_param('password', '');
 
     if (!api_admin_hash_equals((string)$account['username'], $username)) {
+        api_admin_rate_limit_record_failure($pdo);
         b64_error('Invalid username or password.', 401);
     }
 
     if (!api_admin_verify_password($password, (string)$account['password_hash'])) {
+        api_admin_rate_limit_record_failure($pdo);
         b64_error('Invalid username or password.', 401);
     }
+
+    // Successful login wipes attempt history for this IP.
+    api_admin_rate_limit_clear($pdo);
 
     api_admin_session_start();
     $_SESSION['du_admin_auth'] = true;
@@ -284,29 +368,29 @@ function api_admin_handle_logout() {
 
 function api_admin_read_disks_json($root_dir) {
     api_admin_require_auth();
-    $path = $root_dir . DIRECTORY_SEPARATOR . 'disks.json';
+    $path = $root_dir . DIRECTORY_SEPARATOR . DU_DISKS_CONFIG_FILENAME;
     if (!is_file($path)) {
-        b64_error('disks.json not found.', 404);
+        b64_error(DU_DISKS_CONFIG_FILENAME . ' not found.', 404);
     }
 
     $content = @file_get_contents($path);
     if ($content === false) {
-        b64_error('Unable to read disks.json.', 500);
+        b64_error('Unable to read ' . DU_DISKS_CONFIG_FILENAME . '.', 500);
     }
 
     $decoded = json_decode($content, true);
     if (json_last_error() !== JSON_ERROR_NONE) {
-        b64_error('disks.json is not valid JSON: ' . api_admin_json_error_message(), 500);
+        b64_error(DU_DISKS_CONFIG_FILENAME . ' is not valid JSON: ' . api_admin_json_error_message(), 500);
     }
 
     b64_success(array(
-        'path' => 'disks.json',
+        'path' => DU_DISKS_CONFIG_FILENAME,
         'content' => json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
     ));
 }
 
 function api_admin_backup_dir($root_dir) {
-    return api_admin_db_dir($root_dir) . DIRECTORY_SEPARATOR . 'backups';
+    return api_admin_db_dir($root_dir) . DIRECTORY_SEPARATOR . DU_ADMIN_BACKUP_DIRNAME;
 }
 
 function api_admin_create_disks_backup($root_dir, $source_path) {
@@ -417,12 +501,12 @@ function api_admin_restore_backup($root_dir) {
         b64_error('Unable to normalize backup JSON.', 500);
     }
 
-    $disks_path = $root_dir . DIRECTORY_SEPARATOR . 'disks.json';
+    $disks_path = $root_dir . DIRECTORY_SEPARATOR . DU_DISKS_CONFIG_FILENAME;
     $pre_restore_backup = api_admin_create_disks_backup($root_dir, $disks_path);
 
     $ok = @file_put_contents($disks_path, $normalized . PHP_EOL, LOCK_EX);
     if ($ok === false) {
-        b64_error('Failed to restore disks.json from backup.', 500);
+        b64_error('Failed to restore ' . DU_DISKS_CONFIG_FILENAME . ' from backup.', 500);
     }
 
     b64_success(array(
@@ -453,18 +537,18 @@ function api_admin_save_disks_json($root_dir) {
         b64_error('Unable to encode JSON content.', 500);
     }
 
-    $path = $root_dir . DIRECTORY_SEPARATOR . 'disks.json';
+    $path = $root_dir . DIRECTORY_SEPARATOR . DU_DISKS_CONFIG_FILENAME;
     if (is_file($path) && !is_writable($path)) {
         @chmod($path, 0666);
     }
     if (!is_file($path) && !is_writable(dirname($path))) {
-        b64_error('Directory is not writable for disks.json: ' . dirname($path), 500);
+        b64_error('Directory is not writable for ' . DU_DISKS_CONFIG_FILENAME . ': ' . dirname($path), 500);
     }
 
     $backup_file = api_admin_create_disks_backup($root_dir, $path);
     $ok = @file_put_contents($path, $normalized . PHP_EOL, LOCK_EX);
     if ($ok === false) {
-        b64_error('Failed to write disks.json at: ' . $path . '. Check file permission.', 500);
+        b64_error('Failed to write ' . DU_DISKS_CONFIG_FILENAME . ' at: ' . $path . '. Check file permission.', 500);
     }
 
     b64_success(array(

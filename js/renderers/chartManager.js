@@ -207,7 +207,13 @@ export class ChartManager {
         if (!chart || chart.ctx === null) { this._registry.delete(id); return; }
 
         const wrapper = canvas.parentElement;
-        if (onResize && wrapper) {
+        // Skip resize when the container is hidden (display:none anywhere up
+        // the tree → offsetHeight=0). Calling chart.resize() in that state
+        // makes Chart.js cache size=0; when the page becomes visible again
+        // the chart stays collapsed until something else triggers a resize.
+        if (!wrapper || wrapper.offsetHeight === 0 || wrapper.offsetWidth === 0) return;
+
+        if (onResize) {
             onResize(chart, canvas.getContext('2d'), wrapper.offsetWidth, wrapper.offsetHeight);
         }
         chart.resize();
@@ -742,7 +748,9 @@ export class ChartManager {
 
                     if (!team || team.team_id === undefined) {
                         // Any bucket without team_id is treated as "Other"/uncategorized users.
-                        const otherUsers = dataStore.getOtherUsers();
+                        // Cap to top 10 like the default users chart, otherwise huge "Other"
+                        // groups push the chart container off-screen.
+                        const otherUsers = dataStore.getOtherUsers().slice(0, 10);
                         if (otherUsers.length) {
                             this.renderUsersChart(otherUsers);
                         } else {
@@ -752,8 +760,8 @@ export class ChartManager {
                         return;
                     }
 
-                    // Named team -> show its members (empty state if no users assigned)
-                    const teamUsers = dataStore.getUsersByTeamId(team.team_id);
+                    // Named team -> show its top 10 members (empty state if no users assigned).
+                    const teamUsers = dataStore.getUsersByTeamId(team.team_id).slice(0, 10);
                     if (teamUsers.length) {
                         this.renderUsersChart(teamUsers);
                     } else {
@@ -871,13 +879,19 @@ export class ChartManager {
         const labels  = userData.map(u => u.name);
         const bytes   = userData.map(u => u.used);
         const { divisor, unit } = pickUnit(bytes);
-        const data    = bytes; // use raw bytes
+
+        // Chart.js logarithmic scale silently drops data points with value <= 0
+        // (log(0) = -Infinity), which removes both the bar AND the y-axis
+        // label for that user. Clamp zeros to 1 byte (effectively invisible)
+        // so every user keeps a label. Tooltip still shows the real value.
+        const data = logScale ? bytes.map(v => v > 0 ? v : 1) : bytes;
 
         if (this.usersChart) this.usersChart.destroy();
 
         const xScaleCfg = logScale
             ? {
                 type: 'logarithmic',
+                min: 1,
                 grid: { color: ct().gridXs },
                 ticks: {
                     autoSkip: true,
@@ -908,12 +922,21 @@ export class ChartManager {
                     tooltip: {
                         backgroundColor: ct().tipBg, titleColor: ct().tipBody, bodyColor: ct().tipBody,
                         borderColor: ct().tipBdr, borderWidth: 1,
-                        callbacks: { label: c => ` ${smartFmt(c.raw)}` }
+                        // Show real raw byte value, not the log-clamped one.
+                        callbacks: { label: c => ` ${smartFmt(bytes[c.dataIndex])}` }
                     }
                 },
                 scales: {
                     x: xScaleCfg,
-                    y: { grid: { display: false } }
+                    // y is the category axis (user names). Chart.js default
+                    // autoSkip=true silently hides every other label when the
+                    // container is narrow — visible as "10 bars but only 5
+                    // names". Force every label to render; collisions are
+                    // avoided by maxBarThickness instead.
+                    y: {
+                        grid: { display: false },
+                        ticks: { autoSkip: false }
+                    }
                 }
             }
         });

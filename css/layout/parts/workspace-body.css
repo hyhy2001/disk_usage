@@ -29,7 +29,7 @@
 }
 
 .top-header h1 {
-    /* TASK-07: Fluid typography */
+    /* Fluid typography */
     font-size: clamp(1.05rem, 2.5vw, 1.45rem);
     font-weight: 700;
     letter-spacing: -0.02em;

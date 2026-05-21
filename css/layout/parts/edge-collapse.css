@@ -655,7 +655,7 @@
 }
 
 /* ==========================================================================
-   TASK-08: Global Focus Ring — consistent keyboard navigation indicator
+   Global Focus Ring — consistent keyboard navigation indicator
    ========================================================================== */
 :focus-visible {
     outline: 2px solid var(--emerald-500);

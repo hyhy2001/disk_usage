@@ -2,6 +2,8 @@
  * Render the Inodes Stat tab
  * @param {Object} inodesData - The JSON object from inode_usage_report.json
  */
+import { pct } from '../utils/dom.js';
+
 export function renderInodesTab(inodesData, chartMgr) {
     const container = document.getElementById('inodes-body');
     if (!container) return;
@@ -20,8 +22,6 @@ export function renderInodesTab(inodesData, chartMgr) {
     }
 
     const { inodes_total = 0, inodes_used = 0, inodes_scanned = 0, inodes_free = 0, users = [] } = inodesData;
-
-    function pct(part, total) { return total ? ((part / total) * 100).toFixed(1) : '0.0'; }
 
     const scannedBytes = inodes_scanned;
     const gapBytes = Math.max(0, inodes_used - inodes_scanned);

@@ -83,6 +83,11 @@ which generates the JSON reports this dashboard consumes.
 All data endpoints are consolidated into a single `api.php`. The `?type=` parameter selects the
 operation; `?id=` maps to a disk via `disks.json` (path never exposed to the client).
 
+**HTTP caching:** The idempotent endpoints `meta`, `users`, `disks`, `team` emit
+`ETag` + `Cache-Control` headers. Clients that send `If-None-Match` get a `304 Not Modified`
+response (zero body) when the underlying source files (mtime/size) have not changed.
+This is the cheapest form of polling — use it when wiring polled requests on the frontend.
+
 #### `?id=<disk_id>` (default — snapshot + history)
 
 Returns combined JSON with `history[]`, `latest` snapshot, team usage, user usage, top directories.
@@ -254,9 +259,18 @@ disk_usage/
 │
 ├── backend/                    # PHP API implementation
 │   ├── bootstrap.php           # Loads backend libs/handlers
+│   ├── constants.php           # Filename + report-pattern constants (mirrors check_disk/src/constants.py)
 │   ├── router.php              # Dispatches api.php requests by type/action
 │   ├── handlers/               # Endpoint handlers: disks, detail, dirs, files, treemap, admin, etc.
-│   └── lib/                    # Shared request, response, cache, filesystem, export helpers
+│   └── lib/                    # Shared backend libraries:
+│       ├── request.php         #   param + b64 + sanitize helpers
+│       ├── response.php        #   b64_success / b64_error / api_send_etag_cache (HTTP 304 flow)
+│       ├── disks_walker.php    #   api_iterate_disks / api_find_team_disks / api_count_disks
+│       ├── keyword.php         #   api_keyword_tokens / api_keyword_like_clause / api_keyword_match_path
+│       ├── filesystem.php      #   JSON loaders + report-file discovery
+│       ├── cache.php           #   File-backed cache for paginated payloads
+│       ├── db_connection.php   #   Read-only SQLite PDO open + PRAGMA tuning
+│       └── path_resolver.php   #   dir_id → full path resolution (single + batched)
 │
 ├── css/                        # Source CSS plus generated *.min.css bundles
 │   ├── core/                   # Design tokens, font declarations, core bundle
@@ -267,10 +281,18 @@ disk_usage/
 ├── js/                         # Source ES modules plus generated *.min.js bundles
 │   ├── core/                   # App bootstrap, router, data store
 │   ├── services/               # Fetch orchestration and API data loading
+│   │   ├── api.js              #   createApiClient() — fetchJson with cache + inflight dedup
+│   │   ├── normalize.js        #   normalize{Dir,File}Row + payload normalisers (canonicalise legacy field names)
+│   │   └── dataFetcher.js      #   Sync flow, scan-status polling, team chart, disk selector
 │   ├── renderers/              # Dashboard tab renderers and Chart.js wrapper
 │   ├── features/               # Feature modules such as group-user management
 │   ├── ui/                     # Modals, tooltip, theme, boot helpers
-│   ├── utils/                  # Formatting, CSV export, persisted filters
+│   ├── utils/                  # Reusable helpers:
+│   │   ├── formatters.js       #   fmt / smartFmt / smartFmtTick / pickUnit / fmtDate
+│   │   ├── dom.js              #   escHtml / pct / debounce
+│   │   ├── sort.js             #   compareDiskCards + extractFromDataset / extractFromApiDisk
+│   │   ├── csvExport.js        #   downloadCsv / toCsv / streamExportGzip
+│   │   └── filterStorage.js    #   localStorage-backed filter persistence
 │   └── vendor/                 # Self-hosted third-party browser assets
 │
 ├── fonts/                      # Self-hosted Inter/Fira/JetBrains font files

@@ -4,11 +4,15 @@ ob_start('ob_gzhandler');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 header('Pragma: no-cache');
 
+require_once __DIR__ . '/constants.php';
 require_once __DIR__ . '/lib/request.php';
 require_once __DIR__ . '/lib/response.php';
+require_once __DIR__ . '/lib/disks_walker.php';
+require_once __DIR__ . '/lib/keyword.php';
 require_once __DIR__ . '/lib/filesystem.php';
 require_once __DIR__ . '/lib/cache.php';
-require_once __DIR__ . '/lib/export_throttle.php';
+require_once __DIR__ . '/lib/db_connection.php';
+require_once __DIR__ . '/lib/path_resolver.php';
 
 if (isset($_GET['debug_runtime']) && $_GET['debug_runtime'] === '1') {
     header('Content-Type: application/json');

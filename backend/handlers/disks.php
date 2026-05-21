@@ -1,6 +1,10 @@
 <?php
 
 function api_handle_disks($root_dir) {
+    // ETag based on disks.json mtime — config rarely changes, polling cheap.
+    $disks_file = $root_dir . DIRECTORY_SEPARATOR . DU_DISKS_CONFIG_FILENAME;
+    api_send_etag_cache($disks_file, array(), 60);
+
     $disks = api_load_disks_config($root_dir);
     $safe_disks = array();
 

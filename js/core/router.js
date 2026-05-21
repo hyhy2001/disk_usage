@@ -1,5 +1,6 @@
 // SPA Router — manages page visibility, active nav state, and hash routes
 import { saveFilters, loadFilters } from '../utils/filterStorage.js';
+import { AppState } from './main.js';
 
 const PAGES = {
     overview: document.getElementById('page-overview'),
@@ -59,6 +60,16 @@ function showPage(pageId) {
 
     currentPage = pageId;
     saveFilters({ activePage: pageId });
+
+    // Charts on a page that was display:none receive 0-height layout, so
+    // Chart.js auto-resize observers compute the wrong size while hidden.
+    // When the page becomes visible, force every registered chart to
+    // re-measure once layout has settled (2 frames is enough on Chrome/FF).
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            AppState?.chartManagerInstance?._resizeAll?.();
+        });
+    });
 }
 
 function parseRoute() {
@@ -183,17 +194,28 @@ export function initRouter() {
         setRouteContext({ space: fromRoute.space, team: fromRoute.team, disk: fromRoute.disk });
     }
 
+    // When the URL points to a specific disk, always land on Overview —
+    // disk activation is a "fresh entry" and should not honour stale
+    // detail/* deep-links from a previous session. (Disk-less routes still
+    // honour the saved page so /<team>-only and /detail without disk work.)
     const savedState = loadFilters();
     const saved = savedState.activePage;
-    const initialPage = (fromRoute.page && PAGES[fromRoute.page]) ? fromRoute.page : ((saved && PAGES[saved]) ? saved : 'overview');
+    let initialPage;
+    let initialDetailTab;
+    if (fromRoute.disk) {
+        initialPage = 'overview';
+        initialDetailTab = 'snapshot';
+    } else {
+        initialPage = (fromRoute.page && PAGES[fromRoute.page]) ? fromRoute.page : ((saved && PAGES[saved]) ? saved : 'overview');
+        initialDetailTab = fromRoute.detailTab || savedState.activeTab || 'snapshot';
+    }
 
-    // Seed state from URL route first (critical for deep-link restore with disk + tab)
-    const seed = { activePage: initialPage, activeTab: fromRoute.detailTab || savedState.activeTab || 'snapshot' };
+    const seed = { activePage: initialPage, activeTab: initialDetailTab };
     if (fromRoute.disk) seed.activeDisk = fromRoute.disk;
     saveFilters(seed);
 
     showPage(initialPage);
-    replaceRoute(initialPage, fromRoute.detailTab || 'snapshot');
+    replaceRoute(initialPage, initialDetailTab);
 
     Object.entries(NAV_ITEMS).forEach(([pageId, el]) => {
         el?.addEventListener('click', () => navigateTo(pageId, pageId === 'detail' ? (loadFilters().activeTab || 'snapshot') : null));

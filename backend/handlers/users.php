@@ -16,20 +16,21 @@ function api_users_normalize_list($users) {
 }
 
 
-function api_users_from_detail_manifest($disk_path) {
-    $manifest_path = $disk_path . DIRECTORY_SEPARATOR . 'detail_users' . DIRECTORY_SEPARATOR . 'data_detail.json';
-    if (!is_file($manifest_path)) return array();
-    $raw = @file_get_contents($manifest_path);
-    if ($raw === false) return array();
-    $json = @json_decode($raw, true);
-    if (!is_array($json) || !isset($json['users']) || !is_array($json['users'])) return array();
-
+function api_users_from_detail_db($disk_path) {
+    $db = $disk_path . DIRECTORY_SEPARATOR . DU_DETAIL_DB_DIRNAME . DIRECTORY_SEPARATOR . DU_DETAIL_DB_FILENAME;
+    if (!is_file($db)) return array();
+    try {
+        $pdo = new PDO('sqlite:' . $db);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->exec('PRAGMA query_only=1');
+        $rows = $pdo->query("SELECT username FROM users WHERE username NOT LIKE 'uid-%' ORDER BY username")->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Exception $e) {
+        return array();
+    }
     $users = array();
-    foreach ($json['users'] as $u) {
-        if (!is_array($u) || !isset($u['username'])) continue;
-        $name = trim((string)$u['username']);
-        if ($name === '') continue;
-        $users[] = $name;
+    foreach ((array)$rows as $u) {
+        $name = trim((string)$u);
+        if ($name !== '') $users[] = $name;
     }
     return api_users_normalize_list($users);
 }
@@ -37,12 +38,8 @@ function api_users_from_detail_manifest($disk_path) {
 function api_users_from_latest_main_report($disk_path) {
     $info = api_get_latest_main_report_info($disk_path);
     $latest_file = isset($info['latest_file']) ? $info['latest_file'] : false;
-    if (!$latest_file || !is_file($latest_file)) return array();
-
-    $raw = @file_get_contents($latest_file);
-    if ($raw === false) return array();
-    $json = @json_decode($raw, true);
-    if (!is_array($json)) return array();
+    $json = api_load_json_file($latest_file);
+    if (!$json) return array();
 
     $users = array();
     if (isset($json['user_usage']) && is_array($json['user_usage'])) {
@@ -68,12 +65,8 @@ function api_users_from_latest_main_report($disk_path) {
 function api_users_system_groups_from_latest_main_report($disk_path) {
     $info = api_get_latest_main_report_info($disk_path);
     $latest_file = isset($info['latest_file']) ? $info['latest_file'] : false;
-    if (!$latest_file || !is_file($latest_file)) return array();
-
-    $raw = @file_get_contents($latest_file);
-    if ($raw === false) return array();
-    $json = @json_decode($raw, true);
-    if (!is_array($json)) return array();
+    $json = api_load_json_file($latest_file);
+    if (!$json) return array();
 
     $team_name_by_id = array();
     if (isset($json['team_usage']) && is_array($json['team_usage'])) {
@@ -126,18 +119,20 @@ function api_users_system_groups_from_latest_main_report($disk_path) {
 }
 
 function api_handle_users($disk_path) {
-    $detail_dir = $disk_path . DIRECTORY_SEPARATOR . 'detail_users';
-    $manifest_path = $detail_dir . DIRECTORY_SEPARATOR . 'data_detail.json';
+    $detail_dir = $disk_path . DIRECTORY_SEPARATOR . DU_DETAIL_DB_DIRNAME;
+    $db_path = $detail_dir . DIRECTORY_SEPARATOR . DU_DETAIL_DB_FILENAME;
     $disk_mtime = @filemtime($disk_path);
     $dir_mtime = @filemtime($detail_dir);
-    $manifest_mtime = @filemtime($manifest_path);
-    $cache_key = 'users:' . $disk_path . ':' . (is_int($disk_mtime) ? $disk_mtime : 0) . ':' . (is_int($dir_mtime) ? $dir_mtime : 0) . ':' . (is_int($manifest_mtime) ? $manifest_mtime : 0);
+    $db_mtime = @filemtime($db_path);
+
+    // ETag from the same source files used for the cache key.
+    api_send_etag_cache(array($disk_path, $detail_dir, $db_path), array(), 30);
+
+    $cache_key = 'users:' . $disk_path . ':' . (is_int($disk_mtime) ? $disk_mtime : 0) . ':' . (is_int($dir_mtime) ? $dir_mtime : 0) . ':' . (is_int($db_mtime) ? $db_mtime : 0);
     $data = api_cache_get($cache_key, 30);
     if ($data === null) {
-        $users = array();
-
-        // Fast path: user list from detail manifest (current pipeline source-of-truth).
-        $users = api_users_from_detail_manifest($disk_path);
+        // Fast path: user list from detail.db (current pipeline source-of-truth).
+        $users = api_users_from_detail_db($disk_path);
 
         // Fallback #1: user list from latest disk usage report.
         if (count($users) === 0) {
@@ -146,30 +141,12 @@ function api_handle_users($disk_path) {
 
         // Fallback #2: user list from inode usage report.
         if (count($users) === 0) {
-            $inode_file = find_file_by_pattern($disk_path, '/.*inode_usage_report.*\.json$/i');
-            if ($inode_file && is_file($inode_file)) {
-                $raw = @file_get_contents($inode_file);
-                if ($raw !== false) {
-                    $inode = @json_decode($raw, true);
-                    if (is_array($inode) && isset($inode['users']) && is_array($inode['users'])) {
-                        foreach ($inode['users'] as $u) {
-                            if (is_array($u) && isset($u['name']) && $u['name'] !== '') {
-                                $users[] = (string)$u['name'];
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Fallback #2: user list from detail manifest.
-        if (count($users) === 0 && is_file($manifest_path)) {
-            $raw = @file_get_contents($manifest_path);
-            if ($raw !== false) {
-                $manifest = @json_decode($raw, true);
-                if (is_array($manifest) && isset($manifest['users']) && is_array($manifest['users'])) {
-                    foreach ($manifest['users'] as $u) {
-                        if (is_array($u) && isset($u['username']) && $u['username'] !== '') $users[] = (string)$u['username'];
+            $inode_file = find_file_by_pattern($disk_path, DU_INODE_REPORT_PATTERN);
+            $inode = api_load_json_file($inode_file);
+            if ($inode && isset($inode['users']) && is_array($inode['users'])) {
+                foreach ($inode['users'] as $u) {
+                    if (is_array($u) && isset($u['name']) && $u['name'] !== '') {
+                        $users[] = (string)$u['name'];
                     }
                 }
             }

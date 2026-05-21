@@ -55,7 +55,7 @@
     color: var(--text-secondary, #94a3b8);
     font-size: 0.72rem;
     font-weight: 600;
-    /* TASK-01: Minimum touch target */
+    /* Minimum touch target */
     padding: 6px 10px;
     min-height: 32px;
     border-radius: 6px;
@@ -91,7 +91,7 @@
 }
 
 .tsh-value {
-    /* TASK-07: Fluid typography */
+    /* Fluid typography */
     font-size: clamp(1rem, 2vw, 1.3rem);
     font-weight: 700;
     color: var(--text-primary);

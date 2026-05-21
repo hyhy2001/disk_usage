@@ -1,14 +1,16 @@
 import { UINodes, AppState, animateValue, bytesToTB, showToast } from '../core/main.js';
 import { DataStore } from '../core/dataStore.js';
 import { ChartManager } from '../renderers/chartManager.js';
-import { initRouter, navigateTo, setRouteContext } from '../core/router.js';
+import { initRouter, navigateTo, setRouteContext } from '../core/router.js?v=95';
 import { renderDetailTables, initScaleToggle, resetDashboardToEmpty } from '../renderers/detailRenderer.js';
-import { initUserDetailTab, resetUserDetailTab } from '../renderers/userDetailRenderer.js?v=81';
+import { initUserDetailTab, resetUserDetailTab } from '../renderers/userDetailRenderer.js?v=95';
 import { fmt, smartFmtTick } from '../utils/formatters.js';
 import { saveFilters, loadFilters } from '../utils/filterStorage.js';
+import { compareDiskCards, extractFromDataset, extractFromApiDisk } from '../utils/sort.js';
+import { createApiClient } from './api.js';
 
 // ── Sidebar live clock ────────────────────────────────────────────────────────
-// Cache formatter to avoid re-creating Intl.DateTimeFormat every second (PF-02)
+// Cache formatter to avoid re-creating Intl.DateTimeFormat every second
 const _clockFmt = new Intl.DateTimeFormat('en-GB', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit', second: '2-digit',
@@ -37,7 +39,6 @@ class DataFetcher {
         this._toastHistory = new Map(); // toastKey -> lastShownAtMs
         this._groupUserConfig = null;
         this._scanStatusTimer = null; // ID of the status polling timer
-        this._scanLocked = false;
         this._teamCardPollTimer = null; // ID of team card polling timer
         this._currentTeamName = null; // Name of current team being polled
 
@@ -53,7 +54,6 @@ class DataFetcher {
         const permTab = document.querySelector('.detail-tab-btn[data-tab="permissions"]');
         if (permTab) {
             permTab.addEventListener('click', () => {
-                if (this._scanLocked) return;
                 if (!this._permissionsLoaded && this._activeDisk) {
                     this._fetchPermissions();
                 }
@@ -64,7 +64,6 @@ class DataFetcher {
         const treeMapTab = document.querySelector('.detail-tab-btn[data-tab="treemap"]');
         if (treeMapTab) {
             treeMapTab.addEventListener('click', () => {
-                if (this._scanLocked) return;
                 if (!this._treeMapLoaded && this._activeDisk) {
                     this._fetchTreeMap();
                 }
@@ -75,7 +74,6 @@ class DataFetcher {
         const userDetailTab = document.querySelector('.detail-tab-btn[data-tab="user-detail"]');
         if (userDetailTab) {
             userDetailTab.addEventListener('click', () => {
-                if (this._scanLocked) return;
                 if (this._activeDisk) {
                     const snapshot = this.dataStore?.latestSnapshot;
                     // Merge user_usage + other_usage so picker shows all known users
@@ -187,38 +185,12 @@ class DataFetcher {
     // Lightweight in-memory cache for idempotent GET JSON requests.
     // - cacheTimeMs > 0: serve cached payload while fresh.
     // - Also dedupes concurrent identical inflight requests.
-    async _fetchJson(url, { signal, cacheTimeMs = 0 } = {}) {
-        if (!this._fetchCache) this._fetchCache = new Map();
-        if (!this._fetchInflight) this._fetchInflight = new Map();
-
-        if (cacheTimeMs > 0) {
-            const cached = this._fetchCache.get(url);
-            if (cached && (Date.now() - cached.time) < cacheTimeMs) {
-                return cached.data;
-            }
-            const pending = this._fetchInflight.get(url);
-            if (pending) return pending;
-        }
-
-        const exec = (async () => {
-            const res = await fetch(url, { signal });
-            if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
-            const data = await res.json();
-            if (cacheTimeMs > 0) {
-                this._fetchCache.set(url, { time: Date.now(), data });
-            }
-            return data;
-        })();
-
-        if (cacheTimeMs > 0) {
-            this._fetchInflight.set(url, exec);
-            exec.finally(() => this._fetchInflight.delete(url));
-        }
-        return exec;
+    async _fetchJson(url, opts = {}) {
+        if (!this._api) this._api = createApiClient();
+        return this._api.fetchJson(url, opts);
     }
 
     async _fetchDiskMeta(diskId, signal) {
-        if (this._scanLocked) return null;
         try {
             const json = await this._fetchJson(`api.php?id=${encodeURIComponent(diskId)}&type=meta`, { signal, cacheTimeMs: 15000 });
             if (json?.status !== 'success' || !json?.data) return null;
@@ -382,135 +354,75 @@ class DataFetcher {
             }
             if (document.hidden) return;
             const status = await this._fetchScanStatus(diskId);
-            // Insert banner into workspace actions area (near sync button)
-            const anchor = document.querySelector('.workspace-actions');
-            let banner = document.getElementById('scan-status-banner');
-            if (!banner && anchor) {
-                banner = document.createElement('div');
-                banner.id = 'scan-status-banner';
-                banner.className = 'scan-status-banner hidden';
-                banner.innerHTML = '<span class="scan-status-banner-icon"></span><span class="scan-status-banner-text"></span>';
-                // Insert as first child so it appears before the sync button
-                anchor.insertBefore(banner, anchor.firstChild);
-            }
-            const bannerText = banner ? banner.querySelector('.scan-status-banner-text') : null;
 
-            // Show overlay when scan is running OR stage is not 'done'
+            // Inline status pill is now the only scan indicator. The old
+            // .scan-status-banner is no longer rendered — remove any stale
+            // instance left over from previous builds.
+            const staleBanner = document.getElementById('scan-status-banner');
+            if (staleBanner) staleBanner.remove();
+
             const isScanning = (status && status.running) || (status && status.stage && status.stage !== 'done');
 
             if (isScanning) {
                 const stageMeta = this._getScanStageMeta(status?.stage, status?.message);
-                UINodes.statusText.textContent = stageMeta.statusText;
+                this._setStatusScanning(stageMeta.statusText);
                 UINodes.statusDot.classList.add('scanning');
                 UINodes.statusDot.style.backgroundColor = '';
                 UINodes.statusDot.title = `Stage: ${status.stage || 'unknown'}`;
-                if (banner && bannerText) {
-                    banner.classList.remove('hidden');
-                    bannerText.textContent = stageMeta.bannerText;
-                }
-                this._showScanOverlay(stageMeta.overlayText);
             } else if (!AppState.isProcessing) {
                 if (status) {
                     const isError = status.stage === 'error';
-                    UINodes.statusText.textContent = isError ? (status.message || 'Disk scan failed') : 'System Optimized';
+                    const statusLabel = isError ? (status.message || 'Disk scan failed') : 'System Optimized';
+                    this._setStatusIdle(statusLabel);
                     UINodes.statusDot.classList.remove('scanning');
                     UINodes.statusDot.title = status.stage ? `Stage: ${status.stage}` : '';
                     if (isError) {
                         UINodes.statusDot.style.backgroundColor = 'var(--rose-500)';
                     }
                 }
-                if (banner) banner.classList.add('hidden');
-                this._hideScanOverlay();
             }
         }, 3000);
     }
 
 
-    _getScanStageMeta(stage, message) {
-        const msg = (message || '').trim();
+    /**
+     * Replace #system-status content with an inline spinner SVG + label.
+     * Used while scan is in progress — no full-screen overlay.
+     */
+    _setStatusScanning(label) {
+        const el = UINodes.statusText;
+        if (!el) return;
+        el.innerHTML =
+            '<svg class="status-spinner-svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">' +
+                '<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>' +
+            '</svg>' +
+            '<span class="status-text-label">' + this._escHtml(label) + '</span>';
+    }
+
+    /** Restore plain idle text. */
+    _setStatusIdle(label) {
+        const el = UINodes.statusText;
+        if (!el) return;
+        el.textContent = label;
+    }
+
+    _escHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+
+    _getScanStageMeta(stage, _message) {
         const map = {
-            scan: {
-                label: 'Scanning files',
-                overlay: 'Disk scan in progress. Scanning filesystem, please wait.',
-            },
-            report: {
-                label: 'Building summary report',
-                overlay: 'Disk scan in progress. Building summary reports, please wait.',
-            },
-            detail: {
-                label: 'Building user details',
-                overlay: 'Disk scan in progress. Building user detail reports, please wait.',
-            },
-            treemap: {
-                label: 'Building treemap',
-                overlay: 'Disk scan in progress. Building treemap data, please wait.',
-            },
-            sync: {
-                label: 'Syncing reports',
-                overlay: 'Disk scan in progress. Syncing reports to the remote server, please wait.',
-            },
-            error: {
-                label: 'Scan failed',
-                overlay: 'Disk scan failed.',
-            },
-            done: {
-                label: 'Completed',
-                overlay: 'Disk scan completed.',
-            },
+            scan:    'Scanning',
+            report:  'Building report',
+            detail:  'Building detail',
+            treemap: 'Building treemap',
+            sync:    'Syncing',
+            error:   'Failed',
+            done:    'Completed',
         };
-        const meta = map[stage] || {
-            label: stage ? `Processing ${stage}` : 'Processing',
-            overlay: 'Disk scan in progress. Please wait.',
-        };
-        return {
-            statusText: msg ? `${meta.label} — ${msg}` : meta.label,
-            bannerText: msg ? `[${stage || 'processing'}] ${msg}` : meta.label,
-            overlayText: meta.overlay,
-        };
-    }
-
-    _showScanOverlay(message) {
-        let overlay = document.getElementById('disk-scan-overlay');
-        if (!overlay) {
-            overlay = document.createElement('div');
-            overlay.id = 'disk-scan-overlay';
-            overlay.className = 'disk-scan-overlay';
-            overlay.innerHTML = `
-                <div class="disk-scan-overlay-content">
-                    <div class="disk-scan-spinner"></div>
-                    <div class="disk-scan-message">Disk scan in progress. Please wait.</div>
-                    <div class="disk-scan-progress">
-                        <div class="disk-scan-progress-bar"></div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(overlay);
-        }
-        const canvas = document.getElementById('workspace-canvas');
-        if (canvas) {
-            const rect = canvas.getBoundingClientRect();
-            overlay.style.left = `${Math.max(0, rect.left)}px`;
-            overlay.style.width = `${Math.max(0, rect.width)}px`;
-            overlay.style.top = '0px';
-            overlay.style.bottom = '0px';
-        } else {
-            overlay.style.left = '0px';
-            overlay.style.width = '100vw';
-            overlay.style.top = '0px';
-            overlay.style.bottom = '0px';
-        }
-        const msgEl = overlay.querySelector('.disk-scan-message');
-        if (msgEl) msgEl.textContent = message || 'Disk scan in progress. Please wait.';
-        this._scanLocked = true;
-        overlay.classList.add('visible');
-    }
-
-    _hideScanOverlay() {
-        this._scanLocked = false;
-        const overlay = document.getElementById('disk-scan-overlay');
-        if (overlay) {
-            overlay.classList.remove('visible');
-        }
+        return { statusText: map[stage] || 'Building' };
     }
 
     _stopStatusPolling() {
@@ -518,7 +430,6 @@ class DataFetcher {
             clearInterval(this._scanStatusTimer);
             this._scanStatusTimer = null;
         }
-        this._hideScanOverlay();
     }
 
     _applyAggregatePayload(jsonResponse, { fromCache = false, silentToast = false } = {}) {
@@ -591,20 +502,7 @@ class DataFetcher {
             const cards = Array.from(grid.querySelectorAll('.team-disk-card'));
             if (cards.length === 0) return;
 
-            cards.sort((a, b) => {
-                const nameA = a.dataset.name || '';
-                const nameB = b.dataset.name || '';
-                const usedA = parseFloat(a.dataset.usedPct) || 0;
-                const usedB = parseFloat(b.dataset.usedPct) || 0;
-                const freeA = parseFloat(a.dataset.freeBytes) || 0;
-                const freeB = parseFloat(b.dataset.freeBytes) || 0;
-
-                if (currentSort === 'alpha-asc') return nameA.localeCompare(nameB);
-                if (currentSort === 'alpha-desc') return nameB.localeCompare(nameA);
-                if (currentSort === 'usage-desc') return usedB - usedA;
-                if (currentSort === 'free-desc') return freeB - freeA;
-                return 0;
-            });
+            cards.sort((a, b) => compareDiskCards(a, b, currentSort, extractFromDataset));
 
             cards.forEach(card => grid.appendChild(card));
 
@@ -748,27 +646,8 @@ class DataFetcher {
 
         const currentSort = localStorage.getItem('teamDiskSort') || 'alpha-asc';
 
-        const sortedData = [...data].sort((a, b) => {
-            const nameA = (a._disk_name || '').toLowerCase();
-            const nameB = (b._disk_name || '').toLowerCase();
-            const sysA = a.general_system || {};
-            const sysB = b.general_system || {};
-            const totalA = sysA.total || 0;
-            const totalB = sysB.total || 0;
-            const usedA = sysA.used || 0;
-            const usedB = sysB.used || 0;
-            const freeA = Math.max(0, totalA - usedA);
-            const freeB = Math.max(0, totalB - usedB);
-
-            const usedPctA = totalA > 0 ? (usedA / totalA) * 100 : 0;
-            const usedPctB = totalB > 0 ? (usedB / totalB) * 100 : 0;
-
-            if (currentSort === 'alpha-asc') return nameA.localeCompare(nameB);
-            if (currentSort === 'alpha-desc') return nameB.localeCompare(nameA);
-            if (currentSort === 'usage-desc') return usedPctB - usedPctA;
-            if (currentSort === 'free-desc') return freeB - freeA;
-            return 0;
-        });
+        const sortedData = [...data].sort((a, b) =>
+            compareDiskCards(a, b, currentSort, extractFromApiDisk));
 
         sortedData.forEach(d => {
             const sys = d.general_system || {};
@@ -902,7 +781,7 @@ class DataFetcher {
 
     async _initDiskSelector() {
         try {
-            // TASK-04: Show skeleton while fetching disk list
+            // Show skeleton while fetching disk list
             const list = document.getElementById('disk-list');
             if (list) {
                 const skeletonHTML = Array(3).fill(0)
@@ -930,6 +809,15 @@ class DataFetcher {
 
             // Define method to activate a disk
             this.activateDisk = (id) => {
+                // Force the workspace nav state to Overview before anything
+                // else runs (in case the previous disk was on Detail/etc).
+                // showPage() inside navigateTo() also does this, but doing it
+                // synchronously here means subsequent code can't observe a
+                // stale `.tab-btn.active === nav-detail` and react to it.
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                const navOverviewBtn = document.getElementById('nav-overview');
+                if (navOverviewBtn) navOverviewBtn.classList.add('active');
+
                 const list = document.getElementById('disk-list');
                 if (list) {
                     list.querySelectorAll('.disk-list-item').forEach(el => el.classList.remove('active'));
@@ -946,18 +834,15 @@ class DataFetcher {
                 }
 
                 this._activeDisk = id;
-                saveFilters({ activeDisk: id });
+                saveFilters({ activeDisk: id, activePage: 'overview', activeTab: 'snapshot' });
                 // Keep disk activation lightweight; user list loads on demand in detail tab.
 
                 // Start active-disk polling while team polling continues
                 this._startStatusPolling(id);
 
-                // Hiding empty state constraints & show features
-                const currentTab = loadFilters().activePage || 'overview';
-                navigateTo(currentTab === 'detail' ? 'detail' : 'overview');
-                const tabs = document.querySelector('.detail-tabs');
-                if (tabs) tabs.style.display = ''; // Restore subtabs visibility
-
+                // Update route context BEFORE navigating, otherwise toRoutePath()
+                // still sees stale or empty team/disk and emits a useless URL
+                // like `#/team` instead of `#/<team>/<disk>/overview`.
                 const activeCfg = this.disksConfig?.find(d => d.id === id);
                 if (activeCfg) {
                     setRouteContext({
@@ -966,6 +851,15 @@ class DataFetcher {
                         disk: String(activeCfg.id || 'disk').toLowerCase(),
                     });
                 }
+
+                // Always land on Overview when activating a disk — feels like
+                // "opening" the disk. URL hash + activePage are forced to overview
+                // so reloading the page doesn't bounce the user back to a detail
+                // tab they were on for the *previous* disk.
+                navigateTo('overview');
+                const tabs = document.querySelector('.detail-tabs');
+                if (tabs) tabs.style.display = ''; // Restore subtabs visibility
+
                 const titleEl = document.getElementById('shared-page-title');
                 if (titleEl && activeCfg) {
                     titleEl.textContent = activeCfg.name;
@@ -1028,12 +922,10 @@ class DataFetcher {
                 if (sharedHeader) sharedHeader.style.display = '';
 
 
-                const activeTabBtn = document.querySelector('.tab-btn.active');
-                let desiredPage = 'overview';
-                if (activeTabBtn && activeTabBtn.id === 'nav-detail') desiredPage = 'detail';
-                else if (activeTabBtn && activeTabBtn.id === 'nav-overview') desiredPage = 'overview';
-                else desiredPage = (loadFilters().activePage === 'detail') ? 'detail' : 'overview';
-                navigateTo(desiredPage);
+                // Always end activation on Overview. (Earlier check that
+                // preserved the previously-active tab was removed — the user
+                // wants disk-click to feel like a fresh entry into the disk.)
+                navigateTo('overview');
             };
 
             // Setup render context function
@@ -1072,8 +964,6 @@ class DataFetcher {
                         });
                     });
                 }
-
-                // Removed standalone specific dropdown chevron logic
             };
 
             const projectContainer = document.getElementById('project-team-list');
@@ -1438,11 +1328,6 @@ class DataFetcher {
             return;
         }
 
-        if (this._scanLocked) {
-            UINodes.statusText.textContent = "Disk scan in progress — please wait until scan completes.";
-            return;
-        }
-
         const inflight = this._inflightSyncByDisk.get(diskId);
         if (inflight) {
             UINodes.statusText.textContent = "Sync already running...";
@@ -1508,7 +1393,6 @@ class DataFetcher {
                 UINodes.statusText.textContent = "Error: " + error.message;
                 UINodes.statusDot.classList.remove('scanning');
                 UINodes.statusDot.style.backgroundColor = 'var(--rose-500)';
-                // TASK-06: Toast on sync error
                 this._toastOnce('sync-failed', 'Sync failed', error.message || 'Check connection and try again', 'error');
             } finally {
                 this._inflightSyncByDisk.delete(diskId);
@@ -1523,11 +1407,9 @@ class DataFetcher {
     }
 
     async _fetchPermissions() {
-        if (this._scanLocked) return;
         const diskId = this._activeDisk;
         if (!diskId) return;
         const permBody = document.getElementById('permissions-body');
-        // TASK-05: Loading state with styled empty-state
         if (permBody) {
             permBody.innerHTML = `
                 <div class="empty-state">
@@ -1583,7 +1465,6 @@ class DataFetcher {
     }
 
     async _fetchTreeMap() {
-        if (this._scanLocked) return;
         const diskId = this._activeDisk;
         if (!diskId) return;
 
@@ -1732,7 +1613,6 @@ class DataFetcher {
             UINodes.statusDot.classList.add('scanning');
             UINodes.statusDot.style.backgroundColor = '';
             UINodes.progressBar.style.width = '0%';
-            // TASK-10: Indeterminate progress animation while loading
             UINodes.progressBar.classList.add('loading-indeterminate');
         } else {
             UINodes.statusDot.classList.remove('scanning');
@@ -1764,7 +1644,7 @@ function initMobileSidebar() {
     document.querySelectorAll('.nav-item').forEach(el =>
         el.addEventListener('click', () => { if (window.innerWidth <= 640) close(); })
     );
-    // Auto-close sidebar when disk is selected on mobile (PF-03)
+    // Auto-close sidebar when disk is selected on mobile
     document.addEventListener('diskSelected', () => {
         if (window.innerWidth <= 640) close();
         const teamSidebar = document.getElementById('team-disk-sidebar');

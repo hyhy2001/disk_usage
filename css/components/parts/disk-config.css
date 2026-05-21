@@ -100,7 +100,7 @@
     background: rgba(16,185,129,0.12);
     border-color: rgba(16,185,129,0.25);
     color: var(--emerald-400);
-    /* TASK-09: Smooth active state transition */
+    /* Smooth active state transition */
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 

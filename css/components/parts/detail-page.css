@@ -113,6 +113,21 @@
 
 .snapshot-rows { display: flex; flex-direction: column; gap: 6px; }
 
+/* When the surrounding tab pane is bound to viewport height (snapshot tab
+   on comfortable desktop viewports), make each box's row list scroll
+   internally if its content is long. The header stays fixed at the top of
+   each box; only the data rows scroll. */
+@media (min-width: 1101px) and (min-height: 760px) {
+    #page-detail #tab-pane-snapshot.detail-tab-pane.active .snapshot-rows {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 4px;
+        scrollbar-gutter: stable;
+    }
+}
+
 /* -- Horizontal Bar Rows ---------------------------------------------------- */
 .sbar-row {
     display: grid;
@@ -489,6 +504,57 @@
     min-width: 0;
     width: 100%;
     box-sizing: border-box;
+    /* Viewport-fit: keep all detail tabs within the visible area, with a
+       small bottom margin against the screen edge. Long content scrolls
+       inside the tab pane (or its inner scrollers) instead of pushing the
+       window scrollbar. */
+    padding-bottom: 16px;
+}
+
+/* On comfortable desktop viewports, bound the snapshot/user-detail tabs to
+   the visible area so 4 box (General + Teams + Other + Top Users) scroll
+   internally rather than spilling past the bottom of the screen. */
+@media (min-width: 1101px) and (min-height: 760px) {
+    /* Snapshot tab: do NOT scroll the whole pane — instead let each box
+       (.snapshot-section) scroll its rows internally (rule below). The
+       pane itself just bounds the overall height. */
+    #page-detail #tab-pane-snapshot.detail-tab-pane.active {
+        min-height: 0;
+        max-height: calc(100dvh - 280px);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+    #page-detail #tab-pane-snapshot.detail-tab-pane.active > .snapshot-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+    }
+    #page-detail #tab-pane-snapshot.detail-tab-pane.active .snapshot-two-col {
+        flex: 1 1 auto;
+        min-height: 0;
+        align-items: stretch;
+    }
+    #page-detail #tab-pane-snapshot.detail-tab-pane.active .snapshot-col {
+        min-height: 0;
+        height: 100%;
+    }
+    #page-detail #tab-pane-snapshot.detail-tab-pane.active .snapshot-section {
+        min-height: 0;
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* User Detail tab: keep its existing internal scrollers, just bound the
+       overall pane height like the snapshot tab. */
+    #page-detail #tab-pane-user-detail.detail-tab-pane.active {
+        min-height: 0;
+        max-height: calc(100dvh - 280px);
+        overflow-y: auto;
+        overflow-x: hidden;
+        scrollbar-gutter: stable;
+    }
 }
 
 /* -- Snapshot tab body ------------------------------------------------------ */

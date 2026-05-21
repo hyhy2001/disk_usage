@@ -5,31 +5,47 @@
     min-height: 340px;
 }
 
-/* -- Overview Compact Fit (Desktop) ---------------------------------------- */
-/* Keep the same chart positions, but scale heights so 3 charts fit better
-   in one viewport on common laptop/desktop sizes. */
+/* -- Overview Compact Fit (Desktop) ----------------------------------------
+   Goal: 3 chart cards (timeline + team donut + users bar) phải fit gọn
+   trong 1 viewport phổ thông (laptop 13"-15", desktop 1080p) mà không cần
+   scroll. Chiều cao canvas dùng clamp(min, vh-based, max) để scale theo
+   viewport, có padding-bottom dưới page để chừa lề mép màn hình.            */
 @media (min-width: 1101px) and (min-height: 760px) {
+    #page-overview {
+        padding-bottom: 16px;       /* breathing room with screen bottom edge */
+    }
+
     #page-overview .charts-grid {
-        gap: 16px;
+        gap: 14px;
     }
 
     #page-overview .chart-container {
-        padding: 18px;
-        gap: 12px;
-        min-height: 280px;
+        padding: 16px;
+        gap: 10px;
+        min-height: 240px;
     }
 
     #page-overview .canvas-wrapper {
-        height: clamp(185px, 21vh, 245px);
-        min-height: 185px;
+        height: clamp(160px, 18vh, 210px);
+        min-height: 160px;
     }
 
     #page-overview .large-span .canvas-wrapper {
-        height: clamp(255px, 32vh, 336px);
-        min-height: 255px;
+        height: clamp(220px, 28vh, 296px);
+        min-height: 220px;
     }
 
     #page-overview .large-span .timeline-header {
         padding-bottom: 2px;
+    }
+}
+
+/* Extra-tall viewports (>=900px): allow charts to grow a bit more */
+@media (min-width: 1101px) and (min-height: 900px) {
+    #page-overview .canvas-wrapper {
+        height: clamp(180px, 21vh, 245px);
+    }
+    #page-overview .large-span .canvas-wrapper {
+        height: clamp(250px, 32vh, 336px);
     }
 }

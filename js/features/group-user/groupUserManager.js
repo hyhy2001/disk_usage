@@ -505,6 +505,14 @@ function createModalShell() {
     const groupsContainer = document.getElementById('group-user-groups');
     if (groupsContainer) {
         groupsContainer.addEventListener('click', (e) => {
+            // Don't run select-group logic on the second click of a double-
+            // click sequence — that one is reserved for inline rename. The
+            // first click still selects (e.detail === 1); the second click
+            // arrives with e.detail === 2 and is followed by a `dblclick`
+            // event. Without this guard, renderAll() recreates the row
+            // between clicks and the dblclick listener never fires reliably.
+            if (e.detail > 1) return;
+
             const row = e.target && typeof e.target.closest === 'function'
                 ? e.target.closest('[data-group-id]')
                 : null;

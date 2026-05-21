@@ -13,20 +13,24 @@ function b64_error($message, $code) {
     exit;
 }
 
-
 /**
  * Issue ETag/Cache-Control headers based on the source file's mtime/size and any
  * extra context (query params, etc). If the client sends a matching
  * If-None-Match header we short-circuit with a 304 response and exit.
  *
+ * Use for idempotent endpoints whose response is fully derived from a
+ * small set of source files (meta/users/disks/team). Bootstrap sets
+ * `Cache-Control: no-cache` globally, so this function overrides it.
+ *
  * @param string|array $source_paths   File path or array of file paths whose
  *                                     mtime+size define the cached snapshot.
+ *                                     Empty/non-existent paths are ignored.
  * @param array        $extra_keys     Extra strings (e.g. filter params, type)
  *                                     that should invalidate the cache when
  *                                     they change.
- * @param int          $max_age        Browser cache TTL in seconds.
+ * @param int          $max_age        Browser cache TTL in seconds (default 30).
  */
-function api_send_etag_cache($source_paths, $extra_keys = array(), $max_age = 300) {
+function api_send_etag_cache($source_paths, $extra_keys = array(), $max_age = 30) {
     if (!is_array($source_paths)) $source_paths = array($source_paths);
 
     $parts = array();

@@ -1,16 +1,17 @@
 // Detail Page Renderer — 2 tabs: Latest Snapshot & History/Analysis
 import { AppState } from '../core/main.js';
 import { fmt, fmtDate } from '../utils/formatters.js';
+import { pct } from '../utils/dom.js';
 import { saveFilters, loadFilters } from '../utils/filterStorage.js';
-import { getDetailTabFromUrl, replaceRoute } from '../core/router.js';
+import { getDetailTabFromUrl, replaceRoute } from '../core/router.js?v=95';
 import { renderInodesTab } from './inodeRenderer.js';
 
 let _store = null;
 
-// AbortController: canceled & replaced each time a new disk is loaded (CQ-02)
+// AbortController: canceled & replaced each time a new disk is loaded
 let _historyAbortCtrl = null;
 
-// Debounce timer for applyFilters (PF-01)
+// Debounce timer for applyFilters
 let _applyTimer = null;
 
 function debouncedApplyFilters() {
@@ -21,8 +22,6 @@ function debouncedApplyFilters() {
 // ── Format Helpers ────────────────────────────────────────────────────────
 
 function toInputDate(ms) { return new Date(ms).toISOString().split('T')[0]; }
-
-function pct(part, total) { return total ? ((part / total) * 100).toFixed(1) : '0.0'; }
 
 // ── Bar Row ────────────────────────────────────────────────────────────────
 
@@ -209,7 +208,7 @@ function renderUserFilterBox(sortedNames, defaultSet) {
         </div>`;
     }).join('');
 
-    // Event delegation — auto-removed when AbortController aborts on disk switch (ACC-03)
+    // Event delegation — auto-removed when AbortController aborts on disk switch
     const evtSignal = _historyAbortCtrl?.signal;
     wrap.addEventListener('click', e => {
         const item = e.target.closest('.user-filter-item');
@@ -227,8 +226,6 @@ function renderUserFilterBox(sortedNames, defaultSet) {
 }
 
 // Keep old name as alias so resetFilters can call it too
-const renderUserChips = renderUserFilterBox;
-
 function renderPivotView(pivotData) {
     const { dates, userNames, matrix } = pivotData;
 
@@ -355,6 +352,9 @@ export function applyFilters() {
 
 }
 
+
+const renderUserChips = renderUserFilterBox;
+
 function resetFilters() {
     if (!_store) return;
     const dr  = _store.getDateRange();
@@ -401,7 +401,14 @@ function initDetailTabs() {
             document.querySelectorAll('.detail-tab-pane').forEach(p => p.classList.remove('active'));
             document.getElementById(`tab-pane-${target}`)?.classList.add('active');
             saveFilters({ activeTab: target });
-            replaceRoute('detail', target);
+            // Only rewrite the URL to /detail/<target> when the user is
+            // actually on the Detail page. Otherwise this handler — which
+            // also fires when initDetailTabs() simulates a click below to
+            // restore the previously-active inner tab — would override an
+            // Overview URL with /detail/latest.
+            if ((loadFilters().activePage || 'overview') === 'detail') {
+                replaceRoute('detail', target);
+            }
             if (target === 'history') {
                 requestAnimationFrame(() => {
                     applyFilters();
@@ -411,8 +418,11 @@ function initDetailTabs() {
         });
     });
 
-    // Restore previously active tab
-    if (savedTab) {
+    // Restore previously active tab — only when the page itself is Detail.
+    // Otherwise the simulated click below would not just restore the inner
+    // tab visually, it would also fire `replaceRoute('detail', ...)` and
+    // hijack a URL that should stay on Overview.
+    if (savedTab && (loadFilters().activePage || 'overview') === 'detail') {
         const savedBtn = document.querySelector(`.detail-tab-btn[data-tab="${savedTab}"]`);
         if (savedBtn) savedBtn.click();
     }
@@ -589,7 +599,7 @@ export function resetDashboardToEmpty(chartMgr) {
 
 
 function initHistoryTab() {
-    // Abort all listeners from the previous disk load to prevent accumulation (CQ-02)
+    // Abort all listeners from the previous disk load to prevent accumulation
     if (_historyAbortCtrl) _historyAbortCtrl.abort();
     _historyAbortCtrl = new AbortController();
     const { signal } = _historyAbortCtrl;
@@ -700,7 +710,7 @@ function initHistoryTab() {
 }
 
 
-// Toggle a filter box item — module-local, keyboard-accessible, with debounce (ACC-03 + PF-01)
+// Toggle a filter box item — module-local, keyboard-accessible, with debounce
 function _toggleUserFilter(el) {
     el.classList.toggle('selected');
     const sel = el.classList.contains('selected');

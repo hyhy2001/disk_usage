@@ -11,7 +11,7 @@ function api_handle_aggregate($disk_path) {
         return $file_dates[$a] - $file_dates[$b];
     });
 
-    $inode_file = find_file_by_pattern($disk_path, '/.*inode_usage_report.*\.json$/i');
+    $inode_file = find_file_by_pattern($disk_path, DU_INODE_REPORT_PATTERN);
     $inode_json = "null";
     if ($inode_file && is_file($inode_file)) {
         $inode_json = file_get_contents($inode_file);

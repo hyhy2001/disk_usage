@@ -61,7 +61,7 @@ export function bytesToTB(bytes) {
     return bytes / 1e12;
 }
 
-// ── TASK-06: Toast Notification System ────────────────────────────────────────
+// ── Toast Notification System ────────────────────────────────────────
 
 const TOAST_ICONS = {
     success: `

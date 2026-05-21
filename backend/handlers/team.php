@@ -5,32 +5,16 @@ function api_handle_team($root_dir) {
     if ($team_name === '') b64_error('Missing team name', 400);
 
     $disks = api_load_disks_config($root_dir);
-    $team_disks = array();
-
-    if (is_array($disks)) {
-        foreach ($disks as $p_or_d) {
-            if (isset($p_or_d['teams']) && is_array($p_or_d['teams'])) {
-                foreach ($p_or_d['teams'] as $t) {
-                    if (isset($t['name']) && $t['name'] === $team_name) {
-                        if (isset($t['disks']) && is_array($t['disks'])) {
-                            foreach ($t['disks'] as $d) {
-                                $team_disks[] = $d;
-                            }
-                        }
-                    }
-                }
-            }
-            if (isset($p_or_d['name']) && $p_or_d['name'] === $team_name) {
-                if (isset($p_or_d['disks']) && is_array($p_or_d['disks'])) {
-                    foreach ($p_or_d['disks'] as $d) {
-                        $team_disks[] = $d;
-                    }
-                }
-            }
-        }
-    }
+    $team_disks = api_find_team_disks($disks, $team_name);
 
     if (empty($team_disks)) b64_error('Team not found or has no disks', 404);
+
+    // ETag from disks.json + each disk_path mtime + team name.
+    $etag_paths = array($root_dir . DIRECTORY_SEPARATOR . DU_DISKS_CONFIG_FILENAME);
+    foreach ($team_disks as $d) {
+        if (!empty($d['path'])) $etag_paths[] = $root_dir . DIRECTORY_SEPARATOR . trim($d['path'], '/\\');
+    }
+    api_send_etag_cache($etag_paths, array($team_name), 15);
 
     $result_data = array();
 
@@ -52,9 +36,8 @@ function api_handle_team($root_dir) {
         }
 
         if ($latest) {
-            $json = @file_get_contents($latest);
-            $parsed = @json_decode($json, true);
-            if ($parsed && is_array($parsed)) {
+            $parsed = api_load_json_file($latest);
+            if ($parsed) {
                 $summary = array();
                 $summary['_disk_id'] = isset($d['id']) ? $d['id'] : '';
                 $summary['_disk_name'] = isset($d['name']) ? $d['name'] : 'Unknown Disk';

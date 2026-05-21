@@ -4,6 +4,7 @@
 import { fmtDateSec as fmtDate } from '../utils/formatters.js';
 import { downloadCsv, downloadZip, streamExportGzip, toCsv }   from '../utils/csvExport.js';
 import { showProgressToast, updateProgressToast, closeProgressToast, showToast } from '../core/main.js';
+import { escHtml } from '../utils/dom.js';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const PERM_PAGE     = 100;
@@ -28,12 +29,6 @@ const TYPE_ICON = {
     directory: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
     file:      `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>`,
 };
-
-function escHtml(s) {
-    return String(s)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
 
 // ── Pagination widget ─────────────────────────────────────────────────────────
 function _renderPagination(current, total) {

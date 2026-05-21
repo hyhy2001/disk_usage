@@ -71,3 +71,23 @@
 }
 
 
+
+/* Inline scan-in-progress spinner inside #system-status pill.
+   Replaces the full-screen .disk-scan-overlay so the dashboard stays
+   interactive during background scans. */
+#system-status .status-spinner-svg {
+    width: 11px;
+    height: 11px;
+    flex-shrink: 0;
+    color: var(--sky-400, #38bdf8);
+    animation: status-spinner-rotate 0.9s linear infinite;
+}
+
+#system-status .status-text-label {
+    white-space: nowrap;
+}
+
+@keyframes status-spinner-rotate {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}

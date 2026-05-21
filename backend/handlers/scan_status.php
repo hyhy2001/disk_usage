@@ -15,11 +15,8 @@ function api_resolve_disk_status($status_file) {
 
     if (!is_file($status_file)) return $empty;
 
-    $raw = @file_get_contents($status_file);
-    if ($raw === false) return array_merge($empty, array('error' => 'unreadable'));
-
-    $status = @json_decode($raw, true);
-    if (!is_array($status)) return array_merge($empty, array('error' => 'parse_error'));
+    $status = api_load_json_file($status_file);
+    if ($status === null) return array_merge($empty, array('error' => 'parse_error'));
 
     $status = array_merge($empty, $status);
 
@@ -38,7 +35,7 @@ function api_resolve_disk_status($status_file) {
 }
 
 function api_handle_scan_status($disk_path) {
-    $status_file = $disk_path . DIRECTORY_SEPARATOR . 'scan_status.json';
+    $status_file = $disk_path . DIRECTORY_SEPARATOR . DU_SCAN_STATUS_FILENAME;
     b64_success(api_resolve_disk_status($status_file));
 }
 
@@ -52,26 +49,7 @@ function api_handle_team_scan_status($root_dir) {
     }
 
     $disks = api_load_disks_config($root_dir);
-    $team_disks = array();
-
-    if (is_array($disks)) {
-        foreach ($disks as $p_or_d) {
-            if (isset($p_or_d['teams']) && is_array($p_or_d['teams'])) {
-                foreach ($p_or_d['teams'] as $t) {
-                    if (isset($t['name']) && $t['name'] === $team_name) {
-                        if (isset($t['disks']) && is_array($t['disks'])) {
-                            foreach ($t['disks'] as $d) { $team_disks[] = $d; }
-                        }
-                    }
-                }
-            }
-            if (isset($p_or_d['name']) && $p_or_d['name'] === $team_name) {
-                if (isset($p_or_d['disks']) && is_array($p_or_d['disks'])) {
-                    foreach ($p_or_d['disks'] as $d) { $team_disks[] = $d; }
-                }
-            }
-        }
-    }
+    $team_disks = api_find_team_disks($disks, $team_name);
 
     $result_data = array();
     foreach ($team_disks as $d) {
@@ -79,7 +57,7 @@ function api_handle_team_scan_status($root_dir) {
         $disk_path = $root_dir . DIRECTORY_SEPARATOR . trim($d['path'], '/\\');
         if (!is_dir($disk_path)) continue;
 
-        $status = api_resolve_disk_status($disk_path . DIRECTORY_SEPARATOR . 'scan_status.json');
+        $status = api_resolve_disk_status($disk_path . DIRECTORY_SEPARATOR . DU_SCAN_STATUS_FILENAME);
         $status['_disk_id']   = isset($d['id'])   ? (string)$d['id']   : '';
         $status['_disk_name'] = isset($d['name']) ? (string)$d['name'] : 'Unknown Disk';
         $result_data[] = $status;
