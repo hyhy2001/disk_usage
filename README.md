@@ -35,9 +35,12 @@ which generates the JSON reports this dashboard consumes.
 ### Detail User Tab *(Early Access)*
 - **User picker dropdown** — searchable, lists all users (configured + system UIDs)
 - **Directory card** — top directories sorted by size with colour-coded bars and CSV export
-- **File card** — files sorted by size with extension badges, paginated (500 rows/page)
-- **SQLite-backed PHP API** — reads `detail_users/data_detail.db` with paginated queries instead of loading full detail reports
-- **CSV export** — download dirs or files for the current user, or all users at once
+- **File card** — files sorted by size with extension badges
+- **Cursor pagination** — Next/Prev navigation with O(limit) keyset queries; no page numbers, no total count needed
+- **SQLite-backed PHP API** — reads `detail_users/data_detail.db` with cursor-based keyset pagination
+- **Keyword search** — LIKE-based filter on file basename or directory path (comma-separated multi-term)
+- **Advanced filters** — extension filter, min/max size range
+- **CSV export** — streaming gzip export for dirs or files with progress indicator
 - **Beta notice banner** — dismissible session-persistent notice (stored in `sessionStorage`)
 
 ### Permission Issues Tab
@@ -49,6 +52,21 @@ which generates the JSON reports this dashboard consumes.
 - **User summary sidebar** — item counts per user (always reflects full unfiltered totals)
 - **CSV export** — Export Filtered (current filters) or Export All (raw dump)
 - **Backward-compatible API** — accepts both new flat format and old nested format
+
+### Treemap Explorer Tab
+- **Interactive directory tree** — navigate filesystem hierarchy by clicking folders
+- **Breadcrumb navigation** — click any ancestor to jump back; resolves paths via tree-walk
+- **Global search** — find directories by name across the entire tree; results scoped to current path
+- **Size bars** — visual percentage of disk usage per node with colour coding
+- **Owner column** — shows directory owner for each node
+- **Lazy loading** — fetches children on demand via `treemap.db` shard API
+- **Responsive layout** — 4-column grid collapses to 2-column then single-column at narrow widths
+
+### Inodes Stat Tab
+- **System inode summary** — total/used/free inodes with capacity pie chart
+- **Per-user inode distribution** — 2-column grid of user cards showing file count contribution
+- **Searchable user list** — filter users by name
+- **Stat cards** — quick metrics (total users, avg files/user, max files user)
 
 ### ⚙️ Config Generator (`setup.html`)
 - **Visual setup wizard** — browser-based tool to generate config files without editing JSON by hand
@@ -110,15 +128,44 @@ Returns `{ users: [{name, used}] }` — all users with detail reports for this d
 
 #### `?id=<disk_id>&type=detail&user_b64=<base64_username>` — Unified user detail
 
-Returns directory and file breakdowns for a single user in one JSON response. Usernames are sent as UTF-8 base64 via `user_b64` so spaces, Unicode, and system account names are handled safely.
+Returns directory and file breakdowns for a single user. Supports cursor pagination.
 
-#### `?id=<disk_id>&type=dirs&user_b64=<base64_username>` — Directory report
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `user_b64` | required | Base64-encoded UTF-8 username |
+| `limit` | `500` | Rows per page (max 50000) |
+| `dir_cursor` | _(omit)_ | Opaque cursor for dir pagination (from previous `next_cursor`) |
+| `file_cursor` | _(omit)_ | Opaque cursor for file pagination |
+| `filter_query` | _(omit)_ | Comma-separated keywords — LIKE match on file basename or dir path |
+| `filter_ext` | _(omit)_ | Comma-separated extensions (files only) |
+| `filter_min_size` | _(omit)_ | Minimum file/dir size in bytes |
+| `filter_max_size` | _(omit)_ | Maximum file/dir size in bytes |
 
-Returns the top-directory breakdown for a single user.
+**Response:** `{ dir: { total_dirs_full, total_used, has_more, next_cursor, dirs[] }, file: { total_files_full, total_used, has_more, next_cursor, files[] } }`
 
-#### `?id=<disk_id>&type=files&user_b64=<base64_username>&offset=N&limit=M` — Paginated file report
+#### `?id=<disk_id>&type=dirs&user_b64=<base64_username>` — Directory report (cursor)
 
-Reads `detail_users/data_detail.db` and returns paginated file rows. Responses are JSON; the frontend only falls back to base64 parsing for older cached responses.
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `limit` | `500` | Rows per page |
+| `cursor` | _(omit)_ | Opaque cursor from previous response's `next_cursor` |
+| `filter_query` | _(omit)_ | Keyword filter on dir path |
+| `filter_min_size` / `filter_max_size` | _(omit)_ | Size range filter |
+
+**Response:** `{ dir: { total_dirs_full, total_used, has_more, next_cursor, dirs[] } }`
+
+#### `?id=<disk_id>&type=files&user_b64=<base64_username>` — File report (cursor)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `limit` | `500` | Rows per page |
+| `cursor` | _(omit)_ | Opaque cursor from previous response's `next_cursor` |
+| `filter_query` | _(omit)_ | Keyword filter on file basename |
+| `filter_ext` | _(omit)_ | Extension filter |
+| `filter_min_size` / `filter_max_size` | _(omit)_ | Size range filter |
+
+**Response:** `{ file: { total_files_full, total_used, has_more, next_cursor, files[] } }`
+
 
 ### File Matching
 
@@ -147,18 +194,21 @@ Browser
   │
   ├── GET api.php?id=disk_sda&type=users    ← list users with detail reports
   │
-  ├── GET api.php?id=disk_sda&type=detail   ← dirs + files for a user
+  ├── GET api.php?id=disk_sda&type=detail   ← dirs + files for a user (cursor)
   │     &user_b64=YWxpY2U=
+  │     &limit=500&dir_cursor=...&file_cursor=...
   │
-  ├── GET api.php?id=disk_sda&type=files    ← paginated file list for a user
-  │     &user_b64=YWxpY2U=&offset=0&limit=500
+  ├── GET api.php?id=disk_sda&type=files    ← paginated file list (cursor)
+  │     &user_b64=YWxpY2U=&limit=500
+  │     &cursor=eyJzaXplIjo...
+  │
+  ├── GET api.php?id=disk_sda&type=treemap  ← treemap children for a shard
+  │     &shard_id=42&offset=0&limit=200
   │
   └── GET api.php?id=disk_sda              ← paginated permission issues
-        &type=permissions                     with optional filters
+        &type=permissions
         &offset=0&limit=100
         &users=alice,bob
-        &item_type=file
-        &path=/var/log
 ```
 
 ---
@@ -233,29 +283,35 @@ Each `path` directory should contain:
 - `disk_usage_report*.json` — one or more dated reports from check_disk
 - `permission_issue*.json` — permission scan output (optional)
 - `detail_users/data_detail.db` — unified per-user directory and file detail database (optional)
-- `tree_map_data.db` — treemap data database (optional)
+- `tree_map_data/treemap.db` — treemap data database (optional)
 
 ### SQLite report schemas
 
-`detail_users/data_detail.db` is the unified Detail User database. The dashboard reads these tables:
+`detail_users/data_detail.db` is the unified Detail User database:
 
-| Table | Key columns | Purpose |
-|-------|-------------|---------|
-| `users` | `user_id`, `username`, `scan_date`, `total_dirs`, `total_files`, `total_used` | Per-user metadata and totals |
-| `dir_detail` | `user_id`, `dir_id`, `size` | Directory usage rows |
-| `file_detail` | `user_id`, `dir_id`, `basename_id`, `ext_id`, `size` | File usage rows |
-| `dirs_dict` | `dir_id`, `path` | Directory path dictionary |
-| `basename_dict` | `basename_id`, `basename` | File basename dictionary |
-| `ext_dict` | `ext_id`, `ext` | File extension dictionary |
-| `user_meta` | `username` | User list fallback for older/newer scanner output |
+| Table | Columns | Purpose |
+|-------|---------|---------|
+| `meta` | `key`, `value` | scan_root, scan_timestamp |
+| `users` | `uid`, `username`, `team_id`, `total_files`, `total_dirs`, `total_size`, `permission_issues`, `is_target` | Per-user metadata and totals |
+| `file_names` | `id`, `name` | Unique file basename dictionary |
+| `dirs` | `id`, `uid`, `parent_id`, `path`, `owner_uid`, `size`, `files` | Directory rows — one per (dir, user) pair. `path` is pre-computed absolute. PK: `(id, uid)` |
+| `files` | `dir_id`, `name_id`, `ext`, `uid`, `size` | File rows — `ext` stored inline (no dictionary) |
 
-`tree_map_data.db` stores lazy-loaded treemap shards:
+Indexes (keyset-pagination optimized):
+- `ix_files_uid_size_dir_name` — covers no-filter cursor pagination
+- `ix_files_uid_ext_size_dir_name` — covers ext-filter cursor pagination
+- `ix_files_dir_uid_ext_size_name` — covers dir_id batch path resolution
+- `ix_dirs_uid_size_dir` — covers dir cursor pagination
+- `ix_file_names_name` — covers LIKE keyword search
 
-| Table | Key columns | Purpose |
-|-------|-------------|---------|
-| `shards` | `id`, `path`, `data` | One treemap shard per row; `data` is JSON text or zlib-compressed JSON |
+`tree_map_data/treemap.db` stores the directory tree for the treemap explorer:
 
-Shard JSON items may use either the compact scanner format `{id, name, size, owner, children_count}` or the dashboard format `{shard_id, name, value, type, owner, has_children, path}`; the API normalizes both before returning JSON.
+| Table | Columns | Purpose |
+|-------|---------|---------|
+| `meta` | `key`, `value` | scan_root, scan_timestamp, max_level, total_size, total_dirs |
+| `names` | `id`, `name` | Directory segment dictionary |
+| `owners` | `uid`, `username` | UID → username mapping |
+| `dirs` | `id`, `parent_id`, `name_id`, `total_size`, `file_count`, `dir_count`, `owner_uid`, `has_files` | Full directory tree (all depths) |
 
 ---
 
@@ -361,13 +417,17 @@ curl "http://localhost/disk_usage/api.php?id=disk_sda" | python3 -m json.tool | 
 curl "http://localhost/disk_usage/api.php?id=disk_sda&type=permissions&item_type=file&path=/var/log&limit=10" \
   | python3 -m json.tool
 
-# Unified user detail (UTF-8 username encoded as base64)
+# Unified user detail (cursor pagination)
 USER_B64="$(printf '%s' 'user1' | base64 | tr -d '\n')"
-curl "http://localhost/disk_usage/api.php?id=disk_sda&type=detail&user_b64=${USER_B64}&dir_offset=0&file_offset=0&limit=50" \
+curl "http://localhost/disk_usage/api.php?id=disk_sda&type=detail&user_b64=${USER_B64}&limit=50" \
   | python3 -m json.tool | head -30
 
-# Per-user files (paginated)
-curl "http://localhost/disk_usage/api.php?id=disk_sda&type=files&user_b64=${USER_B64}&offset=0&limit=50" \
+# Per-user files with cursor (first page — no cursor param)
+curl "http://localhost/disk_usage/api.php?id=disk_sda&type=files&user_b64=${USER_B64}&limit=50" \
+  | python3 -m json.tool | head -30
+
+# Treemap children
+curl "http://localhost/disk_usage/api.php?id=disk_sda&type=treemap&shard_id=0&limit=50" \
   | python3 -m json.tool | head -30
 ```
 
@@ -404,12 +464,13 @@ check_disk (CLI, server-side)
         ├── disk_usage_report_20260322.json      (snapshot + dirs + users)
         ├── permission_issues_20260322.json       (inaccessible paths)
         ├── detail_users/data_detail.db           (unified per-user dirs/files)
-        └── tree_map_data.db                      (treemap shards/search)
+        └── tree_map_data/treemap.db              (directory tree for treemap explorer)
 
 api.php (PHP, web server)
   ├── Aggregates all disk_usage_report*.json → history timeline
-  ├── Reads detail_users/data_detail.db → paginated user detail JSON
-  └── Filters permission_issue*.json server-side → paginated JSON
+  ├── Reads detail_users/data_detail.db → cursor-paginated user detail JSON
+  ├── Reads tree_map_data/treemap.db → lazy-loaded treemap explorer
+  └── Filters permission_issues.db server-side → paginated JSON
 
 Browser (Vanilla JS, no framework)
   ├── Renders charts via Chart.js
