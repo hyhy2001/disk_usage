@@ -75,7 +75,8 @@ function api_detail_dir_rows($pdo, $uid, $offset, $limit, $filters) {
                 if ($known_total > 0 && $offset + $limit > $known_total / 2) {
                     $sql_offset = max(0, $known_total - $offset - $limit);
                     $reverse = true;
-                    $fetch_limit = (int)$limit;
+                    // Clamp to actual remaining rows to avoid overlap on last page.
+                    $fetch_limit = max(1, min((int)$limit, $known_total - (int)$offset));
                 }
             }
 
@@ -211,7 +212,7 @@ function api_detail_file_rows($pdo, $uid, $offset, $limit, $filters) {
             if ($known_total > 0 && $offset + $limit > $known_total / 2) {
                 $sql_offset = max(0, $known_total - $offset - $limit);
                 $reverse = true;
-                $fetch_limit = (int)$limit;
+                $fetch_limit = max(1, min((int)$limit, $known_total - (int)$offset));
             }
         }
 
