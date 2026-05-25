@@ -176,12 +176,19 @@ function _renderDirCard(dirData) {
         </div>`;
     }).join('');
 
-    const totalDirs   = Math.max(0, dirData.total_dirs ?? dirData.dirs.length);
+    const rawTotalDirs = Number(dirData.total_dirs);
+    const totalDirsKnown = rawTotalDirs >= 0;
+    const totalDirs   = totalDirsKnown ? rawTotalDirs : Math.max(0, dirData.dirs.length);
     const totalDirsFull = Math.max(0, dirData.total_dirs_full ?? totalDirs);
-    const totalPages  = Math.max(1, Math.ceil(totalDirs / FILE_PAGE));
     const currentPage = _dirPage;
+    // When total is unknown (-1), use has_more to indicate at least one more page exists.
+    const totalPages = totalDirsKnown
+        ? Math.max(1, Math.ceil(totalDirs / FILE_PAGE))
+        : (dirData.has_more ? currentPage + 1 : currentPage);
     const displayTotal = Math.max(0, _hasActiveFilters() ? totalDirs : totalDirsFull);
-    const badge       = `Page ${currentPage} of ${totalPages} · ${displayTotal.toLocaleString()} dirs`;
+    const badge = totalDirsKnown
+        ? `Page ${currentPage} of ${totalPages} · ${displayTotal.toLocaleString()} dirs`
+        : `Page ${currentPage} · ${displayTotal.toLocaleString()} dirs`;
 
     return `
     <div class="ud-card glass-panel" id="ud-dir-card">
@@ -272,13 +279,18 @@ function _renderPagination(current, total, type) {
 function _renderFileCard(fileData) {
     const files = fileData?.files || [];
     const grandTotal  = fileData?.total_used || 1;
-    const totalFiles  = Math.max(0, fileData?.total_files ?? files.length);
+    const rawTotalFiles = Number(fileData?.total_files);
+    const totalFilesKnown = rawTotalFiles >= 0;
+    const totalFiles  = totalFilesKnown ? rawTotalFiles : Math.max(0, files.length);
     const totalFilesFull = Math.max(0, fileData?.total_files_full ?? totalFiles);
-    const totalPages  = Math.max(1, Math.ceil(totalFiles / FILE_PAGE));
     const currentPage = _filePage;
-    const shown       = (fileData?.offset ?? 0) + files.length;
+    const totalPages = totalFilesKnown
+        ? Math.max(1, Math.ceil(totalFiles / FILE_PAGE))
+        : (fileData?.has_more ? currentPage + 1 : currentPage);
     const displayTotal = Math.max(0, _hasActiveFilters() ? totalFiles : totalFilesFull);
-    const badge       = files.length ? `Page ${currentPage} of ${totalPages} · ${displayTotal.toLocaleString()} files` : 'No files';
+    const badge = totalFilesKnown
+        ? (files.length ? `Page ${currentPage} of ${totalPages} · ${displayTotal.toLocaleString()} files` : 'No files')
+        : (files.length ? `Page ${currentPage} · ${displayTotal.toLocaleString()} files` : 'No files');
 
     const rows = files.length ? files.map(f => {
         const pct = Math.min((f.size / grandTotal) * 100, 100).toFixed(1);
@@ -1183,7 +1195,8 @@ function _attachContentEvents(contentEl, root) {
 
 async function _goToPageFile(root, page, allowFallback = true) {
     if (!_currentDisk || !_selectedUser) return;
-    if (page < 1 || page > _fileTotalPages) return;
+    // Allow navigation beyond _fileTotalPages when total is unknown (has_more driven)
+    if (page < 1 || (_fileTotalPages > 0 && page > _fileTotalPages)) return;
 
     // Dim the list while loading
     const list  = root.querySelector('#ud-file-list');
@@ -1198,9 +1211,14 @@ async function _goToPageFile(root, page, allowFallback = true) {
         const fileData = await _fetchFilePage(_currentDisk, _selectedUser, offset, FILE_PAGE);
         _scanRoot = String((fileData && fileData.scan_root) || _scanRoot || '');
         const rows = Array.isArray(fileData?.files) ? fileData.files.map(_normalizeFileRow) : [];
-        const fallbackTotal = Math.max(0, fileData.total_files ?? rows.length);
+        const rawTotal = Number(fileData.total_files);
+        const totalKnown = rawTotal >= 0;
+        const fallbackTotal = totalKnown ? rawTotal : Math.max(0, rows.length);
         const totalFiles = Math.max(0, _fileTotalExact ?? fallbackTotal);
-        const computedTotalPages = Math.max(1, Math.ceil(totalFiles / FILE_PAGE));
+        // When total is unknown, derive total pages from has_more.
+        const computedTotalPages = totalKnown
+            ? Math.max(1, Math.ceil(totalFiles / FILE_PAGE))
+            : (fileData.has_more ? page + 1 : page);
 
         // Guard against stale/overestimated totals from backend indexes.
         // If requested page is empty, clamp UI back to last page that can contain rows.
@@ -1258,7 +1276,7 @@ async function _goToPageFile(root, page, allowFallback = true) {
 async function _goToPageDir(root, page, allowFallback = true) {
     if (!_currentDisk || !_selectedUser) return;
     if (_hasExtFilter()) return;
-    if (page < 1 || page > _dirTotalPages) return;
+    if (page < 1 || (_dirTotalPages > 0 && page > _dirTotalPages)) return;
 
     // Dim the list while loading
     const list  = root.querySelector('#ud-dir-list');
@@ -1273,9 +1291,13 @@ async function _goToPageDir(root, page, allowFallback = true) {
         const dirData = await _fetchDir(_currentDisk, _selectedUser, offset, FILE_PAGE);
         _scanRoot = String((dirData && dirData.scan_root) || _scanRoot || '');
         const rows = Array.isArray(dirData?.dirs) ? dirData.dirs.map(_normalizeDirRow) : [];
-        const fallbackTotal = Math.max(0, dirData.total_dirs ?? rows.length);
+        const rawTotal = Number(dirData.total_dirs);
+        const totalKnown = rawTotal >= 0;
+        const fallbackTotal = totalKnown ? rawTotal : Math.max(0, rows.length);
         const totalDirs = Math.max(0, _dirTotalExact ?? fallbackTotal);
-        const computedTotalPages = Math.max(1, Math.ceil(totalDirs / FILE_PAGE));
+        const computedTotalPages = totalKnown
+            ? Math.max(1, Math.ceil(totalDirs / FILE_PAGE))
+            : (dirData.has_more ? page + 1 : page);
 
         // Guard against stale/overestimated totals from backend indexes.
         if (allowFallback && page > 1 && rows.length === 0) {
