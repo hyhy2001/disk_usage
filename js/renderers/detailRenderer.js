@@ -3,7 +3,7 @@ import { AppState } from '../core/main.js';
 import { fmt, fmtDate } from '../utils/formatters.js';
 import { pct } from '../utils/dom.js';
 import { saveFilters, loadFilters } from '../utils/filterStorage.js';
-import { getDetailTabFromUrl, replaceRoute } from '../core/router.js?v=95';
+import { getDetailTabFromUrl, replaceRoute } from '../core/router.js?v=96';
 import { renderInodesTab } from './inodeRenderer.js';
 
 let _store = null;

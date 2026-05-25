@@ -1475,6 +1475,7 @@ async function _fetchExportPage(kind, diskId, user, offset, limit, cursor = null
     if (cursor !== null) {
         url += '&export_stream=1';
         url += `&cursor=${Math.max(0, Number(cursor) || 0)}`;
+    }
     if (kind !== 'dirs' && _currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
