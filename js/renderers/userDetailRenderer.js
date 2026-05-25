@@ -888,7 +888,7 @@ function _parseApiJson(text) {
     }
 }
 
-async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE, approxMode = false) {
+async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE) {
     if (_abortCtrl) _abortCtrl.abort();
     _abortCtrl = new AbortController();
     const b64User = btoa(unescape(encodeURIComponent(user)));
@@ -896,9 +896,6 @@ async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE, approxMode
     if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
-    if (approxMode) {
-        url += '&approx_total=1';
-    }
     const t0 = performance.now();
     const text = await _fetchApiText(url, { signal: _abortCtrl.signal });
     const t1 = performance.now();
@@ -926,16 +923,13 @@ async function _fetchDetail(diskId, user, dirOffset = 0, fileOffset = 0, limit =
     return json.data;
 }
 
-async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE, approxMode = false) {
+async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE) {
     const b64User = btoa(unescape(encodeURIComponent(user)));
     let url = `api.php?id=${encodeURIComponent(diskId)}&type=files&user_b64=${encodeURIComponent(b64User)}&offset=${offset}&limit=${limit}`;
     if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
     if (_currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
-    if (approxMode) {
-        url += '&approx_total=1';
-    }
 
     const t0 = performance.now();
     const text = await _fetchApiText(url);
@@ -1201,7 +1195,7 @@ async function _goToPageFile(root, page, allowFallback = true) {
     try {
         const offset = (page - 1) * FILE_PAGE;
         const hasFilters = _hasActiveFilters();
-        const fileData = await _fetchFilePage(_currentDisk, _selectedUser, offset, FILE_PAGE, hasFilters);
+        const fileData = await _fetchFilePage(_currentDisk, _selectedUser, offset, FILE_PAGE);
         _scanRoot = String((fileData && fileData.scan_root) || _scanRoot || '');
         const rows = Array.isArray(fileData?.files) ? fileData.files.map(_normalizeFileRow) : [];
         const fallbackTotal = Math.max(0, fileData.total_files ?? rows.length);
@@ -1276,7 +1270,7 @@ async function _goToPageDir(root, page, allowFallback = true) {
     try {
         const offset = (page - 1) * FILE_PAGE;
         const hasFilters = _hasActiveFilters();
-        const dirData = await _fetchDir(_currentDisk, _selectedUser, offset, FILE_PAGE, hasFilters);
+        const dirData = await _fetchDir(_currentDisk, _selectedUser, offset, FILE_PAGE);
         _scanRoot = String((dirData && dirData.scan_root) || _scanRoot || '');
         const rows = Array.isArray(dirData?.dirs) ? dirData.dirs.map(_normalizeDirRow) : [];
         const fallbackTotal = Math.max(0, dirData.total_dirs ?? rows.length);
@@ -1481,9 +1475,6 @@ async function _fetchExportPage(kind, diskId, user, offset, limit, cursor = null
     if (cursor !== null) {
         url += '&export_stream=1';
         url += `&cursor=${Math.max(0, Number(cursor) || 0)}`;
-    } else if (kind !== 'dirs') {
-        url += '&approx_total=1';
-    }
     if (kind !== 'dirs' && _currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
