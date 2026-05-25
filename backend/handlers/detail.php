@@ -61,22 +61,43 @@ function api_detail_dir_rows($pdo, $uid, $offset, $limit, $filters) {
 
     if ($needle === '') {
         try {
+            $is_export = (int)param('export_stream', 0) === 1;
+            $reverse = false;
+            $sql_offset = (int)$offset;
             $fetch_limit = (int)$limit + 1;
+            $known_total = -1;
+
+            // Reverse-pagination using users.total_dirs (no COUNT query needed).
+            if (!$is_export) {
+                $ts = $pdo->prepare('SELECT total_dirs FROM users WHERE uid = ?');
+                $ts->execute(array((int)$uid));
+                $known_total = (int)$ts->fetchColumn();
+                if ($known_total > 0 && $offset + $limit > $known_total / 2) {
+                    $sql_offset = max(0, $known_total - $offset - $limit);
+                    $reverse = true;
+                    $fetch_limit = (int)$limit;
+                }
+            }
+
             $bind2 = $bind;
             $bind2[] = $fetch_limit;
-            $bind2[] = (int)$offset;
+            $bind2[] = $sql_offset;
+            $order = $reverse ? 'ASC' : 'DESC';
             $stmt = $pdo->prepare(
                 'SELECT id, path, size, files FROM dirs WHERE ' . $where_sql
-                . ' ORDER BY size DESC LIMIT ? OFFSET ?'
+                . ' ORDER BY size ' . $order . ' LIMIT ? OFFSET ?'
             );
             $stmt->execute($bind2);
             $page = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            if ($reverse) $page = array_reverse($page);
         } catch (Exception $e) {
             return array('rows' => array(), 'total' => -1, 'has_more' => false);
         }
 
-        $has_more = count($page) > $limit;
-        if ($has_more) $page = array_slice($page, 0, (int)$limit);
+        $has_more = $reverse
+            ? ($offset + count($page)) < $known_total
+            : count($page) > $limit;
+        if (!$reverse && $has_more) $page = array_slice($page, 0, (int)$limit);
 
         $rows = array();
         foreach ($page as $r) {
@@ -174,23 +195,46 @@ function api_detail_file_rows($pdo, $uid, $offset, $limit, $filters) {
     }
 
     try {
+        $is_export_f = (int)param('export_stream', 0) === 1;
+        $reverse = false;
+        $sql_offset = (int)$offset;
         $fetch_limit = (int)$limit + 1;
+        $known_total = -1;
+
+        // Reverse-pagination using users.total_files (no COUNT query needed).
+        // Only applies when no ext/size filters (pure uid filter = index-friendly).
+        $can_reverse = !$is_export_f && $filters['ext'] === '' && $filters['min'] === 0 && $filters['max'] === 0;
+        if ($can_reverse) {
+            $ts = $pdo->prepare('SELECT total_files FROM users WHERE uid = ?');
+            $ts->execute(array((int)$uid));
+            $known_total = (int)$ts->fetchColumn();
+            if ($known_total > 0 && $offset + $limit > $known_total / 2) {
+                $sql_offset = max(0, $known_total - $offset - $limit);
+                $reverse = true;
+                $fetch_limit = (int)$limit;
+            }
+        }
+
         $bind2 = $bind;
         $bind2[] = $fetch_limit;
-        $bind2[] = (int)$offset;
+        $bind2[] = $sql_offset;
+        $order = $reverse ? 'ASC' : 'DESC';
         $stmt = $pdo->prepare(
             'SELECT f.dir_id, n.name AS basename, f.ext, f.size '
             . 'FROM files f JOIN file_names n ON f.name_id = n.id '
-            . 'WHERE ' . $where_sql . ' ORDER BY f.size DESC LIMIT ? OFFSET ?'
+            . 'WHERE ' . $where_sql . ' ORDER BY f.size ' . $order . ' LIMIT ? OFFSET ?'
         );
         $stmt->execute($bind2);
         $page = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($reverse) $page = array_reverse($page);
     } catch (Exception $e) {
-        return array('rows' => array(), 'total' => -1, 'has_more' => false);
+        return array('rows' => array(), 'total' => 0, 'has_more' => false);
     }
 
-    $has_more = count($page) > $limit;
-    if ($has_more) $page = array_slice($page, 0, (int)$limit);
+    $has_more = $reverse
+        ? ($offset + count($page)) < $known_total
+        : count($page) > $limit;
+    if (!$reverse && $has_more) $page = array_slice($page, 0, (int)$limit);
     return api_detail_format_files_page($pdo, $page, $offset, -1, $has_more);
 }
 

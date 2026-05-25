@@ -1270,7 +1270,11 @@ async function _goToPageFile(root, page, allowFallback = true) {
         }
 
         _filePage = page;
-        _fileTotalPages = computedTotalPages;
+        // Only grow totalPages, never shrink during navigation.
+        // This prevents going back to page 1 from resetting the known total.
+        if (computedTotalPages > _fileTotalPages) {
+            _fileTotalPages = computedTotalPages;
+        }
 
         // Re-render file card rows + pagination in-place
         if (list) {
@@ -1348,7 +1352,9 @@ async function _goToPageDir(root, page, allowFallback = true) {
         }
 
         _dirPage = page;
-        _dirTotalPages = computedTotalPages;
+        if (computedTotalPages > _dirTotalPages) {
+            _dirTotalPages = computedTotalPages;
+        }
 
         if (list) {
             const grandTotal = dirData.total_used || 1;
