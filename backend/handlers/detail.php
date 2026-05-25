@@ -37,16 +37,6 @@ function api_detail_user_row($pdo, $username) {
     return $cache[$key] = $row ? $row : false;
 }
 
-// Path resolution delegates to lib/path_resolver.php.
-// detail.db's `files.dir_id` references `tm.dirs.id` (treemap.db ATTACHed),
-// so the schema prefix is 'tm.'.
-function api_detail_path_for($pdo, $dir_id) {
-    return api_path_for($pdo, $dir_id, 'tm.');
-}
-
-function api_detail_resolve_paths($pdo, $dir_ids) {
-    api_path_resolve_batch($pdo, $dir_ids, 'tm.');
-}
 
 function api_detail_filters($is_file) {
     return array(
@@ -62,15 +52,13 @@ function api_detail_keyword_clause($column, $q, &$bind) {
 }
 
 function api_detail_dir_rows($pdo, $uid, $offset, $limit, $filters) {
-    $where = array('dus.uid = ?');
+    $where = array('uid = ?');
     $bind = array((int)$uid);
-    if ($filters['min'] > 0) { $where[] = 'dus.size >= ?'; $bind[] = (int)$filters['min']; }
-    if ($filters['max'] > 0) { $where[] = 'dus.size <= ?'; $bind[] = (int)$filters['max']; }
+    if ($filters['min'] > 0) { $where[] = 'size >= ?'; $bind[] = (int)$filters['min']; }
+    if ($filters['max'] > 0) { $where[] = 'size <= ?'; $bind[] = (int)$filters['max']; }
     $where_sql = implode(' AND ', $where);
     $needle = $filters['q'];
 
-    // Fast path: no keyword filter → push LIMIT/OFFSET to SQL, use the
-    // covering index ix_dus_uid_size. O(limit), not O(N).
     if ($needle === '') {
         $approx = (int)param('approx_total', 0) === 1;
         try {
@@ -81,12 +69,9 @@ function api_detail_dir_rows($pdo, $uid, $offset, $limit, $filters) {
             $fetch_limit = (int)$limit;
 
             if (!$approx) {
-                $stmt = $pdo->prepare('SELECT COUNT(*) FROM dir_user_size dus WHERE ' . $where_sql);
+                $stmt = $pdo->prepare('SELECT COUNT(*) FROM dirs WHERE ' . $where_sql);
                 $stmt->execute($bind);
                 $total = (int)$stmt->fetchColumn();
-
-                // Reverse-pagination: for pages past the midpoint, sort ASC
-                // and read from the bottom to avoid deep OFFSET scan.
                 if (!$is_export && $total > 0 && $offset + $limit > $total / 2) {
                     $sql_offset = max(0, $total - $offset - $limit);
                     $reverse = true;
@@ -100,9 +85,8 @@ function api_detail_dir_rows($pdo, $uid, $offset, $limit, $filters) {
             $bind2[] = $sql_offset;
             $order = $reverse ? 'ASC' : 'DESC';
             $stmt = $pdo->prepare(
-                'SELECT dus.dir_id, dus.size, dus.files FROM dir_user_size dus '
-                . 'WHERE ' . $where_sql . ' ORDER BY dus.size ' . $order . ' '
-                . 'LIMIT ? OFFSET ?'
+                'SELECT id, path, size, files FROM dirs WHERE ' . $where_sql
+                . ' ORDER BY size ' . $order . ' LIMIT ? OFFSET ?'
             );
             $stmt->execute($bind2);
             $page = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -117,28 +101,14 @@ function api_detail_dir_rows($pdo, $uid, $offset, $limit, $filters) {
             $page = array_slice($page, 0, (int)$limit);
         }
 
-        $dir_ids = array();
-        foreach ($page as $r) $dir_ids[] = (int)$r['dir_id'];
-        api_detail_resolve_paths($pdo, $dir_ids);
         $rows = array();
         foreach ($page as $r) {
-            $rows[] = array(
-                'path' => api_detail_path_for($pdo, (int)$r['dir_id']),
-                'used' => (int)$r['size'],
-                'files' => (int)$r['files'],
-            );
+            $rows[] = array('path' => (string)$r['path'], 'used' => (int)$r['size'], 'files' => (int)$r['files']);
         }
-
-        if (!$approx) {
-            $has_more = ($offset + count($rows)) < $total;
-        }
+        if (!$approx) $has_more = ($offset + count($rows)) < $total;
         return array('rows' => $rows, 'total' => $approx ? -1 : $total, 'has_more' => $has_more);
     }
 
-    // Keyword path: FTS5 on tm.names returns name_id matches → join dir_user_size
-    // using d.name_id (matching names appear as dir basenames). For path
-    // substring matches that aren't basenames (e.g. searching "/var/log"),
-    // fall back to scanning the result set with a PHP keyword match.
     return api_detail_dir_rows_keyword($pdo, $uid, $offset, $limit, $filters, $needle, $where_sql, $bind);
 }
 
@@ -152,49 +122,65 @@ function api_detail_dir_rows_keyword($pdo, $uid, $offset, $limit, $filters, $nee
             array('q' => '', 'ext' => '', 'min' => $filters['min'], 'max' => $filters['max']));
     }
 
-    $like_bind = array();
-    $like_clause = api_keyword_like_clause('name', $tokens, $like_bind);
-
-    // No usable LIKE clause → fall back to streaming scan + PHP post-filter.
-    if ($like_clause === '') {
-        return api_detail_dir_rows_keyword_stream($pdo, $uid, $offset, $limit,
-            $needle, $where_sql, $bind);
-    }
-
-    // Fast path: push name_id IN (subquery) + LIMIT/OFFSET to SQL.
-    // dus.uid is in $where_sql; size bounds (if any) also there.
-    $name_subq = '(SELECT id FROM tm.names WHERE ' . substr($like_clause, 1, -1) . ')';
-    $full_where = $where_sql . ' AND d.name_id IN ' . $name_subq;
-    $exec_bind = array_merge($bind, $like_bind);
-
+    // Try FTS4 first (fast path)
+    $dir_tokens = api_keyword_fts_dir_tokens($needle);
+    $fts_info = api_keyword_fts_match($dir_tokens);
     $approx = (int)param('approx_total', 0) === 1;
 
-    try {
-        $total = -1;
-        if (!$approx) {
-            $count_sql = 'SELECT COUNT(*) FROM dir_user_size dus '
-                       . 'JOIN tm.dirs d ON d.id = dus.dir_id WHERE ' . $full_where;
-            $stmt = $pdo->prepare($count_sql);
-            $stmt->execute($exec_bind);
-            $total = (int)$stmt->fetchColumn();
-            if ($total === 0) {
-                return array('rows' => array(), 'total' => 0, 'has_more' => false);
+    if (!$fts_info['needs_like'] && $fts_info['match'] !== '') {
+        // FTS path: id IN (SELECT rowid FROM fts_dir_paths WHERE MATCH ?)
+        $fts_where = $where_sql . ' AND id IN (SELECT rowid FROM fts_dir_paths WHERE fts_dir_paths MATCH ?)';
+        $fts_bind = array_merge($bind, array($fts_info['match']));
+        try {
+            $total = -1;
+            $fetch_limit = (int)$limit;
+            if (!$approx) {
+                $stmt = $pdo->prepare('SELECT COUNT(*) FROM dirs WHERE ' . $fts_where);
+                $stmt->execute($fts_bind);
+                $total = (int)$stmt->fetchColumn();
+                if ($total === 0) return array('rows' => array(), 'total' => 0, 'has_more' => false);
+            } else {
+                $fetch_limit = (int)$limit + 1;
             }
+            $page_bind = array_merge($fts_bind, array($fetch_limit, (int)$offset));
+            $stmt = $pdo->prepare(
+                'SELECT id, path, size, files FROM dirs WHERE ' . $fts_where
+                . ' ORDER BY size DESC LIMIT ? OFFSET ?'
+            );
+            $stmt->execute($page_bind);
+            $page = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            // FTS failed → fall through to LIKE
+            $fts_info['needs_like'] = true;
         }
+    }
 
-        // Fetch limit+1 in approx mode to derive has_more without a COUNT.
-        $fetch_limit = $approx ? ((int)$limit + 1) : (int)$limit;
-        $page_bind = $exec_bind;
-        $page_bind[] = $fetch_limit;
-        $page_bind[] = (int)$offset;
-        $page_sql = 'SELECT dus.dir_id, dus.size, dus.files FROM dir_user_size dus '
-                  . 'JOIN tm.dirs d ON d.id = dus.dir_id WHERE ' . $full_where
-                  . ' ORDER BY dus.size DESC LIMIT ? OFFSET ?';
-        $stmt = $pdo->prepare($page_sql);
-        $stmt->execute($page_bind);
-        $page = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {
-        return array('rows' => array(), 'total' => 0, 'has_more' => false);
+    if ($fts_info['needs_like'] || $fts_info['match'] === '') {
+        // LIKE fallback: path LIKE '%needle%'
+        $like_val = '%' . str_replace(array('%', '_'), array('\%', '\_'), $needle) . '%';
+        $like_where = $where_sql . ' AND path LIKE ? ESCAPE \'\\\'';
+        $like_bind = array_merge($bind, array($like_val));
+        try {
+            $total = -1;
+            $fetch_limit = (int)$limit;
+            if (!$approx) {
+                $stmt = $pdo->prepare('SELECT COUNT(*) FROM dirs WHERE ' . $like_where);
+                $stmt->execute($like_bind);
+                $total = (int)$stmt->fetchColumn();
+                if ($total === 0) return array('rows' => array(), 'total' => 0, 'has_more' => false);
+            } else {
+                $fetch_limit = (int)$limit + 1;
+            }
+            $page_bind = array_merge($like_bind, array($fetch_limit, (int)$offset));
+            $stmt = $pdo->prepare(
+                'SELECT id, path, size, files FROM dirs WHERE ' . $like_where
+                . ' ORDER BY size DESC LIMIT ? OFFSET ?'
+            );
+            $stmt->execute($page_bind);
+            $page = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            return array('rows' => array(), 'total' => 0, 'has_more' => false);
+        }
     }
 
     $has_more = false;
@@ -202,73 +188,14 @@ function api_detail_dir_rows_keyword($pdo, $uid, $offset, $limit, $filters, $nee
         $has_more = true;
         $page = array_slice($page, 0, (int)$limit);
     }
-
-    if (empty($page)) {
-        return array('rows' => array(), 'total' => $approx ? -1 : $total, 'has_more' => $has_more);
-    }
-
-    $dir_ids = array();
-    foreach ($page as $r) $dir_ids[] = (int)$r['dir_id'];
-    api_detail_resolve_paths($pdo, $dir_ids);
-
     $rows = array();
     foreach ($page as $r) {
-        $rows[] = array(
-            'path' => api_detail_path_for($pdo, (int)$r['dir_id']),
-            'used' => (int)$r['size'],
-            'files' => (int)$r['files'],
-        );
+        $rows[] = array('path' => (string)$r['path'], 'used' => (int)$r['size'], 'files' => (int)$r['files']);
     }
-
-    if (!$approx) {
-        $has_more = ($offset + count($rows)) < $total;
-    }
+    if (!$approx) $has_more = ($offset + count($rows)) < $total;
     return array('rows' => $rows, 'total' => $approx ? -1 : $total, 'has_more' => $has_more);
 }
 
-// Streaming fallback: scans all candidate dus rows, post-filters by full path.
-// Used when name LIKE clause normalises to nothing usable.
-function api_detail_dir_rows_keyword_stream($pdo, $uid, $offset, $limit, $needle, $where_sql, $bind) {
-    $sql = 'SELECT dus.dir_id, dus.size, dus.files FROM dir_user_size dus '
-         . 'WHERE ' . $where_sql . ' ORDER BY dus.size DESC';
-
-    try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($bind);
-    } catch (Exception $e) {
-        return array('rows' => array(), 'total' => 0, 'has_more' => false);
-    }
-
-    $rows = array();
-    $matched = 0;
-    $batch = array();
-    $batch_size = 512;
-
-    $flush = function() use (&$batch, &$rows, &$matched, $needle, $offset, $limit, $pdo) {
-        if (empty($batch)) return;
-        $dir_ids = array();
-        foreach ($batch as $r) $dir_ids[] = (int)$r['dir_id'];
-        api_detail_resolve_paths($pdo, $dir_ids);
-        foreach ($batch as $r) {
-            $path = api_detail_path_for($pdo, (int)$r['dir_id']);
-            if (!api_detail_keyword_match($path, $needle)) continue;
-            $matched++;
-            if ($matched <= $offset) continue;
-            if (count($rows) < $limit) {
-                $rows[] = array('path' => $path, 'used' => (int)$r['size'], 'files' => (int)$r['files']);
-            }
-        }
-        $batch = array();
-    };
-
-    while (($r = $stmt->fetch(PDO::FETCH_ASSOC)) !== false) {
-        $batch[] = $r;
-        if (count($batch) >= $batch_size) $flush();
-    }
-    $flush();
-
-    return array('rows' => $rows, 'total' => $matched, 'has_more' => $matched > ($offset + count($rows)));
-}
 
 function api_detail_file_rows($pdo, $uid, $offset, $limit, $filters) {
     $where = array('f.uid = ?');
@@ -276,76 +203,23 @@ function api_detail_file_rows($pdo, $uid, $offset, $limit, $filters) {
     if ($filters['min'] > 0) { $where[] = 'f.size >= ?'; $bind[] = (int)$filters['min']; }
     if ($filters['max'] > 0) { $where[] = 'f.size <= ?'; $bind[] = (int)$filters['max']; }
 
-    // (Was: anchor for partial ix_files_uid_size_big — replaced by full
-    // ix_files_uid_size index, so the planner picks it up automatically.)
-
-    // Resolve ext names → ext_ids so SQL filter can use ix_files_uid_ext_size.
-    $ext_ids = null;
+    // Ext filter: TEXT inline, no ext_id lookup needed
     if ($filters['ext'] !== '') {
-        $ext_ids = api_detail_resolve_ext_ids($pdo, $filters['ext']);
-        if (empty($ext_ids)) {
-            // Filter specifies ext that doesn't exist in this DB → empty result.
-            return array('rows' => array(), 'total' => 0, 'has_more' => false);
+        $ext_list = array_filter(array_map('trim', explode(',', strtolower($filters['ext']))));
+        if (!empty($ext_list)) {
+            $place = implode(',', array_fill(0, count($ext_list), '?'));
+            $where[] = 'f.ext IN (' . $place . ')';
+            foreach ($ext_list as $e) $bind[] = $e;
         }
-        $where[] = 'f.ext_id IN (' . implode(',', array_map('intval', $ext_ids)) . ')';
     }
+
     $where_sql = implode(' AND ', $where);
     $needle = $filters['q'];
 
-    // Fastest path: no filter at all. top_files materialized table covers
-    // the full top-N truthfully (rank 1..1000 per user are the actual largest
-    // files — not a sample). Beyond rank 1000 we fall back to the indexed
-    // scan, which is also fast.
-    $can_use_top_files =
-        $needle === '' &&
-        $filters['min'] === 0 &&
-        $filters['max'] === 0 &&
-        $ext_ids === null &&
-        ($offset + $limit) <= 1000;
-
-    if ($can_use_top_files) {
-        try {
-            $stmt = $pdo->prepare('SELECT COUNT(*) FROM top_files WHERE uid = ?');
-            $stmt->execute(array((int)$uid));
-            $total = (int)$stmt->fetchColumn();
-            // total here is min(1000, real_total). Use users.total_files for
-            // the truthful total, so the UI doesn't show a misleading 1000.
-            $stmt2 = $pdo->prepare('SELECT total_files FROM users WHERE uid = ?');
-            $stmt2->execute(array((int)$uid));
-            $real_total = (int)$stmt2->fetchColumn();
-
-            $stmt = $pdo->prepare(
-                'SELECT f.dir_id, n.name AS basename, e.ext, t.size '
-                . 'FROM top_files t '
-                . 'JOIN files f ON f.id = t.file_id '
-                . 'JOIN names n ON f.name_id = n.id '
-                . 'JOIN exts e  ON f.ext_id  = e.id '
-                . 'WHERE t.uid = ? ORDER BY t.rank LIMIT ? OFFSET ?'
-            );
-            $stmt->execute(array((int)$uid, (int)$limit, (int)$offset));
-            $page = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            return api_detail_format_files_page($pdo, $page, $offset, $real_total);
-        } catch (Exception $e) {
-            // Fall through to indexed scan.
-        }
-    }
-
-    // Keyword search: use FTS5 on tm.names to narrow files set.
     if ($needle !== '') {
-        return api_detail_file_rows_keyword($pdo, $uid, $offset, $limit, $filters,
-            $needle, $where_sql, $bind);
+        return api_detail_file_rows_keyword($pdo, $uid, $offset, $limit, $filters, $needle, $where_sql, $bind);
     }
 
-    // Indexed scan: pushes LIMIT/OFFSET to SQL. Plan hits one of:
-    //   * ix_files_uid_size       (covers ORDER BY size DESC for any page)
-    //   * ix_files_uid_ext_size   (when ext_id IN ...)
-    //   * temp B-tree sort on a (uid)-restricted set (worst case)
-    //
-    // Reverse-pagination optimization: deep OFFSET on a 700k-row index forces
-    // SQLite to skip that many index leaves before returning the page. For
-    // pages past the midpoint we sort ASC and read the tail — same N rows
-    // but the scan is from the bottom (small-size end). Reverse the result
-    // to restore the user's expected DESC order.
     $approx = (int)param('approx_total', 0) === 1;
     try {
         $total = -1;
@@ -358,7 +232,6 @@ function api_detail_file_rows($pdo, $uid, $offset, $limit, $filters) {
             $stmt = $pdo->prepare('SELECT COUNT(*) FROM files f WHERE ' . $where_sql);
             $stmt->execute($bind);
             $total = (int)$stmt->fetchColumn();
-
             if (!$is_export_f && $total > 0 && $offset + $limit > $total / 2) {
                 $sql_offset = max(0, $total - $offset - $limit);
                 $reverse = true;
@@ -372,12 +245,9 @@ function api_detail_file_rows($pdo, $uid, $offset, $limit, $filters) {
         $bind2[] = $sql_offset;
         $order = $reverse ? 'ASC' : 'DESC';
         $stmt = $pdo->prepare(
-            'SELECT f.dir_id, n.name AS basename, e.ext, f.size '
-            . 'FROM files f '
-            . 'JOIN names n ON f.name_id = n.id '
-            . 'JOIN exts e  ON f.ext_id  = e.id '
-            . 'WHERE ' . $where_sql . ' ORDER BY f.size ' . $order . ' '
-            . 'LIMIT ? OFFSET ?'
+            'SELECT f.dir_id, n.name AS basename, f.ext, f.size '
+            . 'FROM files f JOIN file_names n ON f.name_id = n.id '
+            . 'WHERE ' . $where_sql . ' ORDER BY f.size ' . $order . ' LIMIT ? OFFSET ?'
         );
         $stmt->execute($bind2);
         $page = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -394,10 +264,6 @@ function api_detail_file_rows($pdo, $uid, $offset, $limit, $filters) {
     return api_detail_format_files_page($pdo, $page, $offset, $total);
 }
 
-// Keyword search for files. PHP 5.4 + bundled SQLite 3.8.10 has no FTS5, so
-// we use a substring LIKE scan against tm.names (small lookup table; ~50 ms
-// cold, ~5 ms warm). The matching name_id set is then pushed into the files
-// query via a subquery so SQLite uses ix_files_name_uid_size for the join.
 function api_detail_file_rows_keyword($pdo, $uid, $offset, $limit, $filters,
                                        $needle, $where_sql, $bind) {
     $tokens = api_detail_keyword_tokens($needle);
@@ -406,46 +272,68 @@ function api_detail_file_rows_keyword($pdo, $uid, $offset, $limit, $filters,
             array('q' => '', 'ext' => $filters['ext'], 'min' => $filters['min'], 'max' => $filters['max']));
     }
 
-    // Build the LIKE clauses inline so the subquery runs once per statement.
-    $like_bind = array();
-    $like_clause = api_keyword_like_clause('name', $tokens, $like_bind);
-    if ($like_clause === '') {
-        return api_detail_file_rows_keyword_fallback($pdo, $uid, $offset, $limit,
-            $filters, $needle, $where_sql, $bind);
-    }
-    $name_subq = '(SELECT id FROM names WHERE ' . substr($like_clause, 1, -1) . ')';
+    $fts_info = api_keyword_fts_match($tokens);
+    $approx = (int)param('approx_total', 0) === 1;
 
-    try {
-        $approx = (int)param('approx_total', 0) === 1;
-        $total = -1;
-        $fetch_limit = (int)$limit;
-
-        if (!$approx) {
-            $count_sql = 'SELECT COUNT(*) FROM files f WHERE ' . $where_sql
-                       . ' AND f.name_id IN ' . $name_subq;
-            $stmt = $pdo->prepare($count_sql);
-            $stmt->execute(array_merge($bind, $like_bind));
-            $total = (int)$stmt->fetchColumn();
-        } else {
-            $fetch_limit = (int)$limit + 1;
+    if (!$fts_info['needs_like'] && $fts_info['match'] !== '') {
+        $name_subq = '(SELECT rowid FROM fts_file_names WHERE fts_file_names MATCH ?)';
+        $fts_where = $where_sql . ' AND f.name_id IN ' . $name_subq;
+        $fts_bind = array_merge($bind, array($fts_info['match']));
+        try {
+            $total = -1;
+            $fetch_limit = (int)$limit;
+            if (!$approx) {
+                $stmt = $pdo->prepare('SELECT COUNT(*) FROM files f WHERE ' . $fts_where);
+                $stmt->execute($fts_bind);
+                $total = (int)$stmt->fetchColumn();
+            } else {
+                $fetch_limit = (int)$limit + 1;
+            }
+            $page_bind = array_merge($fts_bind, array($fetch_limit, (int)$offset));
+            $stmt = $pdo->prepare(
+                'SELECT f.dir_id, n.name AS basename, f.ext, f.size '
+                . 'FROM files f JOIN file_names n ON f.name_id = n.id '
+                . 'WHERE ' . $fts_where . ' ORDER BY f.size DESC LIMIT ? OFFSET ?'
+            );
+            $stmt->execute($page_bind);
+            $page = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            $fts_info['needs_like'] = true;
         }
+    }
 
-        $page_sql = 'SELECT f.dir_id, n.name AS basename, e.ext, f.size '
-                  . 'FROM files f '
-                  . 'JOIN names n ON f.name_id = n.id '
-                  . 'JOIN exts e  ON f.ext_id  = e.id '
-                  . 'WHERE ' . $where_sql
-                  . ' AND f.name_id IN ' . $name_subq . ' '
-                  . 'ORDER BY f.size DESC LIMIT ? OFFSET ?';
-        $stmt = $pdo->prepare($page_sql);
-        $bind_page = array_merge($bind, $like_bind);
-        $bind_page[] = $fetch_limit;
-        $bind_page[] = (int)$offset;
-        $stmt->execute($bind_page);
-        $page = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {
-        return api_detail_file_rows_keyword_fallback($pdo, $uid, $offset, $limit,
-            $filters, $needle, $where_sql, $bind);
+    if ($fts_info['needs_like'] || $fts_info['match'] === '') {
+        // LIKE fallback on file_names.name
+        $like_bind = array();
+        $like_clause = api_keyword_like_clause('n.name', $tokens, $like_bind);
+        if ($like_clause === '') {
+            return array('rows' => array(), 'total' => 0, 'has_more' => false);
+        }
+        $like_where = $where_sql . ' AND ' . $like_clause;
+        $all_bind = array_merge($bind, $like_bind);
+        try {
+            $total = -1;
+            $fetch_limit = (int)$limit;
+            if (!$approx) {
+                $stmt = $pdo->prepare(
+                    'SELECT COUNT(*) FROM files f JOIN file_names n ON f.name_id = n.id WHERE ' . $like_where
+                );
+                $stmt->execute($all_bind);
+                $total = (int)$stmt->fetchColumn();
+            } else {
+                $fetch_limit = (int)$limit + 1;
+            }
+            $page_bind = array_merge($all_bind, array($fetch_limit, (int)$offset));
+            $stmt = $pdo->prepare(
+                'SELECT f.dir_id, n.name AS basename, f.ext, f.size '
+                . 'FROM files f JOIN file_names n ON f.name_id = n.id '
+                . 'WHERE ' . $like_where . ' ORDER BY f.size DESC LIMIT ? OFFSET ?'
+            );
+            $stmt->execute($page_bind);
+            $page = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            return array('rows' => array(), 'total' => 0, 'has_more' => false);
+        }
     }
 
     $has_more = false;
@@ -453,90 +341,32 @@ function api_detail_file_rows_keyword($pdo, $uid, $offset, $limit, $filters,
         $has_more = true;
         $page = array_slice($page, 0, (int)$limit);
     }
-
-    if (empty($page)) {
-        return array('rows' => array(), 'total' => $approx ? -1 : $total, 'has_more' => $has_more);
-    }
-    $dir_ids = array();
-    foreach ($page as $r) $dir_ids[] = (int)$r['dir_id'];
-    api_detail_resolve_paths($pdo, $dir_ids);
-
-    $rows = array();
-    foreach ($page as $r) {
-        $dir_id = (int)$r['dir_id'];
-        $parent = api_detail_path_for($pdo, $dir_id);
-        $base = (string)$r['basename'];
-        $path = $parent === '/' ? '/' . $base : ($parent === '' ? $base : $parent . '/' . $base);
-        $rows[] = array('path' => $path, 'size' => (int)$r['size'], 'xt' => (string)$r['ext']);
-    }
-
-    if (!$approx) {
-        $has_more = ($offset + count($rows)) < $total;
-    }
-    return array('rows' => $rows, 'total' => $approx ? -1 : $total, 'has_more' => $has_more);
+    if (!$approx) $has_more = ($offset + count($page)) < $total;
+    return api_detail_format_files_page($pdo, $page, $offset, $approx ? -1 : $total, $approx ? $has_more : null);
 }
 
-// Last-resort scan when FTS5 isn't usable (legacy DB, unsupported wildcard).
-// Streams rows in size-DESC order, post-filters by full path.
-function api_detail_file_rows_keyword_fallback($pdo, $uid, $offset, $limit, $filters,
-                                                $needle, $where_sql, $bind) {
-    try {
-        $sql = 'SELECT f.dir_id, n.name AS basename, e.ext, f.size '
-             . 'FROM files f '
-             . 'JOIN names n ON f.name_id = n.id '
-             . 'JOIN exts e  ON f.ext_id  = e.id '
-             . 'WHERE ' . $where_sql . ' ORDER BY f.size DESC';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($bind);
-    } catch (Exception $e) {
-        return array('rows' => array(), 'total' => 0, 'has_more' => false);
-    }
 
-    $rows = array();
-    $matched = 0;
-    $batch = array();
-    $batch_size = 512;
-
-    $flush = function() use (&$batch, &$rows, &$matched, $needle, $offset, $limit, $pdo) {
-        if (empty($batch)) return;
-        $dir_ids = array();
-        foreach ($batch as $r) $dir_ids[] = (int)$r['dir_id'];
-        api_detail_resolve_paths($pdo, $dir_ids);
-        foreach ($batch as $r) {
-            $dir_id = (int)$r['dir_id'];
-            $parent = api_detail_path_for($pdo, $dir_id);
-            $base = (string)$r['basename'];
-            $path = $parent === '/' ? '/' . $base : ($parent === '' ? $base : $parent . '/' . $base);
-            if (!api_detail_keyword_match($path, $needle)) continue;
-            $matched++;
-            if ($matched <= $offset) continue;
-            if (count($rows) < $limit) {
-                $rows[] = array('path' => $path, 'size' => (int)$r['size'], 'xt' => (string)$r['ext']);
-            }
-        }
-        $batch = array();
-    };
-
-    while (($r = $stmt->fetch(PDO::FETCH_ASSOC)) !== false) {
-        $batch[] = $r;
-        if (count($batch) >= $batch_size) $flush();
-    }
-    $flush();
-    return array('rows' => $rows, 'total' => $matched, 'has_more' => $matched > ($offset + count($rows)));
-}
-
-// Format a SQL page (with raw dir_id + basename) into the JSON shape the API
-// returns. Batches path resolution so the per-page cost is one IN-query.
 function api_detail_format_files_page($pdo, $page, $offset, $total, $has_more_override = null) {
     if (empty($page)) {
         return array('rows' => array(), 'total' => $total, 'has_more' => false);
     }
-    $dir_ids = array();
-    foreach ($page as $r) $dir_ids[] = (int)$r['dir_id'];
-    api_detail_resolve_paths($pdo, $dir_ids);
+    // Batch resolve dir_id → path from dirs table
+    $dir_ids = array_values(array_unique(array_map(function($r) { return (int)$r['dir_id']; }, $page)));
+    $path_map = array();
+    if (!empty($dir_ids)) {
+        $place = implode(',', array_fill(0, count($dir_ids), '?'));
+        try {
+            $stmt = $pdo->prepare('SELECT DISTINCT id, path FROM dirs WHERE id IN (' . $place . ')');
+            $stmt->execute($dir_ids);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $path_map[(int)$r['id']] = (string)$r['path'];
+            }
+        } catch (Exception $e) {}
+    }
     $rows = array();
     foreach ($page as $r) {
-        $parent = api_detail_path_for($pdo, (int)$r['dir_id']);
+        $dir_id = (int)$r['dir_id'];
+        $parent = isset($path_map[$dir_id]) ? $path_map[$dir_id] : '';
         $base = (string)$r['basename'];
         $path = $parent === '/' ? '/' . $base : ($parent === '' ? $base : $parent . '/' . $base);
         $rows[] = array('path' => $path, 'size' => (int)$r['size'], 'xt' => (string)$r['ext']);
@@ -545,27 +375,6 @@ function api_detail_format_files_page($pdo, $page, $offset, $total, $has_more_ov
     return array('rows' => $rows, 'total' => $total, 'has_more' => $has_more);
 }
 
-// Resolve a comma-separated ext list (e.g. "json,log") to an array of ext_ids
-// found in `exts`. Unknown exts are dropped. Empty/whitespace input → null.
-function api_detail_resolve_ext_ids($pdo, $ext_csv) {
-    static $cache = array();
-    $oid = spl_object_hash($pdo);
-    $key = $oid . ':' . strtolower(trim($ext_csv));
-    if (isset($cache[$key])) return $cache[$key];
-
-    $exts = array_values(array_filter(array_map('strtolower', array_map('trim', explode(',', $ext_csv))), 'strlen'));
-    if (empty($exts)) return $cache[$key] = null;
-    $place = implode(',', array_fill(0, count($exts), '?'));
-    try {
-        $stmt = $pdo->prepare('SELECT id FROM exts WHERE ext IN (' . $place . ')');
-        $stmt->execute($exts);
-        $ids = array();
-        while (($v = $stmt->fetchColumn()) !== false) $ids[] = (int)$v;
-    } catch (Exception $e) {
-        $ids = array();
-    }
-    return $cache[$key] = $ids;
-}
 
 // Tokenize keyword query the same way api_keyword_match_path does.
 function api_detail_keyword_tokens($q) {

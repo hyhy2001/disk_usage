@@ -50,3 +50,32 @@ function api_keyword_match_path($path, $q) {
     }
     return false;
 }
+
+function api_keyword_fts_match($tokens) {
+    if (empty($tokens)) return array('match' => '', 'needs_like' => false);
+    $fts_parts = array();
+    $needs_like = false;
+    foreach ($tokens as $t) {
+        $t = strtolower(trim($t));
+        if ($t === '') continue;
+        $star_pos = strpos($t, '*');
+        if ($star_pos === false) {
+            $fts_parts[] = $t . '*';
+        } elseif ($star_pos === strlen($t) - 1) {
+            $fts_parts[] = substr($t, 0, -1) . '*';
+        } else {
+            $needs_like = true;
+        }
+    }
+    if (empty($fts_parts)) $needs_like = true;
+    return array(
+        'match' => implode(' ', $fts_parts),
+        'needs_like' => $needs_like,
+    );
+}
+
+function api_keyword_fts_dir_tokens($needle) {
+    $parts = preg_split('#[/\\\\\s]+#', strtolower(trim($needle)));
+    $parts = array_filter($parts, function($t) { return strlen($t) > 0; });
+    return array_values($parts);
+}
