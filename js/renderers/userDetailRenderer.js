@@ -1109,10 +1109,31 @@ async function _loadAndRender(user) {
         const hasExtFilter = _hasExtFilter();
         const dirDisabled = hasExtFilter;
         const dirDisableReason = hasExtFilter ? 'ext' : '';
-        _fileTotalPages = Math.max(1, Math.ceil((fileData.total_files ?? fileData.files.length) / FILE_PAGE));
-        _dirTotalPages  = dirDisabled
-            ? 1
-            : Math.max(1, Math.ceil((dirData.total_dirs ?? dirData.dirs.length) / FILE_PAGE));
+
+        // total_files / total_dirs may be -1 (backend skips COUNT for fast page load).
+        // In that case use total_files_full (from users table) for non-filtered view,
+        // or has_more for filtered view, to set initial pagination bounds.
+        const fileTotalRaw = Number(fileData?.total_files);
+        if (fileTotalRaw >= 0) {
+            _fileTotalPages = Math.max(1, Math.ceil(fileTotalRaw / FILE_PAGE));
+        } else if (!_hasActiveFilters() && fileData?.total_files_full > 0) {
+            _fileTotalPages = Math.max(1, Math.ceil(fileData.total_files_full / FILE_PAGE));
+        } else {
+            _fileTotalPages = fileData?.has_more ? 2 : 1;
+        }
+
+        if (dirDisabled) {
+            _dirTotalPages = 1;
+        } else {
+            const dirTotalRaw = Number(dirData?.total_dirs);
+            if (dirTotalRaw >= 0) {
+                _dirTotalPages = Math.max(1, Math.ceil(dirTotalRaw / FILE_PAGE));
+            } else if (!_hasActiveFilters() && dirData?.total_dirs_full > 0) {
+                _dirTotalPages = Math.max(1, Math.ceil(dirData.total_dirs_full / FILE_PAGE));
+            } else {
+                _dirTotalPages = dirData?.has_more ? 2 : 1;
+            }
+        }
 
         if (contentBody) {
             contentBody.innerHTML = `
