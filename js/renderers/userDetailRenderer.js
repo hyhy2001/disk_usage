@@ -181,12 +181,20 @@ function _renderDirCard(dirData) {
     const totalDirs   = totalDirsKnown ? rawTotalDirs : Math.max(0, dirData.dirs.length);
     const totalDirsFull = Math.max(0, dirData.total_dirs_full ?? totalDirs);
     const currentPage = _dirPage;
-    // When total is unknown (-1), use has_more to indicate at least one more page exists.
-    const totalPages = totalDirsKnown
-        ? Math.max(1, Math.ceil(totalDirs / FILE_PAGE))
-        : (dirData.has_more ? currentPage + 1 : currentPage);
-    const displayTotal = Math.max(0, _hasActiveFilters() ? totalDirs : totalDirsFull);
-    const badge = totalDirsKnown
+    const hasFilters = _hasActiveFilters();
+    // No-filter: use total_dirs_full (from users table, always known).
+    // Filtered: use exact total if known, else has_more driven.
+    let totalPages;
+    if (!hasFilters && totalDirsFull > 0) {
+        totalPages = Math.max(1, Math.ceil(totalDirsFull / FILE_PAGE));
+    } else if (totalDirsKnown) {
+        totalPages = Math.max(1, Math.ceil(totalDirs / FILE_PAGE));
+    } else {
+        totalPages = dirData.has_more ? currentPage + 1 : currentPage;
+    }
+    const displayTotal = Math.max(0, hasFilters ? totalDirs : totalDirsFull);
+    const showTotalPages = (!hasFilters && totalDirsFull > 0) || totalDirsKnown;
+    const badge = showTotalPages
         ? `Page ${currentPage} of ${totalPages} · ${displayTotal.toLocaleString()} dirs`
         : `Page ${currentPage} · ${displayTotal.toLocaleString()} dirs`;
 
@@ -284,13 +292,22 @@ function _renderFileCard(fileData) {
     const totalFiles  = totalFilesKnown ? rawTotalFiles : Math.max(0, files.length);
     const totalFilesFull = Math.max(0, fileData?.total_files_full ?? totalFiles);
     const currentPage = _filePage;
-    const totalPages = totalFilesKnown
-        ? Math.max(1, Math.ceil(totalFiles / FILE_PAGE))
-        : (fileData?.has_more ? currentPage + 1 : currentPage);
-    const displayTotal = Math.max(0, _hasActiveFilters() ? totalFiles : totalFilesFull);
-    const badge = totalFilesKnown
-        ? (files.length ? `Page ${currentPage} of ${totalPages} · ${displayTotal.toLocaleString()} files` : 'No files')
-        : (files.length ? `Page ${currentPage} · ${displayTotal.toLocaleString()} files` : 'No files');
+    const hasFilters = _hasActiveFilters();
+    let totalPages;
+    if (!hasFilters && totalFilesFull > 0) {
+        totalPages = Math.max(1, Math.ceil(totalFilesFull / FILE_PAGE));
+    } else if (totalFilesKnown) {
+        totalPages = Math.max(1, Math.ceil(totalFiles / FILE_PAGE));
+    } else {
+        totalPages = fileData?.has_more ? currentPage + 1 : currentPage;
+    }
+    const displayTotal = Math.max(0, hasFilters ? totalFiles : totalFilesFull);
+    const showTotalPages = (!hasFilters && totalFilesFull > 0) || totalFilesKnown;
+    const badge = !files.length
+        ? 'No files'
+        : (showTotalPages
+            ? `Page ${currentPage} of ${totalPages} · ${displayTotal.toLocaleString()} files`
+            : `Page ${currentPage} · ${displayTotal.toLocaleString()} files`);
 
     const rows = files.length ? files.map(f => {
         const pct = Math.min((f.size / grandTotal) * 100, 100).toFixed(1);

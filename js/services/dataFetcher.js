@@ -1,9 +1,9 @@
 import { UINodes, AppState, animateValue, bytesToTB, showToast } from '../core/main.js';
 import { DataStore } from '../core/dataStore.js';
 import { ChartManager } from '../renderers/chartManager.js';
-import { initRouter, navigateTo, setRouteContext } from '../core/router.js?v=98';
+import { initRouter, navigateTo, setRouteContext } from '../core/router.js?v=99';
 import { renderDetailTables, initScaleToggle, resetDashboardToEmpty } from '../renderers/detailRenderer.js';
-import { initUserDetailTab, resetUserDetailTab } from '../renderers/userDetailRenderer.js?v=98';
+import { initUserDetailTab, resetUserDetailTab } from '../renderers/userDetailRenderer.js?v=99';
 import { fmt, smartFmtTick } from '../utils/formatters.js';
 import { saveFilters, loadFilters } from '../utils/filterStorage.js';
 import { compareDiskCards, extractFromDataset, extractFromApiDisk } from '../utils/sort.js';
