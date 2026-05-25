@@ -646,16 +646,22 @@ export class ChartManager {
         ];
 
         if (unknownBytes > 0) {
-            allTeams.push({ name: 'Other', used: unknownBytes });
+            allTeams.push({ name: 'Unknown', used: unknownBytes });
             bgColors.push('#334155');
         }
 
-        // Normalize legend naming: merge any "Unknown" bucket into "Other".
+        // Normalize legend naming:
+        // - Rename to "Unknown" only the SYNTHETIC auto-other bucket (team_id === 'group:__other__'
+        //   or no team_id at all — i.e. the raw API "Other" with no group config).
+        // - User-defined groups named "Other" keep their name and team_id intact.
+        // - Drop zero-usage entries.
         const mergedTeams = new Map();
         allTeams.forEach((t) => {
-            const baseName = String(t?.name || '').trim() || 'Other';
-            const normalizedName = baseName.toLowerCase() === 'unknown' ? 'Other' : baseName;
-            const key = normalizedName.toLowerCase();
+            const baseName = String(t?.name || '').trim() || 'Unknown';
+            const isSyntheticOther = t?.team_id === 'group:__other__' ||
+                (t?.team_id === undefined && baseName.toLowerCase() === 'other');
+            const normalizedName = isSyntheticOther ? 'Unknown' : baseName;
+            const key = isSyntheticOther ? 'unknown' : normalizedName.toLowerCase();
             const used = Number(t?.used || 0);
             if (!mergedTeams.has(key)) {
                 mergedTeams.set(key, {
@@ -671,7 +677,10 @@ export class ChartManager {
                 cur.team_id = t.team_id;
             }
         });
-        allTeams = Array.from(mergedTeams.values()).sort((a, b) => (b.used || 0) - (a.used || 0));
+        // Filter out zero-usage teams (e.g. "Unknown" with no unassigned users).
+        allTeams = Array.from(mergedTeams.values())
+            .filter(t => (t.used || 0) > 0)
+            .sort((a, b) => (b.used || 0) - (a.used || 0));
 
         const labels = allTeams.map(t => t.name);
         const data   = allTeams.map(t => t.used / 1e12);
@@ -747,21 +756,18 @@ export class ChartManager {
                     this._selectedTeamIdx = idx;
 
                     if (!team || team.team_id === undefined) {
-                        // Any bucket without team_id is treated as "Other"/uncategorized users.
-                        // Cap to top 10 like the default users chart, otherwise huge "Other"
-                        // groups push the chart container off-screen.
-                        const otherUsers = dataStore.getOtherUsers().slice(0, 10);
+                        const otherUsers = dataStore.getOtherUsers();
                         if (otherUsers.length) {
                             this.renderUsersChart(otherUsers);
                         } else {
                             this._showNoDataUsersChart();
                         }
-                        this._showTeamFilterBadge(team?.name ?? 'Other', () => this._clearTeamFilter(dataStore));
+                        this._showTeamFilterBadge(team?.name ?? 'Unknown', () => this._clearTeamFilter(dataStore));
                         return;
                     }
 
-                    // Named team -> show its top 10 members (empty state if no users assigned).
-                    const teamUsers = dataStore.getUsersByTeamId(team.team_id).slice(0, 10);
+                    // Named team -> show all its members (empty state if no users assigned).
+                    const teamUsers = dataStore.getUsersByTeamId(team.team_id);
                     if (teamUsers.length) {
                         this.renderUsersChart(teamUsers);
                     } else {
