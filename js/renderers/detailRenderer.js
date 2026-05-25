@@ -70,8 +70,10 @@ function renderSnapshotView() {
     if (snap.grouped && Array.isArray(teams) && teams.length > 0) {
         const merged = new Map();
         teams.forEach((t) => {
-            const isOther = String(t?.name || '').trim().toLowerCase() === 'other';
-            if (isOther) return;
+            // Only skip the SYNTHETIC auto-other bucket (used for unassigned users
+            // when no group is named 'Other'). User-defined groups named 'Other'
+            // are real groups and must contribute their members.
+            if (t?.team_id === 'group:__other__') return;
             const members = _store.getUsersByTeamId(t.team_id) || [];
             members.forEach((u) => {
                 if (!u || !u.name) return;
@@ -85,7 +87,10 @@ function renderSnapshotView() {
             .map(([name, used]) => ({ name, used }))
             .sort((a, b) => b.used - a.used);
     } else {
-        users = (snap.users || []).slice().sort((a, b) => b.used - a.used);
+        users = (snap.users || [])
+            .filter(u => u.team_id !== undefined)
+            .slice()
+            .sort((a, b) => b.used - a.used);
     }
     const sys = general.total;   // df -h total (authoritative)
     const usedByDf = general.used;
@@ -158,7 +163,9 @@ function renderSnapshotView() {
     if (users && users.length > 0) {
         rightColArr.push(section(`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`, 'Users (TOP 10)', `${users.length} total`, userRows));
     }
-    rightColArr.push(section(`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`, 'Other Users (TOP 10)', `${other.length} total`, otherRows));
+    if (other && other.length > 0) {
+        rightColArr.push(section(`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`, 'Other Users (TOP 10)', `${other.length} total`, otherRows));
+    }
     const rightCol = rightColArr.join('');
 
     document.getElementById('tab-snapshot-body').innerHTML =
