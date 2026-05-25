@@ -198,7 +198,10 @@ function renderBreadcrumb(node) {
     }
 
     let chain = getChain(node);
-    if (node && node.path && chain.length <= 2) {
+    // Only build a virtual chain when the node has no parent link at all
+    // (e.g. opened directly via search). When __tmParent is set, the real
+    // chain is reliable — keep it so the current crumb keeps its shard_id.
+    if (node && node.path && !node.__tmParent && chain.length <= 1) {
         chain = buildVirtualChainFromPath(node.path);
     }
     let html = '';
@@ -448,20 +451,64 @@ function buildLinkedVirtualChainForPath(path) {
 }
 
 async function resolveVirtualNode(node) {
-    // If node has no shard_id, try to find it via search API
     if (!node || node.shard_id || !node.path) return node;
-    const path = node.path;
-    // Use exact segment match from search results
-    const data = await fetchSearchPage(path.split('/').pop() || path, 0, 50);
-    const items = Array.isArray(data.items) ? data.items : [];
-    const match = items.find(function(item) { return item.path === path; });
-    if (match && match.shard_id) {
-        node.shard_id = match.shard_id;
-        node.has_children = !!match.has_children;
-        node.value = match.value || node.value || 0;
-        node.owner = match.owner || node.owner || '';
-        node.type = match.type || node.type || 'directory';
-        if (match.name) node.name = match.name;
+    const targetPath = String(node.path).replace(/^\/+|\/+$/g, '');
+    if (!targetPath || !_rootNode) return node;
+
+    // Determine path segments relative to root
+    const rootPath = (_rootNode.path || '').replace(/^\/+|\/+$/g, '');
+    const rootBasename = rootPath ? rootPath.split('/').pop() : '';
+    let rest = targetPath;
+    if (rootBasename && targetPath.indexOf(rootBasename + '/') === 0) {
+        rest = targetPath.slice(rootBasename.length + 1);
+    } else if (rootPath && targetPath.indexOf(rootPath + '/') === 0) {
+        rest = targetPath.slice(rootPath.length + 1);
+    } else if (targetPath === rootBasename || targetPath === rootPath) {
+        node.shard_id = _rootNode.shard_id;
+        node.has_children = true;
+        return node;
+    }
+
+    const segments = rest.split('/').filter(function(s) { return s !== ''; });
+    if (segments.length === 0) {
+        node.shard_id = _rootNode.shard_id;
+        node.has_children = true;
+        return node;
+    }
+
+    // Walk tree from root, matching each segment
+    let currentShardId = _rootNode.shard_id;
+    let resolved = null;
+    for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        const data = await fetchShardPage(currentShardId, 0, 2000);
+        const children = Array.isArray(data.items) ? data.items : [];
+        const match = children.find(function(c) { return c.name === seg; });
+        if (!match || !match.shard_id) {
+            // Could not walk further — fall back to search as last resort
+            const basename = node.path.split('/').pop() || node.path;
+            const searchData = await fetchSearchPage(basename, 0, 500);
+            const items = Array.isArray(searchData.items) ? searchData.items : [];
+            const searchMatch = items.find(function(item) { return item.path === node.path; });
+            if (searchMatch && searchMatch.shard_id) {
+                resolved = searchMatch;
+            }
+            break;
+        }
+        if (i === segments.length - 1) {
+            resolved = match;
+        } else {
+            currentShardId = match.shard_id;
+        }
+    }
+
+    if (resolved) {
+        node.shard_id = resolved.shard_id;
+        node.has_children = !!resolved.has_children;
+        node.value = resolved.value || node.value || 0;
+        node.owner = resolved.owner || node.owner || '';
+        node.type = resolved.type || node.type || 'directory';
+        if (resolved.name) node.name = resolved.name;
     }
     return node;
 }
@@ -672,7 +719,7 @@ async function renderCurrentNode() {
 
         const searchTitleEl = document.getElementById('tmx-current-title');
         if (searchTitleEl) {
-            searchTitleEl.textContent = 'Global search "' + query + '" • choose a path from dropdown';
+            searchTitleEl.textContent = '';
         }
 
         renderList(node);

@@ -10,13 +10,17 @@ let _selectedUser   = null;
 let _currentDisk    = null;
 let _abortCtrl      = null;
 let _otherUsers     = [];   // [{ name, used }] from snapshot
-let _filePage       = 1;    // current page (1-indexed)
-let _fileTotalPages = 1;    // total pages for file report
-let _dirPage        = 1;
-let _dirTotalPages  = 1;
-let _fileTotalExact = null; // exact total from lazy count (filtered mode)
-let _dirTotalExact  = null; // exact total from lazy count (filtered mode)
-const FILE_PAGE     = 500;  // rows per page
+let _filePage           = 1;    // 1-indexed current page
+let _fileCursorStack    = [];
+let _fileNextCursor     = null;
+let _fileHasMore        = false;
+let _currentSentFileCursor = null;
+let _dirPage            = 1;
+let _dirCursorStack     = [];
+let _dirNextCursor      = null;
+let _dirHasMore         = false;
+let _currentSentDirCursor = null;
+const FILE_PAGE         = 500;  // rows per page
 let _currentFilters = JSON.parse(localStorage.getItem('ud_filters') || 'null') || { query: '', ext: '', minSize: 0, maxSize: 0 };
 let _allUserNames   = [];
 let _scanRoot       = '';
@@ -73,21 +77,8 @@ function _extColor(ext) {
 }
 
 function _toAbsoluteDisplayPath(p) {
-    const stripTrail = (s) => String(s || '').replace(/\/+$/, '');
-    if (!p) return stripTrail(_scanRoot || '');
-    if (!_scanRoot) return stripTrail(p);
-    const rootNorm = stripTrail(_scanRoot);
-    const rootBasename = rootNorm.replace(/^\/+/, '').split('/').pop();
-    const trimmed = String(p).replace(/^\/+/, '').replace(/\/+$/, '');
-    if (!trimmed) return rootNorm;
-    if (trimmed === rootNorm.replace(/^\/+/, '') || trimmed === rootBasename) return rootNorm;
-    if (rootBasename && trimmed.indexOf(rootBasename + '/') === 0) {
-        return stripTrail(rootNorm + '/' + trimmed.slice(rootBasename.length + 1));
-    }
-    if (trimmed.indexOf(rootNorm.replace(/^\/+/, '') + '/') === 0) {
-        return stripTrail(rootNorm + '/' + trimmed.slice(rootNorm.replace(/^\/+/, '').length + 1));
-    }
-    return stripTrail(p);
+    if (!p) return String(_scanRoot || '').replace(/\/+$/, '');
+    return String(p).replace(/\/+$/, '');
 }
 
 function _normalizeDirRow(d) {
@@ -154,8 +145,7 @@ function _renderDirCard(dirData) {
                     Top Directories
                 </span>
                 <div class="ud-card-actions">
-                    <span class="ud-card-badge" id="ud-dir-badge">0 dirs</span>
-                </div>
+                    </div>
             </div>
             <div class="ud-path-list" id="ud-dir-list">
                 <div class="ud-empty-row">No directory data available for this user.</div>
@@ -176,27 +166,9 @@ function _renderDirCard(dirData) {
         </div>`;
     }).join('');
 
-    const rawTotalDirs = Number(dirData.total_dirs);
-    const totalDirsKnown = rawTotalDirs >= 0;
-    const totalDirs   = totalDirsKnown ? rawTotalDirs : Math.max(0, dirData.dirs.length);
-    const totalDirsFull = Math.max(0, dirData.total_dirs_full ?? totalDirs);
-    const currentPage = _dirPage;
-    const hasFilters = _hasActiveFilters();
-    // No-filter: use total_dirs_full (from users table, always known).
-    // Filtered: use exact total if known, else has_more driven.
-    let totalPages;
-    if (!hasFilters && totalDirsFull > 0) {
-        totalPages = Math.max(1, Math.ceil(totalDirsFull / FILE_PAGE));
-    } else if (totalDirsKnown) {
-        totalPages = Math.max(1, Math.ceil(totalDirs / FILE_PAGE));
-    } else {
-        totalPages = dirData.has_more ? currentPage + 1 : currentPage;
-    }
-    const displayTotal = Math.max(0, hasFilters ? totalDirs : totalDirsFull);
-    const showTotalPages = (!hasFilters && totalDirsFull > 0) || totalDirsKnown;
-    const badge = showTotalPages
-        ? `Page ${currentPage} of ${totalPages} · ${displayTotal.toLocaleString()} dirs`
-        : `Page ${currentPage} · ${displayTotal.toLocaleString()} dirs`;
+
+    const hasPrev = _dirPage > 1;
+    const hasNext = _dirHasMore;
 
     return `
     <div class="ud-card glass-panel" id="ud-dir-card">
@@ -206,7 +178,6 @@ function _renderDirCard(dirData) {
                 Top Directories
             </span>
             <div class="ud-card-actions">
-                <span class="ud-card-badge" id="ud-dir-badge">${badge}</span>
                 <button class="ud-export-btn" id="ud-export-dirs-user" data-tooltip="Export filtered directories to CSV">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     CSV
@@ -214,7 +185,7 @@ function _renderDirCard(dirData) {
             </div>
         </div>
         <div class="ud-path-list" id="ud-dir-list">${rows}</div>
-        ${_renderPagination(currentPage, totalPages, 'dir')}
+        ${_renderPagination(_dirPage, hasPrev, hasNext, 'dir')}
     </div>`;
 }
 
@@ -232,7 +203,6 @@ function _renderDirCardDisabled(reason) {
                 Top Directories
             </span>
             <div class="ud-card-actions">
-                <span class="ud-card-badge" id="ud-dir-badge">${badge}</span>
             </div>
         </div>
         <div class="ud-path-list" id="ud-dir-list">
@@ -242,72 +212,28 @@ function _renderDirCardDisabled(reason) {
 }
 
 
-function _renderPagination(current, total, type) {
-    if (total <= 1) return '';
+function _renderPagination(currentPage, hasPrev, hasNext, type) {
+    // Only render when there is something to navigate
+    if (!hasPrev && !hasNext) return '';
+    const prevDisabled = hasPrev ? '' : ' disabled';
+    const nextDisabled = hasNext ? '' : ' disabled';
 
-    const pages = [];
-    const delta = 2;  // pages around current
+    const prevBtn = `<button class="ud-page-btn ud-page-nav${prevDisabled}" data-action="prev" aria-label="Previous page">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        <span>Prev</span>
+    </button>`;
 
-    // Build visible page numbers with ellipsis
-    const range = [];
-    for (let i = Math.max(1, current - delta); i <= Math.min(total, current + delta); i++) range.push(i);
+    const nextBtn = `<button class="ud-page-btn ud-page-nav${nextDisabled}" data-action="next" aria-label="Next page">
+        <span>Next</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>`;
 
-    const buttons = [];
-
-    // Prev button
-    buttons.push(`<button class="ud-page-btn${current === 1 ? ' disabled' : ''}" data-page="${current - 1}" aria-label="Previous page">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-    </button>`);
-
-    // First page + ellipsis
-    if (range[0] > 1) {
-        buttons.push(`<button class="ud-page-btn" data-page="1">1</button>`);
-        if (range[0] > 2) buttons.push(`<span class="ud-page-ellipsis">…</span>`);
-    }
-
-    // Range
-    range.forEach(p => buttons.push(
-        `<button class="ud-page-btn${p === current ? ' active' : ''}" data-page="${p}">${p}</button>`
-    ));
-
-    // Last page + ellipsis
-    if (range[range.length - 1] < total) {
-        if (range[range.length - 1] < total - 1) buttons.push(`<span class="ud-page-ellipsis">…</span>`);
-        buttons.push(`<button class="ud-page-btn" data-page="${total}">${total}</button>`);
-    }
-
-    // Next button
-    buttons.push(`<button class="ud-page-btn${current === total ? ' disabled' : ''}" data-page="${current + 1}" aria-label="Next page">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-    </button>`);
-
-    return `<div class="ud-pagination" id="ud-pagination-${type}">${buttons.join('')}</div>`;
+    return `<div class="ud-pagination" id="ud-pagination-${type}">${prevBtn}<span class="ud-page-current" aria-live="polite">Page ${currentPage}</span>${nextBtn}</div>`;
 }
 
 function _renderFileCard(fileData) {
     const files = fileData?.files || [];
     const grandTotal  = fileData?.total_used || 1;
-    const rawTotalFiles = Number(fileData?.total_files);
-    const totalFilesKnown = rawTotalFiles >= 0;
-    const totalFiles  = totalFilesKnown ? rawTotalFiles : Math.max(0, files.length);
-    const totalFilesFull = Math.max(0, fileData?.total_files_full ?? totalFiles);
-    const currentPage = _filePage;
-    const hasFilters = _hasActiveFilters();
-    let totalPages;
-    if (!hasFilters && totalFilesFull > 0) {
-        totalPages = Math.max(1, Math.ceil(totalFilesFull / FILE_PAGE));
-    } else if (totalFilesKnown) {
-        totalPages = Math.max(1, Math.ceil(totalFiles / FILE_PAGE));
-    } else {
-        totalPages = fileData?.has_more ? currentPage + 1 : currentPage;
-    }
-    const displayTotal = Math.max(0, hasFilters ? totalFiles : totalFilesFull);
-    const showTotalPages = (!hasFilters && totalFilesFull > 0) || totalFilesKnown;
-    const badge = !files.length
-        ? 'No files'
-        : (showTotalPages
-            ? `Page ${currentPage} of ${totalPages} · ${displayTotal.toLocaleString()} files`
-            : `Page ${currentPage} · ${displayTotal.toLocaleString()} files`);
 
     const rows = files.length ? files.map(f => {
         const pct = Math.min((f.size / grandTotal) * 100, 100).toFixed(1);
@@ -324,6 +250,9 @@ function _renderFileCard(fileData) {
         </div>`;
     }).join('') : `<div class="ud-empty-row">No files matched the current filter.</div>`;
 
+    const hasPrev = _filePage > 1;
+    const hasNext = _fileHasMore;
+
     return `
     <div class="ud-card glass-panel" id="ud-file-card">
         <div class="ud-card-header">
@@ -332,7 +261,6 @@ function _renderFileCard(fileData) {
                 Top Files
             </span>
             <div class="ud-card-actions">
-                <span class="ud-card-badge" id="ud-file-badge">${badge}</span>
                 <button class="ud-export-btn" id="ud-export-files-user" data-tooltip="Export filtered files to CSV">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     CSV
@@ -340,7 +268,7 @@ function _renderFileCard(fileData) {
             </div>
         </div>
         <div class="ud-path-list" id="ud-file-list">${rows}</div>
-        ${_renderPagination(currentPage, totalPages, 'file')}
+        ${_renderPagination(_filePage, hasPrev, hasNext, 'file')}
     </div>`;
 }
 
@@ -917,28 +845,31 @@ function _parseApiJson(text) {
     }
 }
 
-async function _fetchDir(diskId, user, offset = 0, limit = FILE_PAGE) {
+async function _fetchDir(diskId, user, cursor = null, limit = FILE_PAGE) {
     if (_abortCtrl) _abortCtrl.abort();
     _abortCtrl = new AbortController();
     const b64User = btoa(unescape(encodeURIComponent(user)));
-    let url = `api.php?id=${encodeURIComponent(diskId)}&type=dirs&user_b64=${encodeURIComponent(b64User)}&offset=${offset}&limit=${limit}`;
+    let url = `api.php?id=${encodeURIComponent(diskId)}&type=dirs&user_b64=${encodeURIComponent(b64User)}&limit=${limit}`;
+    if (cursor !== null && cursor !== undefined && String(cursor) !== '') url += `&cursor=${encodeURIComponent(cursor)}`;
     if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
     const t0 = performance.now();
     const text = await _fetchApiText(url, { signal: _abortCtrl.signal });
     const t1 = performance.now();
-    console.log(`[Detail User] fetchDir: offset=${offset} limit=${limit} time=${(t1-t0).toFixed(0)}ms`);
+    console.log(`[Detail User] fetchDir: cursor=${cursor} limit=${limit} time=${(t1-t0).toFixed(0)}ms`);
     const json = _parseApiJson(text);
     if (json.status !== 'success') throw new Error(json.message || 'API error');
     return _normalizeDirPayload(json.data.dir);
 }
 
-async function _fetchDetail(diskId, user, dirOffset = 0, fileOffset = 0, limit = FILE_PAGE) {
+async function _fetchDetail(diskId, user, dirCursor = null, fileCursor = null, limit = FILE_PAGE) {
     if (_abortCtrl) _abortCtrl.abort();
     _abortCtrl = new AbortController();
     const b64User = btoa(unescape(encodeURIComponent(user)));
-    let url = `api.php?id=${encodeURIComponent(diskId)}&type=detail&user_b64=${encodeURIComponent(b64User)}&dir_offset=${dirOffset}&file_offset=${fileOffset}&limit=${limit}`;
+    let url = `api.php?id=${encodeURIComponent(diskId)}&type=detail&user_b64=${encodeURIComponent(b64User)}&limit=${limit}`;
+    if (dirCursor !== null && dirCursor !== undefined && String(dirCursor) !== '') url += `&dir_cursor=${encodeURIComponent(dirCursor)}`;
+    if (fileCursor !== null && fileCursor !== undefined && String(fileCursor) !== '') url += `&file_cursor=${encodeURIComponent(fileCursor)}`;
     if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
     if (_currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
@@ -946,15 +877,16 @@ async function _fetchDetail(diskId, user, dirOffset = 0, fileOffset = 0, limit =
     const t0 = performance.now();
     const text = await _fetchApiText(url, { signal: _abortCtrl.signal });
     const t1 = performance.now();
-    console.log(`[Detail User] fetchDetail: dirOffset=${dirOffset} fileOffset=${fileOffset} limit=${limit} time=${(t1-t0).toFixed(0)}ms`);
+    console.log(`[Detail User] fetchDetail: dirCursor=${dirCursor} fileCursor=${fileCursor} limit=${limit} time=${(t1-t0).toFixed(0)}ms`);
     const json = _parseApiJson(text);
     if (json.status !== 'success') throw new Error(json.message || 'API error');
     return json.data;
 }
 
-async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE) {
+async function _fetchFilePage(diskId, user, cursor = null, limit = FILE_PAGE) {
     const b64User = btoa(unescape(encodeURIComponent(user)));
-    let url = `api.php?id=${encodeURIComponent(diskId)}&type=files&user_b64=${encodeURIComponent(b64User)}&offset=${offset}&limit=${limit}`;
+    let url = `api.php?id=${encodeURIComponent(diskId)}&type=files&user_b64=${encodeURIComponent(b64User)}&limit=${limit}`;
+    if (cursor !== null && cursor !== undefined && String(cursor) !== '') url += `&cursor=${encodeURIComponent(cursor)}`;
     if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
     if (_currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
@@ -963,7 +895,7 @@ async function _fetchFilePage(diskId, user, offset = 0, limit = FILE_PAGE) {
     const t0 = performance.now();
     const text = await _fetchApiText(url);
     const t1 = performance.now();
-    console.log(`[Detail User] fetchFilePage: offset=${offset} limit=${limit} time=${(t1-t0).toFixed(0)}ms`);
+    console.log(`[Detail User] fetchFilePage: cursor=${cursor} limit=${limit} time=${(t1-t0).toFixed(0)}ms`);
     const json = _parseApiJson(text);
     if (json.status !== 'success') throw new Error(json.message || 'API error');
     return _normalizeFilePayload(json.data.file);
@@ -978,67 +910,6 @@ async function _fetchUserList(diskId) {
         return [];
     }
 }
-
-// Lazy count: fired in background after initial render to get the accurate total
-// for filtered queries. count_only=1 hits the same index path as the data query.
-async function _fetchDirCount(diskId, user) {
-    const b64User = btoa(unescape(encodeURIComponent(user)));
-    let url = `api.php?id=${encodeURIComponent(diskId)}&type=dirs&user_b64=${encodeURIComponent(b64User)}&count_only=1&offset=0&limit=1`;
-    if (_currentFilters.query)   url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
-    if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
-    if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
-    try {
-        const text = await _fetchApiText(url);
-        const json = _parseApiJson(text);
-        return (json?.status === 'success') ? (json.data.dir_count ?? null) : null;
-    } catch (_err) {
-        return null;
-    }
-}
-
-async function _fetchFileCount(diskId, user) {
-    const b64User = btoa(unescape(encodeURIComponent(user)));
-    let url = `api.php?id=${encodeURIComponent(diskId)}&type=files&user_b64=${encodeURIComponent(b64User)}&count_only=1&offset=0&limit=1`;
-    if (_currentFilters.query)   url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
-    if (_currentFilters.ext)     url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
-    if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
-    if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
-    try {
-        const text = await _fetchApiText(url);
-        const json = _parseApiJson(text);
-        return (json?.status === 'success') ? (json.data.file_count ?? null) : null;
-    } catch (_err) {
-        return null;
-    }
-}
-
-// Update badge + pagination in-place after accurate count arrives
-function _applyLazyCount(root, type, exactCount) {
-    if (!root || exactCount === null || exactCount === undefined) return;
-    const badge    = root.querySelector(`#ud-${type}-badge`);
-    const pgWrap   = root.querySelector(`#ud-pagination-${type}`);
-    const curPage  = type === 'dir' ? _dirPage : _filePage;
-    const label    = type === 'dir' ? 'dirs' : 'files';
-    const total    = Math.max(1, exactCount);
-    const pages    = Math.max(1, Math.ceil(total / FILE_PAGE));
-
-    if (type === 'dir') {
-        _dirTotalExact = total;
-        _dirTotalPages = pages;
-    } else {
-        _fileTotalExact = total;
-        _fileTotalPages = pages;
-    }
-
-    if (badge) badge.textContent = `Page ${curPage} of ${pages} · ${total.toLocaleString()} ${label}`;
-    if (pgWrap) {
-        pgWrap.outerHTML = _renderPagination(curPage, pages, type);
-    } else if (pages > 1) {
-        const card = root.querySelector(type === 'dir' ? '#ud-dir-card' : '#ud-file-card');
-        if (card) card.insertAdjacentHTML('beforeend', _renderPagination(curPage, pages, type));
-    }
-}
-
 
 // ── Core render ───────────────────────────────────────────────────────────────
 
@@ -1065,11 +936,15 @@ async function _loadAndRender(user) {
 
     _selectedUser   = user;
     _filePage       = 1;
-    _fileTotalPages = 1;
+    _fileCursorStack = [];
+    _fileNextCursor = null;
+    _fileHasMore = false;
+    _currentSentFileCursor = null;
     _dirPage        = 1;
-    _dirTotalPages  = 1;
-    _fileTotalExact = null;
-    _dirTotalExact  = null;
+    _dirCursorStack = [];
+    _dirNextCursor = null;
+    _dirHasMore = false;
+    _currentSentDirCursor = null;
 
     const toolbar = root.querySelector('#ud-unified-toolbar');
     if (toolbar) {
@@ -1082,13 +957,13 @@ async function _loadAndRender(user) {
 
     try {
         let [dirData, fileData] = await Promise.all([
-            _fetchDir(_currentDisk, user, 0, FILE_PAGE),
-            _fetchFilePage(_currentDisk, user, 0, FILE_PAGE)
+            _fetchDir(_currentDisk, user, null, FILE_PAGE),
+            _fetchFilePage(_currentDisk, user, null, FILE_PAGE)
         ]);
 
         const suspiciousEmpty = _isEffectivelyUnfiltered()
-            && (Number(dirData.total_dirs ?? 0) <= 1)
-            && (Number(fileData.total_files ?? 0) <= 1)
+            && (Number(dirData.total_dirs_full ?? 0) <= 1)
+            && (Number(fileData.total_files_full ?? 0) <= 1)
             && (dirData.dirs?.length ?? 0) === 0
             && (fileData.files?.length ?? 0) === 0;
 
@@ -1100,16 +975,16 @@ async function _loadAndRender(user) {
                 _attachFilterEvents(toolbar, root);
             }
             [dirData, fileData] = await Promise.all([
-                _fetchDir(_currentDisk, user, 0, FILE_PAGE),
-                _fetchFilePage(_currentDisk, user, 0, FILE_PAGE)
+                _fetchDir(_currentDisk, user, null, FILE_PAGE),
+                _fetchFilePage(_currentDisk, user, null, FILE_PAGE)
             ]);
         }
 
         _scanRoot = String((dirData && dirData.scan_root) || (fileData && fileData.scan_root) || _scanRoot || '');
 
         const otherUser = _otherUsers.find(o => o.name === user);
-        const noDirBreakdown = (dirData.total_dirs ?? dirData.dirs.length ?? 0) === 0 && (dirData.dirs?.length ?? 0) === 0;
-        const noFileBreakdown = (fileData.total_files ?? fileData.files.length ?? 0) === 0 && (fileData.files?.length ?? 0) === 0;
+        const noDirBreakdown = (dirData.total_dirs_full ?? dirData.dirs.length ?? 0) === 0 && (dirData.dirs?.length ?? 0) === 0;
+        const noFileBreakdown = (fileData.total_files_full ?? fileData.files.length ?? 0) === 0 && (fileData.files?.length ?? 0) === 0;
         if (otherUser && noDirBreakdown && noFileBreakdown) {
             if (contentBody) contentBody.innerHTML = `
                 <div class="ud-empty-state">
@@ -1127,30 +1002,16 @@ async function _loadAndRender(user) {
         const dirDisabled = hasExtFilter;
         const dirDisableReason = hasExtFilter ? 'ext' : '';
 
-        // total_files / total_dirs may be -1 (backend skips COUNT for fast page load).
-        // In that case use total_files_full (from users table) for non-filtered view,
-        // or has_more for filtered view, to set initial pagination bounds.
-        const fileTotalRaw = Number(fileData?.total_files);
-        if (fileTotalRaw >= 0) {
-            _fileTotalPages = Math.max(1, Math.ceil(fileTotalRaw / FILE_PAGE));
-        } else if (!_hasActiveFilters() && fileData?.total_files_full > 0) {
-            _fileTotalPages = Math.max(1, Math.ceil(fileData.total_files_full / FILE_PAGE));
-        } else {
-            _fileTotalPages = fileData?.has_more ? 2 : 1;
-        }
+        // Initialize cursor state BEFORE render so _renderDirCard/_renderFileCard see has_more
+        _fileNextCursor = fileData?.next_cursor ?? null;
+        _fileHasMore    = !!fileData?.has_more;
+        _currentSentFileCursor = null;
+        _fileCursorStack = [];
 
-        if (dirDisabled) {
-            _dirTotalPages = 1;
-        } else {
-            const dirTotalRaw = Number(dirData?.total_dirs);
-            if (dirTotalRaw >= 0) {
-                _dirTotalPages = Math.max(1, Math.ceil(dirTotalRaw / FILE_PAGE));
-            } else if (!_hasActiveFilters() && dirData?.total_dirs_full > 0) {
-                _dirTotalPages = Math.max(1, Math.ceil(dirData.total_dirs_full / FILE_PAGE));
-            } else {
-                _dirTotalPages = dirData?.has_more ? 2 : 1;
-            }
-        }
+        _dirNextCursor  = dirData?.next_cursor ?? null;
+        _dirHasMore     = !!dirData?.has_more;
+        _currentSentDirCursor = null;
+        _dirCursorStack = [];
 
         if (contentBody) {
             contentBody.innerHTML = `
@@ -1159,20 +1020,6 @@ async function _loadAndRender(user) {
                     ${_renderFileCard(fileData)}
                 </div>`;
             _attachContentEvents(contentBody, root);
-        }
-
-        // Skip lazy count for keyword filter because exact recount can overwrite valid pagination.
-        const hasFilters = _hasActiveFilters();
-        const hasKeywordFilter = !!String(_currentFilters.query || '').trim();
-        if (hasFilters && !hasKeywordFilter) {
-            const capturedUser = user;
-            const capturedDisk = _currentDisk;
-
-            const dirBadge  = root.querySelector('#ud-dir-badge');
-            const fileBadge = root.querySelector('#ud-file-badge');
-            if (!dirDisabled && dirBadge) dirBadge.textContent += ' …';
-            if (fileBadge) fileBadge.textContent += ' …';
-
         }
     } catch (err) {
         if (err.name === 'AbortError') return;
@@ -1214,13 +1061,14 @@ function _attachContentEvents(contentEl, root) {
 
             const btn = e.target.closest('.ud-page-btn');
             if (!btn || btn.classList.contains('disabled') || btn.classList.contains('active')) return;
-            const page = parseInt(btn.dataset.page, 10);
-            if (isNaN(page)) return;
+            const action = btn.dataset.action || '';
 
             if (e.target.closest('#ud-pagination-dir')) {
-                _goToPageDir(root, page);
+                if (action === 'prev') _goToPrevDir(root);
+                else if (action === 'next') _goToNextDir(root);
             } else if (e.target.closest('#ud-pagination-file')) {
-                _goToPageFile(root, page);
+                if (action === 'prev') _goToPrevFile(root);
+                else if (action === 'next') _goToNextFile(root);
             }
         });
         contentEl._hasPaginationEvents = true;
@@ -1231,52 +1079,22 @@ function _attachContentEvents(contentEl, root) {
     contentEl.querySelector('#ud-export-files-user')?.addEventListener('click', () => _udExportFiles(false));
 }
 
-async function _goToPageFile(root, page, allowFallback = true) {
+async function _fetchAndRenderFilePage(root, cursor) {
     if (!_currentDisk || !_selectedUser) return;
-    // Allow navigation beyond _fileTotalPages when total is unknown (has_more driven)
-    if (page < 1 || (_fileTotalPages > 0 && page > _fileTotalPages)) return;
-
-    // Dim the list while loading
     const list  = root.querySelector('#ud-file-list');
     const pager = root.querySelector('#ud-pagination-file');
-    const badge = root.querySelector('#ud-file-badge');
     if (list) list.style.opacity = '0.4';
     if (pager) pager.style.pointerEvents = 'none';
 
     try {
-        const offset = (page - 1) * FILE_PAGE;
-        const hasFilters = _hasActiveFilters();
-        const fileData = await _fetchFilePage(_currentDisk, _selectedUser, offset, FILE_PAGE);
+        const fileData = await _fetchFilePage(_currentDisk, _selectedUser, cursor, FILE_PAGE);
         _scanRoot = String((fileData && fileData.scan_root) || _scanRoot || '');
+        _currentSentFileCursor = cursor;
+        _fileNextCursor = fileData?.next_cursor ?? null;
+        _fileHasMore = !!fileData?.has_more;
+
         const rows = Array.isArray(fileData?.files) ? fileData.files.map(_normalizeFileRow) : [];
-        const rawTotal = Number(fileData.total_files);
-        const totalKnown = rawTotal >= 0;
-        const fallbackTotal = totalKnown ? rawTotal : Math.max(0, rows.length);
-        const totalFiles = Math.max(0, _fileTotalExact ?? fallbackTotal);
-        // When total is unknown, derive total pages from has_more.
-        const computedTotalPages = totalKnown
-            ? Math.max(1, Math.ceil(totalFiles / FILE_PAGE))
-            : (fileData.has_more ? page + 1 : page);
 
-        // Guard against stale/overestimated totals from backend indexes.
-        // If requested page is empty, clamp UI back to last page that can contain rows.
-        if (allowFallback && page > 1 && rows.length === 0) {
-            const maxReachablePage = Math.max(1, Math.ceil((offset + rows.length) / FILE_PAGE));
-            const safePage = Math.min(page - 1, computedTotalPages, maxReachablePage);
-            _fileTotalPages = Math.max(1, safePage);
-            if (safePage !== page) {
-                return _goToPageFile(root, safePage, false);
-            }
-        }
-
-        _filePage = page;
-        // Only grow totalPages, never shrink during navigation.
-        // This prevents going back to page 1 from resetting the known total.
-        if (computedTotalPages > _fileTotalPages) {
-            _fileTotalPages = computedTotalPages;
-        }
-
-        // Re-render file card rows + pagination in-place
         if (list) {
             const grandTotal = fileData.total_used || 1;
             list.innerHTML = rows.map(f => {
@@ -1296,65 +1114,49 @@ async function _goToPageFile(root, page, allowFallback = true) {
             list.style.opacity = '';
         }
 
-        // Update badge
-        if (badge) {
-            const fullTotal = Math.max(0, fileData.total_files_full ?? totalFiles);
-            const displayTotal = Math.max(0, _hasActiveFilters() ? totalFiles : fullTotal);
-            badge.textContent = `Page ${page} of ${_fileTotalPages} · ${displayTotal.toLocaleString()} files`;
-        }
-
-        // Re-render pagination
         const pgWrap = root.querySelector('#ud-pagination-file');
+        const newPg = _renderPagination(_filePage, _filePage > 1, _fileHasMore, 'file');
         if (pgWrap) {
-            pgWrap.outerHTML = _renderPagination(page, _fileTotalPages, 'file');
+            pgWrap.outerHTML = newPg;
+        } else if (newPg) {
+            const card = root.querySelector('#ud-file-card');
+            if (card) card.insertAdjacentHTML('beforeend', newPg);
         }
-
     } catch (err) {
         if (list) list.style.opacity = '';
         if (pager) pager.style.pointerEvents = '';
     }
 }
 
-async function _goToPageDir(root, page, allowFallback = true) {
-    if (!_currentDisk || !_selectedUser) return;
-    if (_hasExtFilter()) return;
-    if (page < 1 || (_dirTotalPages > 0 && page > _dirTotalPages)) return;
+async function _goToNextFile(root) {
+    if (!_fileHasMore || !_fileNextCursor) return;
+    _fileCursorStack.push(_currentSentFileCursor);
+    _filePage += 1;
+    await _fetchAndRenderFilePage(root, _fileNextCursor);
+}
 
-    // Dim the list while loading
+async function _goToPrevFile(root) {
+    if (_filePage <= 1 || _fileCursorStack.length === 0) return;
+    const prevCursor = _fileCursorStack.pop();
+    _filePage -= 1;
+    await _fetchAndRenderFilePage(root, prevCursor);
+}
+
+async function _fetchAndRenderDirPage(root, cursor) {
+    if (!_currentDisk || !_selectedUser) return;
     const list  = root.querySelector('#ud-dir-list');
     const pager = root.querySelector('#ud-pagination-dir');
-    const badge = root.querySelector('#ud-dir-badge');
     if (list) list.style.opacity = '0.4';
     if (pager) pager.style.pointerEvents = 'none';
 
     try {
-        const offset = (page - 1) * FILE_PAGE;
-        const hasFilters = _hasActiveFilters();
-        const dirData = await _fetchDir(_currentDisk, _selectedUser, offset, FILE_PAGE);
+        const dirData = await _fetchDir(_currentDisk, _selectedUser, cursor, FILE_PAGE);
         _scanRoot = String((dirData && dirData.scan_root) || _scanRoot || '');
+        _currentSentDirCursor = cursor;
+        _dirNextCursor = dirData?.next_cursor ?? null;
+        _dirHasMore = !!dirData?.has_more;
+
         const rows = Array.isArray(dirData?.dirs) ? dirData.dirs.map(_normalizeDirRow) : [];
-        const rawTotal = Number(dirData.total_dirs);
-        const totalKnown = rawTotal >= 0;
-        const fallbackTotal = totalKnown ? rawTotal : Math.max(0, rows.length);
-        const totalDirs = Math.max(0, _dirTotalExact ?? fallbackTotal);
-        const computedTotalPages = totalKnown
-            ? Math.max(1, Math.ceil(totalDirs / FILE_PAGE))
-            : (dirData.has_more ? page + 1 : page);
-
-        // Guard against stale/overestimated totals from backend indexes.
-        if (allowFallback && page > 1 && rows.length === 0) {
-            const maxReachablePage = Math.max(1, Math.ceil((offset + rows.length) / FILE_PAGE));
-            const safePage = Math.min(page - 1, computedTotalPages, maxReachablePage);
-            _dirTotalPages = Math.max(1, safePage);
-            if (safePage !== page) {
-                return _goToPageDir(root, safePage, false);
-            }
-        }
-
-        _dirPage = page;
-        if (computedTotalPages > _dirTotalPages) {
-            _dirTotalPages = computedTotalPages;
-        }
 
         if (list) {
             const grandTotal = dirData.total_used || 1;
@@ -1373,21 +1175,34 @@ async function _goToPageDir(root, page, allowFallback = true) {
             list.style.opacity = '';
         }
 
-        if (badge) {
-            const fullTotal = Math.max(0, dirData.total_dirs_full ?? totalDirs);
-            const displayTotal = Math.max(0, _hasActiveFilters() ? totalDirs : fullTotal);
-            badge.textContent = `Page ${page} of ${_dirTotalPages} · ${displayTotal.toLocaleString()} dirs`;
-        }
-
         const pgWrap = root.querySelector('#ud-pagination-dir');
+        const newPg = _renderPagination(_dirPage, _dirPage > 1, _dirHasMore, 'dir');
         if (pgWrap) {
-            pgWrap.outerHTML = _renderPagination(page, _dirTotalPages, 'dir');
+            pgWrap.outerHTML = newPg;
+        } else if (newPg) {
+            const card = root.querySelector('#ud-dir-card');
+            if (card) card.insertAdjacentHTML('beforeend', newPg);
         }
-
     } catch (err) {
         if (list) list.style.opacity = '';
         if (pager) pager.style.pointerEvents = '';
     }
+}
+
+async function _goToNextDir(root) {
+    if (!_dirHasMore || !_dirNextCursor) return;
+    if (_hasExtFilter()) return;
+    _dirCursorStack.push(_currentSentDirCursor);
+    _dirPage += 1;
+    await _fetchAndRenderDirPage(root, _dirNextCursor);
+}
+
+async function _goToPrevDir(root) {
+    if (_dirPage <= 1 || _dirCursorStack.length === 0) return;
+    if (_hasExtFilter()) return;
+    const prevCursor = _dirCursorStack.pop();
+    _dirPage -= 1;
+    await _fetchAndRenderDirPage(root, prevCursor);
 }
 
 function _attachPickerEvents(root) {
@@ -1534,14 +1349,11 @@ const UD_BTN_SPINNER_SVG = `
     </svg>
 </span>`;
 
-async function _fetchExportPage(kind, diskId, user, offset, limit, cursor = null) {
+async function _fetchExportPage(kind, diskId, user, cursor = null, limit = 20000) {
     const b64User = btoa(unescape(encodeURIComponent(user)));
-    let url = `api.php?id=${encodeURIComponent(diskId)}&type=${kind === 'dirs' ? 'dirs' : 'files'}&user_b64=${encodeURIComponent(b64User)}&offset=${offset}&limit=${limit}`;
+    let url = `api.php?id=${encodeURIComponent(diskId)}&type=${kind === 'dirs' ? 'dirs' : 'files'}&user_b64=${encodeURIComponent(b64User)}&limit=${limit}`;
+    if (cursor !== null && cursor !== undefined && String(cursor) !== '') url += `&cursor=${encodeURIComponent(cursor)}`;
     if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
-    if (cursor !== null) {
-        url += '&export_stream=1';
-        url += `&cursor=${Math.max(0, Number(cursor) || 0)}`;
-    }
     if (kind !== 'dirs' && _currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
     if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
     if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
@@ -1575,11 +1387,10 @@ async function _startUserCsvExport(kind) {
 
     try {
         const PAGE = kind === 'files' ? 50000 : 20000;
-        let offset = 0;
+        let rowsExported = 0;
         let finished = false;
         let totalHint = null;
-        let fileCursor = kind === 'files' ? 0 : null;
-        let dirCursor = kind === 'dirs' ? 0 : null;
+        let cursor = null;
 
         const headers = kind === 'dirs'
             ? ['User', 'Path', 'Used (bytes)']
@@ -1597,26 +1408,20 @@ async function _startUserCsvExport(kind) {
             async () => {
                 if (finished) return { rows: [], isLast: true };
 
-                const payload = await _fetchExportPage(kind, _currentDisk, _selectedUser, offset, PAGE, kind === 'dirs' ? dirCursor : fileCursor);
+                const payload = await _fetchExportPage(kind, _currentDisk, _selectedUser, cursor, PAGE);
                 const rows = kind === 'dirs' ? (payload?.dirs || []) : (payload?.files || []);
-                if (kind === 'files') {
-                    fileCursor = Number(payload?.next_cursor ?? fileCursor ?? 0);
-                } else if (kind === 'dirs') {
-                    dirCursor = Number(payload?.next_cursor ?? dirCursor ?? 0);
-                }
-                // Use total_files_full/total_dirs_full (from users table) as hint
-                // since total_files/total_dirs is -1 (backend skips COUNT).
+                cursor = payload?.next_cursor ?? null;
                 const rawHint = kind === 'dirs'
-                    ? (payload?.total_dirs_full ?? payload?.total_dirs ?? null)
-                    : (payload?.total_files_full ?? payload?.total_files ?? null);
+                    ? (payload?.total_dirs_full ?? null)
+                    : (payload?.total_files_full ?? null);
                 if (rawHint !== null && Number(rawHint) > 0) totalHint = Number(rawHint);
 
-                offset += rows.length;
+                rowsExported += rows.length;
                 const hasMore = !!payload?.has_more;
                 finished = (rows.length === 0) || !hasMore;
 
-                const pct = totalHint > 0 ? Math.min(100, Math.round((offset / totalHint) * 100)) : (finished ? 100 : 0);
-                updateProgressToast(toastId, pct, `${offset.toLocaleString()}/${(totalHint || 0).toLocaleString()} rows`);
+                const pct = totalHint > 0 ? Math.min(100, Math.round((rowsExported / totalHint) * 100)) : (finished ? 100 : 0);
+                updateProgressToast(toastId, pct, `${rowsExported.toLocaleString()}/${(totalHint || 0).toLocaleString()} rows`);
 
                 const mapped = rows.map(r => {
                     if (kind === 'dirs') {
@@ -1712,8 +1517,16 @@ export async function initUserDetailTab(diskId, otherUsers = []) {
 export function resetUserDetailTab() {
     _selectedUser = null;
     _currentDisk  = null;
-    _fileTotalExact = null;
-    _dirTotalExact  = null;
+    _filePage = 1;
+    _fileCursorStack = [];
+    _fileNextCursor = null;
+    _fileHasMore = false;
+    _currentSentFileCursor = null;
+    _dirPage = 1;
+    _dirCursorStack = [];
+    _dirNextCursor = null;
+    _dirHasMore = false;
+    _currentSentDirCursor = null;
     if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null; }
     const root = _getRoot();
     if (root) root.innerHTML = '';

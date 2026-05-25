@@ -148,15 +148,24 @@
     transition: var(--transition-smooth);
 }
 
-.status-dot.scanning {
-    background-color: var(--emerald-400);
-    box-shadow: 0 0 12px var(--emerald-400);
-    animation: pulse 2s infinite;
+.status-dot.idle {
+    background-color: var(--emerald-400, #34d399);
+    box-shadow: 0 0 8px rgba(52, 211, 153, 0.45);
 }
 
-@keyframes pulse {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(52, 211, 153, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+.status-dot.scanning {
+    background-color: var(--amber-400, #fbbf24);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.55);
+    animation: pulse-scanning 1.6s ease-in-out infinite;
+}
+
+.status-dot.error {
+    background-color: var(--rose-500, #f43f5e);
+    box-shadow: 0 0 10px rgba(244, 63, 94, 0.55);
+}
+
+@keyframes pulse-scanning {
+    0%, 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7); }
+    70%      { transform: scale(1);    box-shadow: 0 0 0 6px rgba(251, 191, 36, 0); }
 }
 

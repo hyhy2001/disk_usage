@@ -159,7 +159,7 @@
 
 .tmx-row {
     display: grid;
-    grid-template-columns: 20px 18px minmax(120px, 1fr) auto;
+    grid-template-columns: 20px 18px minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
     padding: 5px 8px;
@@ -272,6 +272,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
     flex: 0 0 auto;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .tmx-breadcrumb {
@@ -288,7 +291,7 @@
 
 .tmx-search {
     display: grid;
-    grid-template-columns: minmax(160px, 1fr) 34px;
+    grid-template-columns: minmax(0, 1fr) 34px;
     gap: 8px;
     margin-bottom: 8px;
     flex: 0 0 auto;
@@ -652,13 +655,6 @@
         width: fit-content;
     }
 
-    .tmx-item {
-        grid-template-columns: minmax(0, 1fr) auto;
-        grid-template-rows: auto auto auto;
-        gap: 8px 12px;
-        padding: 10px;
-    }
-
     .tmx-table-head {
         display: none;
     }
@@ -667,44 +663,50 @@
         margin-bottom: 8px;
     }
 
+    /* Two-column, two-row stable layout: folder|size on top, owner|type below */
+    .tmx-item {
+        grid-template-columns: minmax(0, 1fr) minmax(120px, 40%);
+        grid-template-rows: auto auto;
+        gap: 6px 12px;
+        padding: 10px;
+    }
+
     .tmx-item-folder {
         grid-column: 1;
         grid-row: 1;
+        min-width: 0;
+    }
+
+    .tmx-item-size {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: stretch;
+        align-self: center;
+        min-width: 0;
     }
 
     .tmx-item-owner {
         grid-column: 1;
         grid-row: 2;
         justify-self: start;
+        min-width: 0;
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-    }
-
-    .tmx-item-owner::before {
-        content: none;
+        gap: 6px;
     }
 
     .tmx-item-type {
         grid-column: 2;
         grid-row: 2;
         justify-self: end;
+        min-width: 0;
         display: inline-flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
     }
 
-    .tmx-item-type::before {
-        content: none;
-    }
-
-    .tmx-item-size {
-        grid-column: 1 / -1;
-        grid-row: 3;
-        justify-self: stretch;
-        padding-right: 0;
-    }
-
+    .tmx-item-owner::before,
+    .tmx-item-type::before,
     .tmx-item-size::before {
         content: none;
     }
@@ -742,30 +744,45 @@
         justify-self: end;
     }
 
+    /* Single-column stack at very narrow widths — fully stable */
     .tmx-item {
-        min-height: 48px;
-        padding: 8px;
-        gap: 7px 10px;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto auto;
+        min-height: auto;
+        padding: 10px;
+        gap: 6px;
+    }
+
+    .tmx-item-folder {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .tmx-item-size {
+        grid-column: 1;
+        grid-row: 2;
+        justify-self: stretch;
+    }
+
+    .tmx-item-owner,
+    .tmx-item-type {
+        grid-row: 3;
+        font-size: 0.66rem;
+    }
+
+    .tmx-item-owner {
+        grid-column: 1;
+        justify-self: start;
+    }
+
+    .tmx-item-type {
+        grid-column: 1;
+        justify-self: end;
+        margin-top: -18px;
     }
 
     .tmx-item-name {
         font-size: 0.76rem;
-    }
-
-    .tmx-item-owner {
-        gap: 6px;
-    }
-
-    .tmx-item-owner::before {
-        content: "Owner";
-        font-size: 0.6rem;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        color: rgba(148,163,184,0.82);
-    }
-
-    .tmx-item-size {
-        padding-right: 10px;
     }
 }
 
@@ -1253,16 +1270,17 @@
 .team-disk-card .card-scan-badge {
     display: none;
     align-items: center;
-    gap: 6px;
-    margin-top: 6px;
-    margin-left: 24px;
-    padding: 4px 8px;
-    border-radius: 6px;
-    background: rgba(59, 130, 246, 0.12);
-    color: var(--text-secondary);
-    font-size: 0.72rem;
+    gap: 5px;
+    margin-left: auto;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(251, 191, 36, 0.12);
+    color: var(--amber-400, #fbbf24);
+    font-size: 0.68rem;
+    font-weight: 500;
     line-height: 1.2;
-    max-width: calc(100% - 24px);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .team-disk-card .card-scan-badge .scan-dot {
@@ -1293,8 +1311,8 @@
 }
 
 :root[data-theme='light'] .team-disk-card .card-scan-badge {
-    background: rgba(59, 130, 246, 0.09);
-    color: #334155;
+    background: rgba(217, 119, 6, 0.10);
+    color: #b45309;
 }
 
 :root[data-theme='light'] .team-disk-card .card-scan-badge .scan-dot.scanning {
@@ -1303,6 +1321,43 @@
 
 :root[data-theme='light'] .team-disk-card .card-scan-badge .scan-dot.error {
     background: #e11d48;
+}
+
+/* Narrow column (sidebar mode): hide pill badge, replace SVG disk icon with status dot */
+.team-disk-sidebar .team-disk-card .card-scan-badge {
+    display: none !important;
+}
+
+.team-disk-sidebar .team-disk-card.is-scanning .disk-name > div:first-child .icon-disk-card,
+.team-disk-sidebar .team-disk-card.is-error    .disk-name > div:first-child .icon-disk-card {
+    display: none;
+}
+
+.team-disk-sidebar .team-disk-card.is-scanning .disk-name > div:first-child::before,
+.team-disk-sidebar .team-disk-card.is-error    .disk-name > div:first-child::before {
+    content: '';
+    display: block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-top: 4px;
+    flex-shrink: 0;
+}
+
+.team-disk-sidebar .team-disk-card.is-scanning .disk-name > div:first-child::before {
+    background: var(--amber-400, #fbbf24);
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.55);
+    animation: team-scan-pulse-dot 1.6s ease-in-out infinite;
+}
+
+.team-disk-sidebar .team-disk-card.is-error .disk-name > div:first-child::before {
+    background: var(--rose-500, #f43f5e);
+    box-shadow: 0 0 8px rgba(244, 63, 94, 0.55);
+}
+
+@keyframes team-scan-pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.55; transform: scale(0.85); }
 }
 
 /* Extended stats that only show when the column is wide enough */

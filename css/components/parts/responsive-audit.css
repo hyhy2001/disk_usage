@@ -364,3 +364,31 @@
    END RESPONSIVE AUDIT FIXES
    ------------------------------------------------------------------------- */
 
+/* ─── Inode tab: prevent horizontal overflow at narrow widths ──────── */
+#inodes-body {
+    min-width: 0;
+}
+#inodes-body .glass-panel {
+    min-width: 0;
+    overflow-x: hidden;
+}
+#inodes-body canvas {
+    max-width: 100%;
+    height: auto !important;
+}
+
+/* ─── Treemap explorer: ensure rows can shrink ─────────────────────── */
+#tab-pane-treemap .tmx-list,
+#tab-pane-treemap .tmx-wrap {
+    min-width: 0;
+}
+#tab-pane-treemap .tmx-row > * {
+    min-width: 0;
+}
+
+/* Collapse snapshot two-col earlier when content area is narrow */
+@container main (max-width: 720px) {
+    .snapshot-two-col {
+        grid-template-columns: 1fr !important;
+    }
+}

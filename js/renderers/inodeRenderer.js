@@ -35,7 +35,7 @@ export function renderInodesTab(inodesData, chartMgr) {
 
     // Build the 4 mini stat cards
     const statCards = `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px;">
             <div class="inode-stat-card">
                 <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Total Inodes</div>
                 <div style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums;">${inodes_total.toLocaleString()}</div>
@@ -115,7 +115,7 @@ export function renderInodesTab(inodesData, chartMgr) {
                         <input type="text" id="inode-user-search" placeholder="Search users..." class="sidebar-text-input" autocomplete="off" spellcheck="false" style="padding-top: 6px; padding-bottom: 6px; font-size: 0.8rem;">
                     </div>
                 </div>
-                <div id="inode-user-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; align-content: start; padding-bottom: 8px;">
+                <div id="inode-user-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; align-content: start; padding-bottom: 8px;">
                     ${userGrid}
                 </div>
             </div>

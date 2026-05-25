@@ -40,6 +40,8 @@ class DataFetcher {
         this._groupUserConfig = null;
         this._scanStatusTimer = null; // ID of the status polling timer
         this._teamCardPollTimer = null; // ID of team card polling timer
+        this._teamScanCache = new Map();      // diskId → last status from team_scan_status
+        this._teamScanCacheTs = 0;            // ms timestamp of last cache write
         this._currentTeamName = null; // Name of current team being polled
 
         // Initialize charts
@@ -201,6 +203,13 @@ class DataFetcher {
     }
 
     async _fetchScanStatus(diskId) {
+        // Reuse team_scan_status cache when fresh (<6s) — same data, fewer API calls.
+        const TEAM_CACHE_TTL_MS = 6000;
+        const id = String(diskId || '');
+        if (id && this._teamScanCache && this._teamScanCache.has(id)
+                && (Date.now() - this._teamScanCacheTs) < TEAM_CACHE_TTL_MS) {
+            return this._teamScanCache.get(id);
+        }
         try {
             // cacheTimeMs: 2000 so rapid clicks don't spam, but updates reasonably fast
             const json = await this._fetchJson(`api.php?id=${encodeURIComponent(diskId)}&type=scan_status`, { cacheTimeMs: 2000 });
@@ -239,12 +248,16 @@ class DataFetcher {
         if (!badge) {
             badge = document.createElement('div');
             badge.className = 'card-scan-badge';
-            const header = card.querySelector('.card-header');
-            if (header) header.appendChild(badge);
+            const nameRow = card.querySelector('.disk-name');
+            if (nameRow) nameRow.appendChild(badge);
         }
 
         const isScanning = !!status.running || (!!status.stage && status.stage !== 'done' && status.stage !== 'error');
         const isError = status.stage === 'error';
+
+        // Reflect state on the card so narrow-column CSS can react.
+        card.classList.toggle('is-scanning', isScanning);
+        card.classList.toggle('is-error', !isScanning && isError);
 
         const usedPill = card.querySelector('.disk-path');
         const statValues = card.querySelectorAll('.extended-stat .value');
@@ -278,14 +291,16 @@ class DataFetcher {
             badge.setAttribute('data-tooltip', _buildTooltip(status));
             badge.setAttribute('data-tooltip-pos', 'top');
             badge.style.display = 'flex';
-
-            if (usedPill) {
-                if (!usedPill.dataset.originalText) usedPill.dataset.originalText = usedPill.textContent;
-                usedPill.textContent = '...';
+            // Restore any prior "..." placeholders so live numbers stay visible.
+            if (usedPill && usedPill.dataset.originalText) {
+                usedPill.textContent = usedPill.dataset.originalText;
+                delete usedPill.dataset.originalText;
             }
             statValues.forEach((el) => {
-                if (!el.dataset.originalText) el.dataset.originalText = el.textContent;
-                el.textContent = '...';
+                if (el.dataset.originalText) {
+                    el.textContent = el.dataset.originalText;
+                    delete el.dataset.originalText;
+                }
             });
             return;
         }
@@ -332,56 +347,75 @@ class DataFetcher {
                 if (id) byDiskId.set(id, s);
             });
 
+            // Cache for _fetchScanStatus reuse — saves a per-disk API call.
+            this._teamScanCache = byDiskId;
+            this._teamScanCacheTs = Date.now();
+
             const cards = document.querySelectorAll('.team-disk-card[data-id]');
             cards.forEach((card) => {
                 const diskId = card.getAttribute('data-id') || '';
                 const status = byDiskId.get(diskId) || { running: false, stage: 'done' };
                 this._setTeamCardScanState(card, status);
             });
+
+            // Keep global status dot in sync with the active disk.
+            if (this._activeDisk) {
+                const activeStatus = byDiskId.get(String(this._activeDisk));
+                if (activeStatus) this._applyGlobalStatus(activeStatus);
+            }
         };
 
         run();
-        this._teamCardPollTimer = setInterval(run, 5000);
+        this._teamCardPollTimer = setInterval(run, 3000);
+    }
+
+    // Apply a scan_status payload to the global status dot + label.
+    // Called from both _startStatusPolling (initial) and the team poll loop.
+    _applyGlobalStatus(status) {
+        // Inline status pill is the only scan indicator. Remove stale banners.
+        const staleBanner = document.getElementById('scan-status-banner');
+        if (staleBanner) staleBanner.remove();
+
+        const isScanning = (status && status.running) || (status && status.stage && status.stage !== 'done');
+
+        if (isScanning) {
+            const stageMeta = this._getScanStageMeta(status?.stage, status?.message);
+            this._setStatusScanning(stageMeta.statusText);
+            UINodes.statusDot.classList.remove('idle', 'error');
+            UINodes.statusDot.classList.add('scanning');
+            UINodes.statusDot.style.backgroundColor = '';
+            UINodes.statusDot.title = `Stage: ${status.stage || 'unknown'}`;
+            return;
+        }
+
+        if (!AppState.isProcessing && status) {
+            const isError = status.stage === 'error';
+            const statusLabel = isError ? (status.message || 'Disk scan failed') : 'System Optimized';
+            this._setStatusIdle(statusLabel);
+            UINodes.statusDot.classList.remove('scanning');
+            UINodes.statusDot.style.backgroundColor = '';
+            UINodes.statusDot.title = status.stage ? `Stage: ${status.stage}` : '';
+            if (isError) {
+                UINodes.statusDot.classList.remove('idle');
+                UINodes.statusDot.classList.add('error');
+            } else {
+                UINodes.statusDot.classList.remove('error');
+                UINodes.statusDot.classList.add('idle');
+            }
+        }
     }
 
     _startStatusPolling(diskId) {
         this._stopStatusPolling();
-        // Poll every 3 seconds
-        this._scanStatusTimer = setInterval(async () => {
-            if (this._activeDisk !== diskId) {
-                this._stopStatusPolling();
-                return;
-            }
-            if (document.hidden) return;
+        // No dedicated timer — team poll loop drives updates for the active
+        // disk in lock-step with the card grid. Trigger one immediate fetch
+        // so the dot updates without waiting for the next team poll tick.
+        (async () => {
+            if (this._activeDisk !== diskId) return;
             const status = await this._fetchScanStatus(diskId);
-
-            // Inline status pill is now the only scan indicator. The old
-            // .scan-status-banner is no longer rendered — remove any stale
-            // instance left over from previous builds.
-            const staleBanner = document.getElementById('scan-status-banner');
-            if (staleBanner) staleBanner.remove();
-
-            const isScanning = (status && status.running) || (status && status.stage && status.stage !== 'done');
-
-            if (isScanning) {
-                const stageMeta = this._getScanStageMeta(status?.stage, status?.message);
-                this._setStatusScanning(stageMeta.statusText);
-                UINodes.statusDot.classList.add('scanning');
-                UINodes.statusDot.style.backgroundColor = '';
-                UINodes.statusDot.title = `Stage: ${status.stage || 'unknown'}`;
-            } else if (!AppState.isProcessing) {
-                if (status) {
-                    const isError = status.stage === 'error';
-                    const statusLabel = isError ? (status.message || 'Disk scan failed') : 'System Optimized';
-                    this._setStatusIdle(statusLabel);
-                    UINodes.statusDot.classList.remove('scanning');
-                    UINodes.statusDot.title = status.stage ? `Stage: ${status.stage}` : '';
-                    if (isError) {
-                        UINodes.statusDot.style.backgroundColor = 'var(--rose-500)';
-                    }
-                }
-            }
-        }, 3000);
+            if (this._activeDisk !== diskId) return;
+            this._applyGlobalStatus(status);
+        })();
     }
 
 
@@ -1392,6 +1426,8 @@ class DataFetcher {
                 this.setProcessingState(false);
                 UINodes.statusText.textContent = "Error: " + error.message;
                 UINodes.statusDot.classList.remove('scanning');
+                UINodes.statusDot.classList.remove('idle');
+                UINodes.statusDot.classList.add('error');
                 UINodes.statusDot.style.backgroundColor = 'var(--rose-500)';
                 this._toastOnce('sync-failed', 'Sync failed', error.message || 'Check connection and try again', 'error');
             } finally {
@@ -1610,12 +1646,14 @@ class DataFetcher {
         UINodes.btnFetch.disabled = isProcessing;
 
         if (isProcessing) {
+            UINodes.statusDot.classList.remove('idle', 'error');
             UINodes.statusDot.classList.add('scanning');
             UINodes.statusDot.style.backgroundColor = '';
             UINodes.progressBar.style.width = '0%';
             UINodes.progressBar.classList.add('loading-indeterminate');
         } else {
-            UINodes.statusDot.classList.remove('scanning');
+            UINodes.statusDot.classList.remove('scanning', 'error');
+            UINodes.statusDot.classList.add('idle');
             UINodes.progressBar.classList.remove('loading-indeterminate');
             setTimeout(() => {
                 UINodes.progressBar.style.width = '100%';
