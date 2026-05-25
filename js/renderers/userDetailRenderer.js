@@ -19,6 +19,10 @@ let _dirTotalExact  = null; // exact total from lazy count (filtered mode)
 const FILE_PAGE     = 500;  // rows per page
 let _currentFilters = JSON.parse(localStorage.getItem('ud_filters') || 'null') || { query: '', ext: '', minSize: 0, maxSize: 0 };
 let _allUserNames   = [];
+let _scanRoot       = '';
+let _dropdownQuery  = '';
+let _dropdownShown  = 0;
+const DROPDOWN_PAGE = 30;
 let _fileCursorByPage = { 1: 0 };
 let _dirCursorByPage  = { 1: 0 };
 
@@ -68,6 +72,24 @@ function _extColor(ext) {
         csv: '#10b981', json: '#06b6d4', txt: '#94a3b8',
     };
     return map[ext] || '#475569';
+}
+
+function _toAbsoluteDisplayPath(p) {
+    const stripTrail = (s) => String(s || '').replace(/\/+$/, '');
+    if (!p) return stripTrail(_scanRoot || '');
+    if (!_scanRoot) return stripTrail(p);
+    const rootNorm = stripTrail(_scanRoot);
+    const rootBasename = rootNorm.replace(/^\/+/, '').split('/').pop();
+    const trimmed = String(p).replace(/^\/+/, '').replace(/\/+$/, '');
+    if (!trimmed) return rootNorm;
+    if (trimmed === rootNorm.replace(/^\/+/, '') || trimmed === rootBasename) return rootNorm;
+    if (rootBasename && trimmed.indexOf(rootBasename + '/') === 0) {
+        return stripTrail(rootNorm + '/' + trimmed.slice(rootBasename.length + 1));
+    }
+    if (trimmed.indexOf(rootNorm.replace(/^\/+/, '') + '/') === 0) {
+        return stripTrail(rootNorm + '/' + trimmed.slice(rootNorm.replace(/^\/+/, '').length + 1));
+    }
+    return stripTrail(p);
 }
 
 function _normalizeDirRow(d) {
@@ -148,7 +170,7 @@ function _renderDirCard(dirData) {
         const cls = parseFloat(pct) > 70 ? 'ud-fill-rose' : parseFloat(pct) > 40 ? 'ud-fill-amber' : 'ud-fill-sky';
         return `
         <div class="ud-path-row">
-            <div class="ud-path-name" title="${d.path}" style="cursor: pointer;">${_shortPath(d.path)}</div>
+            <div class="ud-path-name" title="${_toAbsoluteDisplayPath(d.path)}" style="cursor: pointer;">${_shortPath(_toAbsoluteDisplayPath(d.path))}</div>
             <div class="ud-path-bar-wrap" data-tooltip="${fmt(d.used)} · ${pct}% of user total">
                 <div class="ud-path-bar-fill ${cls}" style="width:${pct}%"></div>
             </div>
@@ -267,7 +289,7 @@ function _renderFileCard(fileData) {
         return `
         <div class="ud-path-row">
             <span class="ud-ext-badge" style="background:${clr}20;color:${clr}">.${ext}</span>
-            <div class="ud-path-name" title="${f.path}" style="cursor: pointer;">${_shortPath(f.path)}</div>
+            <div class="ud-path-name" title="${_toAbsoluteDisplayPath(f.path)}" style="cursor: pointer;">${_shortPath(_toAbsoluteDisplayPath(f.path))}</div>
             <div class="ud-path-bar-wrap" data-tooltip="${fmt(f.size)} · ${pct}% of page total">
                 <div class="ud-path-bar-fill ud-fill-emerald" style="width:${pct}%"></div>
             </div>
@@ -334,6 +356,42 @@ function _formatBytesForInput(bytes) {
     return { val: v, unit: units[i] };
 }
 
+function _renderDropdownOptions(optionsEl, query, reset) {
+    if (!optionsEl) return;
+    const q = (query || '').toLowerCase().trim();
+    const matches = q
+        ? _allUserNames.filter(n => n.toLowerCase().includes(q))
+        : _allUserNames.slice();
+    if (reset) {
+        _dropdownQuery = q;
+        _dropdownShown = 0;
+        optionsEl.innerHTML = '';
+    }
+    const from = _dropdownShown;
+    const batch = matches.slice(from, from + DROPDOWN_PAGE);
+    batch.forEach(name => {
+        const div = document.createElement('div');
+        div.className = 'ud-dropdown-option' + (name === _selectedUser ? ' selected' : '');
+        div.dataset.value = name;
+        div.textContent = name;
+        optionsEl.appendChild(div);
+    });
+    _dropdownShown = from + batch.length;
+    // Show/hide a "no results" message
+    let noRes = optionsEl.querySelector('.ud-dropdown-noresults');
+    if (matches.length === 0) {
+        if (!noRes) {
+            noRes = document.createElement('div');
+            noRes.className = 'ud-dropdown-noresults';
+            noRes.style.cssText = 'padding:10px 14px;font-size:0.82rem;color:var(--text-muted,#94a3b8);';
+            noRes.textContent = 'No users found';
+            optionsEl.appendChild(noRes);
+        }
+    } else if (noRes) {
+        noRes.remove();
+    }
+}
+
 function _renderFilterBar() {
     // Count active advanced filters
     let activeAdv = 0;
@@ -345,7 +403,7 @@ function _renderFilterBar() {
     const maxSizePair = _formatBytesForInput(_currentFilters.maxSize);
 
     const selectedLabel = _selectedUser || 'Select User...';
-    const opts = _allUserNames.map(name =>
+    const opts = _allUserNames.slice(0, DROPDOWN_PAGE).map(name =>
         `<div class="ud-dropdown-option${name === _selectedUser ? ' selected' : ''}" data-value="${name}">${name}</div>`
     ).join('');
     
@@ -482,18 +540,27 @@ function _attachFilterEvents(contentEl, root) {
     const userOptions = contentEl.querySelector('#ud-dropdown-options');
 
     if (userBtn && userList) {
-        const openUser  = () => { userBtn.classList.add('open'); userList.classList.add('visible'); userBtn.setAttribute('aria-expanded', 'true'); userSearch?.focus(); };
-        const closeUser = () => { userBtn.classList.remove('open'); userList.classList.remove('visible'); userBtn.setAttribute('aria-expanded', 'false'); if (userSearch) userSearch.value = ''; _filterUserOptions(''); };
+        const openUser = () => {
+            userBtn.classList.add('open');
+            userList.classList.add('visible');
+            userBtn.setAttribute('aria-expanded', 'true');
+            _renderDropdownOptions(userOptions, '', true);
+            userSearch?.focus();
+        };
+        const closeUser = () => {
+            userBtn.classList.remove('open');
+            userList.classList.remove('visible');
+            userBtn.setAttribute('aria-expanded', 'false');
+            if (userSearch) userSearch.value = '';
+            _dropdownQuery = '';
+        };
         const toggleUser = () => userList.classList.contains('visible') ? closeUser() : openUser();
 
         userBtn.addEventListener('click', e => { e.stopPropagation(); toggleUser(); });
 
-        const _filterUserOptions = (q) => {
-            userOptions?.querySelectorAll('.ud-dropdown-option').forEach(el => {
-                el.classList.toggle('hidden', q.length > 0 && !el.dataset.value.toLowerCase().includes(q.toLowerCase()));
-            });
-        };
-        userSearch?.addEventListener('input', _debounce(e => _filterUserOptions(e.target.value), 120));
+        userSearch?.addEventListener('input', _debounce(e => {
+            _renderDropdownOptions(userOptions, e.target.value, true);
+        }, 150));
 
         userOptions?.addEventListener('click', e => {
             const opt = e.target.closest('.ud-dropdown-option');
@@ -503,14 +570,17 @@ function _attachFilterEvents(contentEl, root) {
             opt.classList.add('selected');
             if (userLabel) { userLabel.textContent = user; userLabel.classList.remove('placeholder'); }
             closeUser();
-            
-            // Allow the user to keep the filter if they switch!
-            // Just update selected user state and render.
             localStorage.setItem('ud_selected_user', user);
             _loadAndRender(user);
         });
-        
-        // Escape keyboard close
+
+        // Scroll-to-bottom loads more
+        userList.addEventListener('scroll', () => {
+            if (userList.scrollTop + userList.clientHeight >= userList.scrollHeight - 40) {
+                _renderDropdownOptions(userOptions, _dropdownQuery, false);
+            }
+        });
+
         userList.addEventListener('keydown', e => { if (e.key === 'Escape') closeUser(); });
     }
 
@@ -1079,6 +1149,8 @@ async function _loadAndRender(user) {
             ]);
         }
 
+        _scanRoot = String((dirData && dirData.scan_root) || (fileData && fileData.scan_root) || _scanRoot || '');
+
         const otherUser = _otherUsers.find(o => o.name === user);
         const noDirBreakdown = (dirData.total_dirs ?? dirData.dirs.length ?? 0) === 0 && (dirData.dirs?.length ?? 0) === 0;
         const noFileBreakdown = (fileData.total_files ?? fileData.files.length ?? 0) === 0 && (fileData.files?.length ?? 0) === 0;
@@ -1215,6 +1287,7 @@ async function _goToPageFile(root, page, allowFallback = true) {
             const next = Number(fileData?.next_cursor ?? 0);
             if (next > 0) _fileCursorByPage[page + 1] = next;
         }
+        _scanRoot = String((fileData && fileData.scan_root) || _scanRoot || '');
         const rows = Array.isArray(fileData?.files) ? fileData.files.map(_normalizeFileRow) : [];
         const fallbackTotal = Math.max(0, fileData.total_files ?? rows.length);
         const totalFiles = Math.max(0, _fileTotalExact ?? fallbackTotal);
@@ -1244,7 +1317,7 @@ async function _goToPageFile(root, page, allowFallback = true) {
                 return `
                 <div class="ud-path-row">
                     <span class="ud-ext-badge" style="background:${clr}20;color:${clr}">.${ext}</span>
-                    <div class="ud-path-name" title="${f.path}" style="cursor: pointer;">${_shortPath(f.path)}</div>
+                    <div class="ud-path-name" title="${_toAbsoluteDisplayPath(f.path)}" style="cursor: pointer;">${_shortPath(_toAbsoluteDisplayPath(f.path))}</div>
                     <div class="ud-path-bar-wrap" data-tooltip="${fmt(f.size)} · ${pct}% of page total">
                         <div class="ud-path-bar-fill ud-fill-emerald" style="width:${pct}%"></div>
                     </div>
@@ -1301,6 +1374,7 @@ async function _goToPageDir(root, page, allowFallback = true) {
             const next = Number(dirData?.next_cursor ?? 0);
             if (next > 0) _dirCursorByPage[page + 1] = next;
         }
+        _scanRoot = String((dirData && dirData.scan_root) || _scanRoot || '');
         const rows = Array.isArray(dirData?.dirs) ? dirData.dirs.map(_normalizeDirRow) : [];
         const fallbackTotal = Math.max(0, dirData.total_dirs ?? rows.length);
         const totalDirs = Math.max(0, _dirTotalExact ?? fallbackTotal);
@@ -1326,7 +1400,7 @@ async function _goToPageDir(root, page, allowFallback = true) {
                 const cls = parseFloat(pct) > 70 ? 'ud-fill-rose' : parseFloat(pct) > 40 ? 'ud-fill-amber' : 'ud-fill-sky';
                 return `
                 <div class="ud-path-row">
-                    <div class="ud-path-name" title="${d.path}" style="cursor: pointer;">${_shortPath(d.path)}</div>
+                    <div class="ud-path-name" title="${_toAbsoluteDisplayPath(d.path)}" style="cursor: pointer;">${_shortPath(_toAbsoluteDisplayPath(d.path))}</div>
                     <div class="ud-path-bar-wrap" data-tooltip="${fmt(d.used)} · ${pct}% of page total">
                         <div class="ud-path-bar-fill ${cls}" style="width:${pct}%"></div>
                     </div>
@@ -1361,31 +1435,41 @@ function _attachPickerEvents(root) {
     const options = root.querySelector('#ud-dropdown-options');
     if (!btn || !list) return;
 
-    const open  = () => { btn.classList.add('open'); list.classList.add('visible'); btn.setAttribute('aria-expanded', 'true'); search?.focus(); };
-    const close = () => { btn.classList.remove('open'); list.classList.remove('visible'); btn.setAttribute('aria-expanded', 'false'); if (search) search.value = ''; _filterOptions(''); };
+    const open = () => {
+        btn.classList.add('open'); list.classList.add('visible');
+        btn.setAttribute('aria-expanded', 'true');
+        _renderDropdownOptions(options, '', true);
+        search?.focus();
+    };
+    const close = () => {
+        btn.classList.remove('open'); list.classList.remove('visible');
+        btn.setAttribute('aria-expanded', 'false');
+        if (search) search.value = '';
+        _dropdownQuery = '';
+    };
     const toggle = () => list.classList.contains('visible') ? close() : open();
 
     btn.addEventListener('click', e => { e.stopPropagation(); toggle(); });
 
-    // Search filter
-    const _filterOptions = (q) => {
-        options?.querySelectorAll('.ud-dropdown-option').forEach(el => {
-            el.classList.toggle('hidden', q.length > 0 && !el.dataset.value.toLowerCase().includes(q.toLowerCase()));
-        });
-    };
-    search?.addEventListener('input', e => _filterOptions(e.target.value));
+    search?.addEventListener('input', _debounce(e => {
+        _renderDropdownOptions(options, e.target.value, true);
+    }, 150));
 
-    // Option click
     options?.addEventListener('click', e => {
         const opt = e.target.closest('.ud-dropdown-option');
         if (!opt) return;
         const user = opt.dataset.value;
-        // Update label + styles
         options.querySelectorAll('.ud-dropdown-option').forEach(el => el.classList.remove('selected'));
         opt.classList.add('selected');
         if (label) { label.textContent = user; label.classList.remove('placeholder'); }
         close();
         _loadAndRender(user);
+    });
+
+    list.addEventListener('scroll', () => {
+        if (list.scrollTop + list.clientHeight >= list.scrollHeight - 40) {
+            _renderDropdownOptions(options, _dropdownQuery, false);
+        }
     });
 
     // Close on outside click

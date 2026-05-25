@@ -650,23 +650,17 @@ export class ChartManager {
             bgColors.push('#334155');
         }
 
-        // Normalize legend naming:
-        // - Rename to "Unknown" only the SYNTHETIC auto-other bucket (team_id === 'group:__other__'
-        //   or no team_id at all — i.e. the raw API "Other" with no group config).
-        // - User-defined groups named "Other" keep their name and team_id intact.
-        // - Drop zero-usage entries.
+        // Merge slices by name. Keep "Other" (scanned users with no team) and
+        // "Unknown" (unscanned gap bytes from totalUsed - sumTeams) as separate slices.
         const mergedTeams = new Map();
         allTeams.forEach((t) => {
             const baseName = String(t?.name || '').trim() || 'Unknown';
-            const isSyntheticOther = t?.team_id === 'group:__other__' ||
-                (t?.team_id === undefined && baseName.toLowerCase() === 'other');
-            const normalizedName = isSyntheticOther ? 'Unknown' : baseName;
-            const key = isSyntheticOther ? 'unknown' : normalizedName.toLowerCase();
+            const key = baseName.toLowerCase();
             const used = Number(t?.used || 0);
             if (!mergedTeams.has(key)) {
                 mergedTeams.set(key, {
                     ...t,
-                    name: normalizedName,
+                    name: baseName,
                     used,
                 });
                 return;
@@ -714,6 +708,12 @@ export class ChartManager {
         // Track which team is currently selected (for toggle)
         this._selectedTeamIdx = null;
 
+        // Hide stale filter badge and reset users chart fingerprint — team data
+        // changed so any previous team selection is no longer valid.
+        const staleBadge = document.getElementById('team-filter-badge');
+        if (staleBadge) staleBadge.style.display = 'none';
+        this._usersFingerprint = null;
+
         this.teamChart = new Chart(ctx, {
             type: 'doughnut',
             plugins: [centerTextPlugin],
@@ -756,20 +756,28 @@ export class ChartManager {
                     this._selectedTeamIdx = idx;
 
                     if (!team || team.team_id === undefined) {
-                        const otherUsers = dataStore.getOtherUsers();
-                        if (otherUsers.length) {
-                            this.renderUsersChart(otherUsers);
-                        } else {
+                        const teamName = String(team?.name ?? 'Unknown');
+                        const isUnscanned = teamName.toLowerCase() === 'unknown';
+                        if (isUnscanned) {
+                            // "Unknown" = unscanned bytes (permission issues, out-of-scope paths) — no user data
                             this._showNoDataUsersChart();
+                        } else {
+                            // "Other" = scanned users with no team assignment
+                            const otherUsers = dataStore.getOtherUsers();
+                            if (otherUsers.length) {
+                                this.renderUsersChart(otherUsers.slice(0, 10));
+                            } else {
+                                this._showNoDataUsersChart();
+                            }
                         }
-                        this._showTeamFilterBadge(team?.name ?? 'Unknown', () => this._clearTeamFilter(dataStore));
+                        this._showTeamFilterBadge(teamName, () => this._clearTeamFilter(dataStore));
                         return;
                     }
 
                     // Named team -> show all its members (empty state if no users assigned).
                     const teamUsers = dataStore.getUsersByTeamId(team.team_id);
                     if (teamUsers.length) {
-                        this.renderUsersChart(teamUsers);
+                        this.renderUsersChart(teamUsers.slice(0, 10));
                     } else {
                         this._showNoDataUsersChart();
                     }

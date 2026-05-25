@@ -1,6 +1,7 @@
 docs/
 .agent/
 *.json
+!package.json
 reports_test/
 reports_test_variant/
 .gitignore

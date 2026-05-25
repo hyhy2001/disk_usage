@@ -242,30 +242,23 @@ export class DataStore {
         const ungroupedSum = ungroupedUsers.reduce((s, u) => s + (u.used || 0), 0);
         let otherTeamId = null;
         if (ungroupedSum > 0) {
-            const otherIdx = distribution.findIndex((g) => String(g?.name || '').trim().toLowerCase() === 'other');
-            if (otherIdx >= 0) {
-                otherTeamId = distribution[otherIdx].team_id || 'group:__other__';
-                const existingMembers = membersByGroup.get(otherTeamId) || [];
-                membersByGroup.set(otherTeamId, existingMembers.concat(ungroupedUsers).sort((a, b) => b.used - a.used));
-                distribution[otherIdx].used = (distribution[otherIdx].used || 0) + ungroupedSum;
-            } else {
-                otherTeamId = 'group:__other__';
-                membersByGroup.set(otherTeamId, ungroupedUsers.slice());
-                distribution.push({
-                    name: 'Other',
-                    used: ungroupedSum,
-                    team_id: otherTeamId,
-                    is_group: true,
-                });
-            }
-        }
-        if (!otherTeamId) {
-            const existingOther = distribution.find((g) => String(g?.name || '').trim().toLowerCase() === 'other');
-            otherTeamId = existingOther?.team_id || null;
+            // Always create a SEPARATE synthetic bucket for unassigned users.
+            // Never merge them into a user-defined group named 'Other' — that
+            // group has its own members and its own slice in the chart.
+            otherTeamId = 'group:__other__';
+            membersByGroup.set(otherTeamId, ungroupedUsers.slice());
+            distribution.push({
+                name: 'Other',
+                used: ungroupedSum,
+                team_id: otherTeamId,
+                is_group: true,
+            });
         }
 
         distribution.sort((a, b) => b.used - a.used);
-        const topConsumers = distribution.slice();
+        const topConsumers = [];
+        usageMap.forEach((used, name) => topConsumers.push({ name, used }));
+        topConsumers.sort((a, b) => b.used - a.used);
         const otherUsers = otherTeamId
             ? (membersByGroup.get(otherTeamId) || []).slice().sort((a, b) => b.used - a.used)
             : [];
@@ -363,23 +356,26 @@ export class DataStore {
             .sort((a, b) => b.used - a.used);
     }
 
-    /** Return other_usage (system/unregistered users), sorted by usage desc */
+    /** Return users not assigned to any team (no team_id) + other_usage entries */
     getOtherUsers() {
-        if (this.groupedView?.otherUsers) {
-            return this.groupedView.otherUsers.slice().sort((a, b) => b.used - a.used);
+        if (this.groupedView) {
+            const unassigned = this.groupedView.ungroupedUsers || [];
+            return unassigned.slice().sort((a, b) => b.used - a.used);
         }
-        if (!this.latestSnapshot || !this.latestSnapshot.other) return [];
-        return this.latestSnapshot.other.slice().sort((a, b) => b.used - a.used);
+        if (!this.latestSnapshot) return [];
+        const unassignedUsers = (this.latestSnapshot.users || []).filter(u => u.team_id === undefined);
+        const otherUsage = this.latestSnapshot.other || [];
+        return [...unassignedUsers, ...otherUsage].sort((a, b) => b.used - a.used);
     }
 
-    getTopConsumers(limit = 10) {
+    getTopConsumers(limit = Number.MAX_SAFE_INTEGER) {
         if (this.groupedView?.topConsumers?.length) {
             return this.groupedView.topConsumers.slice().sort((a, b) => b.used - a.used).slice(0, limit);
         }
         return this.getTopUsers(limit);
     }
 
-    getTopUsers(limit = 10) {
+    getTopUsers(limit = Number.MAX_SAFE_INTEGER) {
         if (!this.latestSnapshot) return [];
         const combined = [
             ...(this.latestSnapshot.users || []),

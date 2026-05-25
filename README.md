@@ -193,6 +193,24 @@ cd disk_usage
 # http://your-server/disk_usage/
 ```
 
+### Frontend build (optional, local/dev)
+
+Use the local Node build script to regenerate minified JS/CSS bundles:
+
+```bash
+# Install dev dependency
+npm install
+
+# Build minified assets
+npm run build
+```
+
+Watch mode is also available:
+
+```bash
+npm run build:watch
+```
+
 ### `disks.json` format
 
 ```json

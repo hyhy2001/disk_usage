@@ -71,8 +71,43 @@ function escHtml(s) {
         .replace(/"/g, '&quot;');
 }
 
+function toAbsoluteDisplayPath(path) {
+    const rootFullPath = (_rootNode && _rootNode.path) ? String(_rootNode.path) : '';
+    if (!rootFullPath) return path || '';
+    const rootNorm = rootFullPath.replace(/\/+$/, '');
+    const rootBasename = rootNorm.replace(/^\/+/, '').split('/').pop();
+    if (!path) return rootNorm;
+    const trimmed = String(path).replace(/^\/+/, '').replace(/\/+$/, '');
+    if (trimmed === '') return rootNorm;
+    // Already absolute (matches the full scan_root) — return as-is.
+    if (trimmed === rootNorm.replace(/^\/+/, '') || trimmed === rootBasename) return rootNorm;
+    if (rootBasename && trimmed.indexOf(rootBasename + '/') === 0) {
+        return rootNorm + '/' + trimmed.slice(rootBasename.length + 1);
+    }
+    if (trimmed.indexOf(rootNorm.replace(/^\/+/, '') + '/') === 0) {
+        // Already contains the absolute path stem — re-anchor with the leading slash.
+        return rootNorm + '/' + trimmed.slice(rootNorm.replace(/^\/+/, '').length + 1);
+    }
+    // Path doesn't sit under the scan root — return verbatim rather than guess.
+    return path;
+}
+
 function sortByValueDesc(a, b) {
     return (b.value || 0) - (a.value || 0);
+}
+
+function highlightMatch(text, query) {
+    const safe = escHtml(text);
+    const q = (query || '').trim();
+    if (!q) return safe;
+    // Build a case-insensitive regex on the escaped query, escaping regex metachars.
+    const escQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    try {
+        const re = new RegExp('(' + escQ + ')', 'gi');
+        return safe.replace(re, '<mark class="tmx-hl">$1</mark>');
+    } catch (_) {
+        return safe;
+    }
 }
 
 function getNodeTypeLabel(node) {
@@ -89,7 +124,8 @@ function setMeta(node, source) {
         el.textContent = 'No node selected';
         return;
     }
-    el.textContent = (node.path || node.name || '-') + ' • ' + fmt(node.value || 0) + (source ? (' • source: ' + source) : '');
+    const displayPath = toAbsoluteDisplayPath(node.path) || node.name || '-';
+    el.textContent = displayPath + ' • ' + fmt(node.value || 0) + (source ? (' • source: ' + source) : '');
 }
 
 function getNodeState(node) {
@@ -119,12 +155,30 @@ function getChain(node) {
 }
 
 function buildVirtualChainFromPath(path) {
-    if (!path || path === '/') return [{ name: '/', path: '/', __tmVirtualRoot: true }];
-    const parts = String(path).split('/').filter(function(p) { return p !== ''; });
-    const chain = [{ name: '/', path: '/', __tmVirtualRoot: true }];
-    let acc = '';
+    const rootFullPath = (_rootNode && _rootNode.path) ? String(_rootNode.path).replace(/^\/+|\/+$/g, '') : '';
+    // Item paths from the API are relative to the scan-root parent, so they
+    // start with the BASENAME of the scan root (e.g. "disk.hydev.me/kiro-rs"),
+    // not the absolute path. Strip the basename to get the path inside scan root.
+    const rootBasename = rootFullPath ? rootFullPath.split('/').pop() : '';
+    const rootEntry = _rootNode || { name: rootFullPath || '/', path: rootFullPath, __tmVirtualRoot: true };
+    if (!path) return [rootEntry];
+    const trimmed = String(path).replace(/^\/+|\/+$/g, '');
+    if (trimmed === '' || trimmed === rootBasename || trimmed === rootFullPath) return [rootEntry];
+
+    let rest = trimmed;
+    if (rootBasename && (trimmed === rootBasename || trimmed.indexOf(rootBasename + '/') === 0)) {
+        rest = trimmed.slice(rootBasename.length).replace(/^\/+/, '');
+    } else if (rootFullPath && trimmed.indexOf(rootFullPath + '/') === 0) {
+        rest = trimmed.slice(rootFullPath.length).replace(/^\/+/, '');
+    }
+
+    const parts = rest.split('/').filter(function(p) { return p !== ''; });
+    const chain = [rootEntry];
+    // Build child paths in the API's path-space (relative to scan-root parent),
+    // so clicking a crumb matches the same path format used elsewhere.
+    let acc = rootBasename;
     for (let i = 0; i < parts.length; i++) {
-        acc += '/' + parts[i];
+        acc = acc ? acc + '/' + parts[i] : parts[i];
         chain.push({
             name: parts[i],
             path: acc,
@@ -228,22 +282,22 @@ async function fetchShardPage(shardId, offset, limit) {
     return _inflight[key];
 }
 
-async function fetchSearchPage(query, offset, limit) {
+async function fetchSearchPage(query, offset, limit, under) {
     if (!_diskId || !query) return { items: [], total: 0, has_more: false, source: 'none' };
 
-    const key = query + ':' + offset + ':' + limit;
+    const underKey = under ? ':under=' + under : '';
+    const key = query + ':' + offset + ':' + limit + underKey;
     if (_searchPageCache[key]) return _searchPageCache[key];
     if (_searchInflight[key]) return _searchInflight[key];
 
     _searchInflight[key] = (async function() {
         try {
-            const res = await fetch(
-                'api.php?id=' + encodeURIComponent(_diskId) +
+            let url = 'api.php?id=' + encodeURIComponent(_diskId) +
                 '&type=treemap_search&q=' + encodeURIComponent(query) +
                 '&offset=' + encodeURIComponent(offset) +
-                '&limit=' + encodeURIComponent(limit),
-                { cache: 'no-store' }
-            );
+                '&limit=' + encodeURIComponent(limit);
+            if (under) url += '&under=' + encodeURIComponent(under);
+            const res = await fetch(url, { cache: 'no-store' });
             const text = await res.text();
             let json;
             try {
@@ -329,7 +383,10 @@ async function loadMoreGlobalSearch() {
 
     _searchState.loading = true;
     try {
-        const data = await fetchSearchPage(q, _searchState.offset, SEARCH_PAGE_SIZE);
+        const under = (_currentNode && _currentNode.shard_id && _rootNode && _currentNode.shard_id !== _rootNode.shard_id)
+            ? _currentNode.shard_id
+            : '';
+        const data = await fetchSearchPage(q, _searchState.offset, SEARCH_PAGE_SIZE, under);
         const batch = Array.isArray(data.items) ? data.items : [];
         _searchState.items = _searchState.items.concat(batch);
         _searchState.offset += batch.length;
@@ -355,20 +412,31 @@ function mapSearchHitToNode(hit) {
 }
 
 function buildLinkedVirtualChainForPath(path) {
-    // Build chain up to the PARENT of path (not including path itself)
-    const trimmed = String(path || '').replace(/\/$/, '');
+    // Build chain up to the PARENT of path (not including path itself).
+    // Stops at the scan root — never builds ancestors above _rootNode.
+    // Item paths from the API are relative to the scan-root parent, so they
+    // start with the BASENAME of the scan root, not the absolute path.
+    const rootFullPath = (_rootNode && _rootNode.path) ? String(_rootNode.path).replace(/^\/+|\/+$/g, '') : '';
+    const rootBasename = rootFullPath ? rootFullPath.split('/').pop() : '';
+    const trimmed = String(path || '').replace(/^\/+|\/+$/g, '');
     const lastSlash = trimmed.lastIndexOf('/');
-    const parentPath = lastSlash <= 0 ? '/' : trimmed.substring(0, lastSlash);
+    if (lastSlash < 0) return _rootNode || null;
+    const parentPath = trimmed.substring(0, lastSlash);
+    if (!parentPath || parentPath === rootBasename || parentPath === rootFullPath) return _rootNode || null;
 
-    if (!parentPath || parentPath === '/') {
-        return _rootNode || null;
+    let rest = parentPath;
+    if (rootBasename && (parentPath === rootBasename || parentPath.indexOf(rootBasename + '/') === 0)) {
+        rest = parentPath.slice(rootBasename.length).replace(/^\/+/, '');
+    } else if (rootFullPath && parentPath.indexOf(rootFullPath + '/') === 0) {
+        rest = parentPath.slice(rootFullPath.length).replace(/^\/+/, '');
     }
+    if (!rest) return _rootNode || null;
 
-    const parts = parentPath.split('/').filter(function(p) { return p !== ''; });
+    const parts = rest.split('/').filter(function(p) { return p !== ''; });
     let parent = _rootNode || null;
-    let acc = '';
+    let acc = rootBasename;
     for (let i = 0; i < parts.length; i++) {
-        acc += '/' + parts[i];
+        acc = acc ? acc + '/' + parts[i] : parts[i];
         parent = {
             name: parts[i],
             path: acc,
@@ -442,11 +510,21 @@ function renderSearchDropdown() {
     let html = '';
     _searchState.items.forEach(function(hit, idx) {
         const label = hit.name || hit.path || 'node';
-        const fullPath = hit.path || '/';
+        const absPath = toAbsoluteDisplayPath(hit.path) || hit.path || '/';
+        const lastSlash = absPath.lastIndexOf('/');
+        const parentPath = lastSlash > 0 ? absPath.slice(0, lastSlash) : absPath;
+        const sizeStr = fmt(Number(hit.value || hit.size || 0));
+        const owner = hit.owner || '';
         html +=
             '<button type="button" class="tmx-search-option" data-idx="' + idx + '">' +
-                '<span class="tmx-search-option-name">' + escHtml(label) + '</span>' +
-                '<span class="tmx-search-option-path">' + escHtml(fullPath) + '</span>' +
+                '<span class="tmx-search-option-top">' +
+                    '<span class="tmx-search-option-name">' + highlightMatch(label, q) + '</span>' +
+                    '<span class="tmx-search-option-size">' + escHtml(sizeStr) + '</span>' +
+                '</span>' +
+                '<span class="tmx-search-option-meta">' +
+                    '<span class="tmx-search-option-path">' + highlightMatch(parentPath, q) + '</span>' +
+                    (owner ? '<span class="tmx-search-option-owner">' + escHtml(owner) + '</span>' : '') +
+                '</span>' +
             '</button>';
     });
 
@@ -460,6 +538,19 @@ function renderSearchDropdown() {
             pickSearchHit(_searchState.items[idx]);
         });
     });
+
+    // Auto load-more on scroll-to-bottom
+    if (!box._tmxScrollBound) {
+        box._tmxScrollBound = true;
+        box.addEventListener('scroll', async function() {
+            if (_searchState.loading) return;
+            if (!_searchState.hasMore) return;
+            if (box.scrollTop + box.clientHeight >= box.scrollHeight - 40) {
+                await loadMoreGlobalSearch();
+                renderSearchDropdown();
+            }
+        });
+    }
 }
 
 function renderList(node) {
@@ -602,7 +693,8 @@ async function renderCurrentNode() {
     if (titleEl) {
         const loaded = st.children.length;
         const total = st.total || loaded;
-        titleEl.textContent = (node.path || node.name || '/') + ' (' + loaded + '/' + total + ')';
+        const displayPath = toAbsoluteDisplayPath(node.path) || node.name || '/';
+        titleEl.textContent = displayPath + ' (' + loaded + '/' + total + ')';
     }
 
     renderList(node);

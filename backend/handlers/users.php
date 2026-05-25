@@ -23,7 +23,7 @@ function api_users_from_detail_db($disk_path) {
         $pdo = new PDO('sqlite:' . $db);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->exec('PRAGMA query_only=1');
-        $rows = $pdo->query("SELECT username FROM users WHERE username NOT LIKE 'uid-%' ORDER BY username")->fetchAll(PDO::FETCH_COLUMN);
+        $rows = $pdo->query("SELECT username FROM users ORDER BY username")->fetchAll(PDO::FETCH_COLUMN);
     } catch (Exception $e) {
         return array();
     }

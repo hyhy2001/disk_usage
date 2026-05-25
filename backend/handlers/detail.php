@@ -170,29 +170,40 @@ function api_detail_dir_rows_keyword($pdo, $uid, $offset, $limit, $filters, $nee
     try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($exec_bind);
-        $candidates = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
         return array('rows' => array(), 'total' => 0, 'has_more' => false);
     }
-    if (empty($candidates)) {
-        return array('rows' => array(), 'total' => 0, 'has_more' => false);
-    }
-
-    $dir_ids = array();
-    foreach ($candidates as $r) $dir_ids[] = (int)$r['dir_id'];
-    api_detail_resolve_paths($pdo, $dir_ids);
 
     $rows = array();
     $matched = 0;
-    foreach ($candidates as $r) {
-        $path = api_detail_path_for($pdo, (int)$r['dir_id']);
-        // Post-filter on full path so ancestor-segment matches work.
-        if (!api_detail_keyword_match($path, $needle)) continue;
-        $matched++;
-        if ($matched <= $offset) continue;
-        if (count($rows) >= $limit) continue;
-        $rows[] = array('path' => $path, 'used' => (int)$r['size'], 'files' => (int)$r['files']);
+    $batch = array();
+    $batch_size = 512;
+
+    // Stream rows in batches to avoid loading all candidates into memory (OOM fix).
+    // Mirrors the pattern in api_detail_file_rows_keyword_fallback.
+    $flush = function() use (&$batch, &$rows, &$matched, $needle, $offset, $limit, $pdo) {
+        if (empty($batch)) return;
+        $dir_ids = array();
+        foreach ($batch as $r) $dir_ids[] = (int)$r['dir_id'];
+        api_detail_resolve_paths($pdo, $dir_ids);
+        foreach ($batch as $r) {
+            $path = api_detail_path_for($pdo, (int)$r['dir_id']);
+            if (!api_detail_keyword_match($path, $needle)) continue;
+            $matched++;
+            if ($matched <= $offset) continue;
+            if (count($rows) < $limit) {
+                $rows[] = array('path' => $path, 'used' => (int)$r['size'], 'files' => (int)$r['files']);
+            }
+        }
+        $batch = array();
+    };
+
+    while (($r = $stmt->fetch(PDO::FETCH_ASSOC)) !== false) {
+        $batch[] = $r;
+        if (count($batch) >= $batch_size) $flush();
     }
+    $flush();
+
     return array('rows' => $rows, 'total' => $matched, 'has_more' => $matched > ($offset + count($rows)));
 }
 
@@ -482,6 +493,7 @@ function api_detail_keyword_match($path, $q) {
 function api_detail_empty_dir($who, $offset, $limit) {
     return array(
         'date' => 0, 'user' => $who, 'total_dirs' => 0, 'total_dirs_full' => 0,
+        'scan_root' => '',
         'total_used' => 0, 'offset' => $offset, 'limit' => $limit,
         'has_more' => false, 'dirs' => array(),
     );
@@ -490,6 +502,7 @@ function api_detail_empty_dir($who, $offset, $limit) {
 function api_detail_empty_file($who, $offset, $limit) {
     return array(
         'date' => 0, 'user' => $who, 'total_files' => 0, 'total_files_full' => 0,
+        'scan_root' => '',
         'total_used' => 0, 'offset' => $offset, 'limit' => $limit,
         'has_more' => false, 'files' => array(),
     );
@@ -515,6 +528,7 @@ function api_handle_dirs($disk_path) {
     $result = api_detail_dir_rows($pdo, (int)$user['uid'], $offset, $limit, api_detail_filters(false));
     $payload = array(
         'date' => (int)api_detail_meta($pdo, 'scan_timestamp'),
+        'scan_root' => api_detail_meta($pdo, 'scan_root'),
         'user' => $who,
         'total_dirs' => (int)$result['total'],
         'total_dirs_full' => (int)$user['total_dirs'],
@@ -548,6 +562,7 @@ function api_handle_files($disk_path) {
     $result = api_detail_file_rows($pdo, (int)$user['uid'], $offset, $limit, api_detail_filters(true));
     $payload = array(
         'date' => (int)api_detail_meta($pdo, 'scan_timestamp'),
+        'scan_root' => api_detail_meta($pdo, 'scan_root'),
         'user' => $who,
         'total_files' => (int)$result['total'],
         'total_files_full' => (int)$user['total_files'],
@@ -591,6 +606,7 @@ function api_handle_detail($disk_path) {
         $dr = api_detail_dir_rows($pdo, $uid, $dir_offset, $limit, api_detail_filters(false));
         $dir = array(
             'date' => $scan_ts, 'user' => $who,
+            'scan_root' => api_detail_meta($pdo, 'scan_root'),
             'total_dirs' => (int)$dr['total'],
             'total_dirs_full' => (int)$user['total_dirs'],
             'total_used' => (int)$user['total_size'],
@@ -604,6 +620,7 @@ function api_handle_detail($disk_path) {
         $fr = api_detail_file_rows($pdo, $uid, $file_offset, $limit, api_detail_filters(true));
         $file = array(
             'date' => $scan_ts, 'user' => $who,
+            'scan_root' => api_detail_meta($pdo, 'scan_root'),
             'total_files' => (int)$fr['total'],
             'total_files_full' => (int)$user['total_files'],
             'total_used' => (int)$user['total_size'],
