@@ -1604,9 +1604,12 @@ async function _startUserCsvExport(kind) {
                 } else if (kind === 'dirs') {
                     dirCursor = Number(payload?.next_cursor ?? dirCursor ?? 0);
                 }
-                totalHint = kind === 'dirs'
-                    ? (payload?.total_dirs ?? totalHint ?? 0)
-                    : (payload?.total_files ?? totalHint ?? 0);
+                // Use total_files_full/total_dirs_full (from users table) as hint
+                // since total_files/total_dirs is -1 (backend skips COUNT).
+                const rawHint = kind === 'dirs'
+                    ? (payload?.total_dirs_full ?? payload?.total_dirs ?? null)
+                    : (payload?.total_files_full ?? payload?.total_files ?? null);
+                if (rawHint !== null && Number(rawHint) > 0) totalHint = Number(rawHint);
 
                 offset += rows.length;
                 const hasMore = !!payload?.has_more;
