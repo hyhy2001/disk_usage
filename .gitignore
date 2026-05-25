@@ -24,6 +24,7 @@ detail_users/
 database/*.db
 *.sqlite
 *.sqlite3
+_demo_out/
 
 # Local docs/notes
 system_architecture.md
