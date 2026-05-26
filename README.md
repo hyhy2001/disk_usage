@@ -36,11 +36,12 @@ which generates the JSON reports this dashboard consumes.
 - **User picker dropdown** — searchable, lists all users (configured + system UIDs)
 - **Directory card** — top directories sorted by size with colour-coded bars and CSV export
 - **File card** — files sorted by size with extension badges
-- **Cursor pagination** — Next/Prev navigation with O(limit) keyset queries; no page numbers, no total count needed
+- **Cursor pagination** — Next/Prev navigation with O(limit) keyset queries
+- **Page indicator** — pill-shaped "Page N" indicator between Prev/Next buttons (no total count, no jump-to-page)
 - **SQLite-backed PHP API** — reads `detail_users/data_detail.db` with cursor-based keyset pagination
 - **Keyword search** — LIKE-based filter on file basename or directory path (comma-separated multi-term)
 - **Advanced filters** — extension filter, min/max size range
-- **CSV export** — streaming gzip export for dirs or files with progress indicator
+- **CSV export** — streaming gzip export for dirs or files with progress indicator. Paths are normalized to absolute form (reconstructed from `scan_root` when DB stores relative paths)
 - **Beta notice banner** — dismissible session-persistent notice (stored in `sessionStorage`)
 
 ### Permission Issues Tab
@@ -82,6 +83,8 @@ which generates the JSON reports this dashboard consumes.
 - **Micro-animations** — hover lifts, skeleton loading states, fade-in transitions
 - **SVG icons only** — no emoji, consistent cross-platform rendering
 - **Accessible** — ARIA roles, keyboard navigation, focus-visible indicators
+- **Container queries**: History and Permission Issues tabs use container queries to stack layouts at narrow widths. Tab pane heights and overflow are reset when stacking so charts/lists don't get clipped.
+- **User filter box**: max-height clamped to `min(60dvh, 480px)` at narrow widths so it doesn't dominate the screen.
 
 ---
 
@@ -294,7 +297,7 @@ Each `path` directory should contain:
 | `meta` | `key`, `value` | scan_root, scan_timestamp |
 | `users` | `uid`, `username`, `team_id`, `total_files`, `total_dirs`, `total_size`, `permission_issues`, `is_target` | Per-user metadata and totals |
 | `file_names` | `id`, `name` | Unique file basename dictionary |
-| `dirs` | `id`, `uid`, `parent_id`, `path`, `owner_uid`, `size`, `files` | Directory rows — one per (dir, user) pair. `path` is pre-computed absolute. PK: `(id, uid)` |
+| `dirs` | `id`, `uid`, `parent_id`, `path`, `owner_uid`, `size`, `files` | Directory rows — one per (dir, user) pair. `path` is absolute when DB is built fresh; when relative, frontend reconstructs from `scan_root`. PK: `(id, uid)` |
 | `files` | `dir_id`, `name_id`, `ext`, `uid`, `size` | File rows — `ext` stored inline (no dictionary) |
 
 Indexes (keyset-pagination optimized):
@@ -312,6 +315,12 @@ Indexes (keyset-pagination optimized):
 | `names` | `id`, `name` | Directory segment dictionary |
 | `owners` | `uid`, `username` | UID → username mapping |
 | `dirs` | `id`, `parent_id`, `name_id`, `total_size`, `file_count`, `dir_count`, `owner_uid`, `has_files` | Full directory tree (all depths) |
+
+### Backend reliability
+
+- **Chunked `dir_id` lookup**: when resolving paths for large export pages, `dir_id IN (...)` queries are chunked to 500 IDs per query to stay well under SQLite's 32766 binding limit. Without chunking, exports of 50K+ rows would silently lose path data, leaving only basenames.
+- **Cursor pagination** in `detail.php` uses `(size, dir_id, name_id)` for files and `(size, id)` for dirs, with all WHERE clauses crafted to hit the corresponding covering keyset index. Page fetch is O(limit) regardless of total row count.
+- **Keyword search** uses `LIKE` against `file_names.name` (covered by `ix_file_names_name`) for files, and `LIKE` on `dirs.path` for dirs. Multi-token queries are OR'd via `api_keyword_like_clause`.
 
 ---
 
