@@ -77,8 +77,24 @@ function _extColor(ext) {
 }
 
 function _toAbsoluteDisplayPath(p) {
-    if (!p) return String(_scanRoot || '').replace(/\/+$/, '');
-    return String(p).replace(/\/+$/, '');
+    const strip = (s) => String(s || '').replace(/\/+$/, '');
+    if (!p) return strip(_scanRoot);
+    const path = String(p).replace(/\/+$/, '');
+    // Already absolute
+    if (path.startsWith('/')) return path;
+    // Relative path from DB starts with scan root basename (e.g. "def/pathA")
+    // Reconstruct absolute: /abc/def + /pathA
+    if (_scanRoot) {
+        const rootNorm = strip(_scanRoot);
+        const rootBasename = rootNorm.split('/').pop();
+        if (rootBasename && path === rootBasename) return rootNorm;
+        if (rootBasename && path.startsWith(rootBasename + '/')) {
+            return rootNorm + '/' + path.slice(rootBasename.length + 1);
+        }
+        // No basename prefix — just join
+        return rootNorm + '/' + path;
+    }
+    return path;
 }
 
 function _normalizeDirRow(d) {
