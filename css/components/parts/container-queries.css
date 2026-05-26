@@ -76,10 +76,6 @@
         grid-template-columns: 1fr !important;
     }
 
-    /* Perm items: hide some columns to save space */
-    .perm-item {
-        grid-template-columns: 20px 90px 1fr 1fr !important;
-    }
 }
 
 /* ── ≤ 560px content: compact everything ────────────────────────────────── */
@@ -127,20 +123,6 @@
         width: 100%;
     }
 
-    /* Perm flat list: simple 2-col */
-    .perm-item {
-        grid-template-columns: 20px 1fr !important;
-        gap: 6px;
-    }
-
-    .perm-user-badge,
-    .perm-item-type {
-        display: none;
-    }
-
-    .perm-item-error {
-        display: none;
-    }
 }
 
 /* ── ≤ 400px content: absolute minimum ──────────────────────────────────── */

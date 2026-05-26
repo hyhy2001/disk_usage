@@ -68,30 +68,6 @@
 }
 
 /* -------------------------------------------------------------------------
-   C4 -- perm-item: 4-column grid overflows at 640px
-   ------------------------------------------------------------------------- */
-@media (max-width: 640px) {
-    .perm-item {
-        grid-template-columns: 22px 1fr;
-        grid-template-rows: auto auto;
-        gap: 4px 8px;
-    }
-    .perm-item-type {
-        grid-column: 2;
-        justify-self: start;
-    }
-    .perm-item-error {
-        grid-column: 1 / -1;
-        font-size: 0.68rem;
-        padding-left: 2px;
-    }
-}
-@media (max-width: 480px) {
-    .perm-item { font-size: 0.72rem; padding: 5px 6px; }
-    .perm-item-path { font-size: 0.67rem; }
-}
-
-/* -------------------------------------------------------------------------
    C5 -- history-timerange: date inputs don't wrap at 480px
    ------------------------------------------------------------------------- */
 @media (max-width: 640px) {

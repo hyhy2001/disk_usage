@@ -1268,17 +1268,6 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
         min-height: 200px;
     }
 
-    /* perm items hide columns */
-    .perm-item {
-        grid-template-columns: 20px 1fr;
-    }
-
-    .perm-user-badge,
-    .perm-item-type,
-    .perm-item-error {
-        display: none;
-    }
-
     /* range buttons smaller */
     .range-btn {
         padding: 5px 7px;
@@ -1333,42 +1322,7 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
     }
 }
 
-/* ── Permission Issues: perm-item grid collapse ──────────────────────────── */
-@container main (max-width: 700px) {
-    /* 4-col → icon + path only, type below */
-    .perm-item {
-        grid-template-columns: 22px 1fr auto;
-        gap: 4px 8px;
-    }
 
-    /* Move error under path */
-    .perm-item-error {
-        grid-column: 2 / -1;
-        font-size: 0.68rem;
-    }
-}
-
-@container main (max-width: 520px) {
-    /* icon + path + type stacked */
-    .perm-item {
-        grid-template-columns: 22px 1fr;
-        grid-template-rows: auto auto;
-        gap: 3px 8px;
-    }
-
-    .perm-item-type {
-        grid-column: 2;
-        justify-self: start;
-        font-size: 0.62rem;
-        padding: 1px 5px;
-    }
-
-    .perm-item-error {
-        grid-column: 1 / -1;
-        font-size: 0.66rem;
-        padding-left: 4px;
-    }
-}
 
 /* ── Permission summary bar (3 stats) wraps on narrow ───────────────────── */
 @container main (max-width: 480px) {
