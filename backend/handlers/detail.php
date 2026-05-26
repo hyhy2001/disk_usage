@@ -283,18 +283,21 @@ function api_detail_format_files_page($pdo, $page) {
     if (empty($page)) {
         return array();
     }
-    // Batch resolve dir_id → path from dirs table
+    // Batch resolve dir_id → path from dirs table.
+    // Chunk to 500 to stay well under SQLite's 32766 binding limit.
     $dir_ids = array_values(array_unique(array_map(function($r) { return (int)$r['dir_id']; }, $page)));
     $path_map = array();
     if (!empty($dir_ids)) {
-        $place = implode(',', array_fill(0, count($dir_ids), '?'));
-        try {
-            $stmt = $pdo->prepare('SELECT DISTINCT id, path FROM dirs WHERE id IN (' . $place . ')');
-            $stmt->execute($dir_ids);
-            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-                $path_map[(int)$r['id']] = (string)$r['path'];
-            }
-        } catch (Exception $e) {}
+        foreach (array_chunk($dir_ids, 500) as $chunk) {
+            $place = implode(',', array_fill(0, count($chunk), '?'));
+            try {
+                $stmt = $pdo->prepare('SELECT DISTINCT id, path FROM dirs WHERE id IN (' . $place . ')');
+                $stmt->execute($chunk);
+                foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $path_map[(int)$r['id']] = (string)$r['path'];
+                }
+            } catch (Exception $e) {}
+        }
     }
     $rows = array();
     foreach ($page as $r) {
