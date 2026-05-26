@@ -24,6 +24,26 @@
 
 /* ── ≤ 720px content: flex-heavy layouts collapse ────────────────────────── */
 @container main (max-width: 720px) {
+    /* Reset desktop fixed-height + overflow when layout stacks */
+    #tab-pane-history.detail-tab-pane.active,
+    #tab-pane-permissions.detail-tab-pane.active {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    #tab-pane-history .history-layout,
+    #tab-pane-permissions #permissions-body {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    .history-main-row {
+        overflow: visible !important;
+    }
+    .history-content {
+        overflow: visible !important;
+    }
+
     /* History filter + charts stack */
     .history-main-row {
         flex-direction: column;

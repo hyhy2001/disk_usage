@@ -484,6 +484,26 @@
 /* - History tab responsive - */
 /* Container query: collapse when content area < 680px */
 @container main (max-width: 680px) {
+    /* Reset desktop fixed-height + overflow when layout stacks */
+    #tab-pane-history.detail-tab-pane.active,
+    #tab-pane-permissions.detail-tab-pane.active {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    #tab-pane-history .history-layout,
+    #tab-pane-permissions #permissions-body {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    .history-main-row {
+        overflow: visible !important;
+    }
+    .history-content {
+        overflow: visible !important;
+    }
+
     .history-main-row {
         flex-direction: column;
     }
@@ -512,6 +532,26 @@
 
 /* Viewport fallback -> Container query for robust internal wrapping */
 @container canvas (max-width: 900px) {
+    /* Reset desktop fixed-height + overflow when layout stacks */
+    #tab-pane-history.detail-tab-pane.active,
+    #tab-pane-permissions.detail-tab-pane.active {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    #tab-pane-history .history-layout,
+    #tab-pane-permissions #permissions-body {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    .history-main-row {
+        overflow: visible !important;
+    }
+    .history-content {
+        overflow: visible !important;
+    }
+
     .history-main-row {
         flex-direction: column;
     }
