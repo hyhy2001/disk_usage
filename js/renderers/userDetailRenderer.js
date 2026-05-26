@@ -1443,13 +1443,13 @@ async function _startUserCsvExport(kind) {
                     if (kind === 'dirs') {
                         return {
                             user: _selectedUser,
-                            path: r?.path || '',
+                            path: _toAbsoluteDisplayPath(r?.path || ''),
                             used: Number(r?.used || 0),
                         };
                     }
                     return {
                         user: _selectedUser,
-                        path: r?.path || '',
+                        path: _toAbsoluteDisplayPath(r?.path || ''),
                         size: Number(r?.size || 0),
                         xt: r?.xt || '',
                     };
