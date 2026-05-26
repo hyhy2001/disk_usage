@@ -51,12 +51,12 @@
 
     .user-filter-box {
         width: 100% !important;
-        max-height: min(50dvh, 360px) !important;
+        max-height: min(60dvh, 480px) !important;
         overflow: hidden;
         align-self: stretch;
     }
     .user-filter-list {
-        max-height: min(38dvh, 280px) !important;
+        max-height: min(48dvh, 380px) !important;
         overflow-y: auto;
     }
 
