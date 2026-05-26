@@ -51,13 +51,13 @@
 
     .user-filter-box {
         width: 100% !important;
-        max-height: min(60dvh, calc(100dvh - 260px));
+        max-height: 220px !important;
         overflow: hidden;
         align-self: stretch;
     }
-
     .user-filter-list {
-        max-height: min(34dvh, 200px);
+        max-height: 160px !important;
+        overflow-y: auto;
     }
 
     .history-chart-card {
