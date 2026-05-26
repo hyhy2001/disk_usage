@@ -24,7 +24,6 @@ function api_dispatch_disk_type($type, $disk_path) {
         'dirs' => 'api_handle_dirs',
         'files' => 'api_handle_files',
         'detail' => 'api_handle_detail',
-        'scan_status' => 'api_handle_scan_status',
     );
     if (!isset($disk_routes[$type])) return false;
     call_user_func($disk_routes[$type], $disk_path);

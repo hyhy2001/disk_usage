@@ -203,21 +203,10 @@ class DataFetcher {
     }
 
     async _fetchScanStatus(diskId) {
-        // Reuse team_scan_status cache when fresh (<6s) — same data, fewer API calls.
-        const TEAM_CACHE_TTL_MS = 6000;
+        // Always use team_scan_status cache — no separate per-disk API call needed.
         const id = String(diskId || '');
-        if (id && this._teamScanCache && this._teamScanCache.has(id)
-                && (Date.now() - this._teamScanCacheTs) < TEAM_CACHE_TTL_MS) {
+        if (id && this._teamScanCache && this._teamScanCache.has(id)) {
             return this._teamScanCache.get(id);
-        }
-        try {
-            // cacheTimeMs: 2000 so rapid clicks don't spam, but updates reasonably fast
-            const json = await this._fetchJson(`api.php?id=${encodeURIComponent(diskId)}&type=scan_status`, { cacheTimeMs: 2000 });
-            if (json?.status === 'success' && json.data) {
-                return json.data;
-            }
-        } catch (_e) {
-            // Ignore errors on background poll
         }
         return null;
     }
