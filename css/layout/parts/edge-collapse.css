@@ -1105,10 +1105,10 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
         display: flex !important;
     }
 
-    .mobile-dropdown-chevron {
+    .mobile-dropdown-toggle {
         display: block !important;
     }
-    
+
     .team-disk-sidebar.expanded .mobile-dropdown-chevron {
         transform: rotate(180deg);
     }

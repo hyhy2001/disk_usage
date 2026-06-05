@@ -51,6 +51,32 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Mobile team-list disclosure. Replaces the former inline onclick on the
+    // <h2> (which was not keyboard-operable and nested interactive content).
+    // Driven by a real <button> so it's focusable + Enter/Space activate it.
+    const teamToggle  = document.getElementById('btn-team-dropdown-toggle');
+    const teamSidebar = document.getElementById('team-disk-sidebar');
+    const teamOverlay = document.getElementById('team-dropdown-overlay');
+    if (teamToggle && teamSidebar) {
+        const setExpanded = (expanded) => {
+            teamSidebar.classList.toggle('expanded', expanded);
+            teamToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        };
+        teamToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setExpanded(!teamSidebar.classList.contains('expanded'));
+        });
+        if (teamOverlay) {
+            teamOverlay.addEventListener('click', () => setExpanded(false));
+        }
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && teamSidebar.classList.contains('expanded')) {
+                setExpanded(false);
+                teamToggle.focus();
+            }
+        });
+    }
+
     window.addEventListener('load', () => {
         setTimeout(() => {
             const perf = performance.getEntriesByType('navigation')[0];
