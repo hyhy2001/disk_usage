@@ -108,7 +108,7 @@
 }
 
 .disk-list::-webkit-scrollbar { width: 4px; }
-.disk-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+.disk-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: var(--radius-xs); }
 
 .disk-search-wrap {
     display: flex;

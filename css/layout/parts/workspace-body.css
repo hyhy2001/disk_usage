@@ -45,7 +45,7 @@
 .header-disk-path {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.78rem;
-    color: #f59e0b;
+    color: var(--amber-500);
     opacity: 0.85;
     letter-spacing: 0.02em;
     white-space: nowrap;

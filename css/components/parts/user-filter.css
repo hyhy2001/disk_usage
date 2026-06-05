@@ -180,12 +180,12 @@
 
 .user-filter-count {
     font-size: 0.7rem;
-    color: #fbbf24;
+    color: var(--amber-400);
     font-weight: 600;
     background: rgba(245,158,11,0.12);
     border: 1px solid rgba(245,158,11,0.3);
     padding: 1px 7px;
-    border-radius: 20px;
+    border-radius: var(--radius-xl);
 }
 
 .user-filter-search {
@@ -249,7 +249,7 @@
 .perm-type-btn.active {
     background: rgba(14,165,233,0.15);
     border-color: rgba(14,165,233,0.4);
-    color: #38bdf8;
+    color: var(--sky-400);
 }
 
 :root[data-theme='light'] .perm-type-btn {
@@ -310,7 +310,7 @@
 
 #tab-pane-permissions .user-filter-list::-webkit-scrollbar-thumb {
     background: rgba(255,255,255,0.18);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
 }
 
 #tab-pane-permissions .user-filter-list::-webkit-scrollbar-track {
@@ -331,7 +331,7 @@
     user-select: none;
 }
 .user-filter-item:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
-.user-filter-item.selected { background: rgba(245,158,11,0.1); color: #fbbf24; }
+.user-filter-item.selected { background: rgba(245,158,11,0.1); color: var(--amber-400); }
 
 .user-filter-check {
     width: 14px;
@@ -348,8 +348,8 @@
     transition: background 0.12s, border-color 0.12s;
 }
 .user-filter-item.selected .user-filter-check {
-    background: #f59e0b;
-    border-color: #f59e0b;
+    background: var(--amber-500);
+    border-color: var(--amber-500);
     color: #000;
 }
 

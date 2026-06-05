@@ -24,7 +24,7 @@
 }
 
 .disk-team-group {
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     margin: 0;
     color: var(--text-primary);
     cursor: pointer;
@@ -149,18 +149,18 @@
 }
 
 .status-dot.idle {
-    background-color: var(--emerald-400, #34d399);
+    background-color: var(--emerald-400, var(--emerald-400));
     box-shadow: 0 0 8px rgba(52, 211, 153, 0.45);
 }
 
 .status-dot.scanning {
-    background-color: var(--amber-400, #fbbf24);
+    background-color: var(--amber-400, var(--amber-400));
     box-shadow: 0 0 10px rgba(251, 191, 36, 0.55);
     animation: pulse-scanning 1.6s ease-in-out infinite;
 }
 
 .status-dot.error {
-    background-color: var(--rose-500, #f43f5e);
+    background-color: var(--rose-500, var(--rose-500));
     box-shadow: 0 0 10px rgba(244, 63, 94, 0.55);
 }
 

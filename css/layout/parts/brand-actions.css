@@ -61,10 +61,10 @@
 }
 .active-sort-btn {
     background: rgba(255,255,255,0.08);
-    color: #38bdf8 !important;
+    color: var(--sky-400) !important;
 }
 :root[data-theme='light'] .active-sort-btn {
     background: rgba(0,0,0,0.06);
-    color: #0ea5e9 !important;
+    color: var(--sky-500) !important;
 }
 

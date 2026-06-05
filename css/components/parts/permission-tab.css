@@ -17,7 +17,7 @@
     flex-wrap: wrap;
 }
 
-.perm-meta-date { color: #f59e0b; font-weight: 500; }
+.perm-meta-date { color: var(--amber-500); font-weight: 500; }
 
 .perm-meta-dir {
     font-family: 'JetBrains Mono', monospace;
@@ -118,9 +118,9 @@
     align-items: center;
     justify-content: center;
     padding: 1px 7px;
-    border-radius: 4px;
+    border-radius: var(--radius-xs);
     background: rgba(56,189,248,0.1);
-    color: #38bdf8;
+    color: var(--sky-400);
     font-size: 0.65rem;
     font-weight: 500;
     border: 1px solid rgba(56,189,248,0.2);
@@ -129,7 +129,7 @@
 
 .perm-item-error {
     font-size: 0.7rem;
-    color: #fb7185;
+    color: var(--rose-400);
     font-style: italic;
     word-break: break-word;
     overflow-wrap: break-word;

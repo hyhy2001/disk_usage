@@ -26,14 +26,97 @@
     /* Layout */
     --sidebar-width: 280px;
     --col2-width: 260px;
-    --border-radius-lg: 16px;
-    --border-radius-md: 12px;
-    --border-radius-sm: 8px;
+    /* Legacy radius names — aliased to the new --radius-* scale below so there
+       is a single source of truth. Existing components keep working. */
+    --border-radius-lg: var(--radius-lg);
+    --border-radius-md: var(--radius-md);
+    --border-radius-sm: var(--radius-sm);
     
     /* Effects */
     --glass-border: 1px solid rgba(255, 255, 255, 0.08);
     --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.36);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* ===================================================================
+       DESIGN SCALE TOKENS  (added G0 — additive only, nothing above changed)
+       Component CSS still hardcodes most of these values; G1 will migrate
+       files onto these vars so a future restyle is a single-file edit.
+       =================================================================== */
+
+    /* Spacing — 4px base, half-steps included to absorb existing 2/6/10/14px */
+    --space-0:   0;
+    --space-px:  1px;
+    --space-0-5: 2px;
+    --space-1:   4px;
+    --space-1-5: 6px;
+    --space-2:   8px;
+    --space-2-5: 10px;
+    --space-3:   12px;
+    --space-3-5: 14px;
+    --space-4:   16px;
+    --space-5:   20px;
+    --space-6:   24px;
+    --space-7:   28px;
+    --space-8:   32px;
+    --space-10:  40px;
+    --space-12:  48px;
+    --space-16:  64px;
+
+    /* Typography */
+    --font-sans: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    --text-2xs:  0.65rem;
+    --text-xs:   0.72rem;
+    --text-sm:   0.8rem;
+    --text-base: 0.875rem;
+    --text-md:   1rem;
+    --text-lg:   1.05rem;  /* current body size */
+    --text-xl:   1.25rem;
+    --text-2xl:  1.5rem;
+    --text-3xl:  1.8rem;
+    --text-4xl:  2rem;
+
+    --leading-tight:   1.2;
+    --leading-normal:  1.5;
+    --leading-relaxed: 1.7;
+
+    --font-normal:   400;
+    --font-medium:   500;
+    --font-semibold: 600;
+    --font-bold:     700;
+
+    /* Radius — keeps the legacy --border-radius-* names working (aliased) */
+    --radius-xs:   4px;
+    --radius-sm:   8px;
+    --radius-md:   12px;
+    --radius-lg:   16px;
+    --radius-xl:   20px;
+    --radius-pill: 999px;
+
+    /* Shadows — 5 scattered recipes consolidated to 3 tiers + a colored glow */
+    --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.30);
+    --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.36);  /* == --glass-shadow */
+    --shadow-lg: 0 32px 80px rgba(0, 0, 0, 0.60);
+    --shadow-glow-emerald: 0 4px 20px rgba(16, 185, 129, 0.15);
+
+    /* Backdrop blur tiers (4–20px in the wild → 3 steps) */
+    --blur-sm: 8px;
+    --blur-md: 16px;
+    --blur-lg: 20px;
+
+    /* Motion — 3 durations + 2 easings (Material standard + spring) */
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1);
+    --duration-fast: 0.15s;
+    --duration-base: 0.25s;
+    --duration-slow: 0.4s;
+
+    /* Amber — used heavily by stat/detail/history components but missing as a
+       token until now (they hardcode #f59e0b / #fbbf24). Added for G1. */
+    --amber-500: #f59e0b;
+    --amber-400: #fbbf24;
+    --amber-100: rgba(245, 158, 11, 0.1);
 }
 
 /* -- Light Theme -------------------------------------------------- */
@@ -50,6 +133,15 @@
     --emerald-100: rgba(16, 185, 129, 0.2);
     --glass-border: 1px solid rgba(15, 23, 42, 0.12);
     --glass-shadow: 0 2px 8px rgba(15,23,42,0.06), 0 0 0 1px rgba(15,23,42,0.05);
+    /* Shadow tiers re-tuned for the light surface (G0 token parity) */
+    --shadow-sm: 0 1px 3px rgba(15,23,42,0.08), 0 0 0 1px rgba(15,23,42,0.04);
+    --shadow-md: 0 4px 16px rgba(15,23,42,0.10), 0 0 0 1px rgba(15,23,42,0.05);
+    --shadow-lg: 0 16px 48px rgba(15,23,42,0.18);
+    --shadow-glow-emerald: 0 4px 20px rgba(5,150,105,0.18);
+    /* Deeper amber for adequate contrast on light backgrounds */
+    --amber-500: #b45309;
+    --amber-400: #d97706;
+    --amber-100: rgba(180, 83, 9, 0.12);
 }
 
 

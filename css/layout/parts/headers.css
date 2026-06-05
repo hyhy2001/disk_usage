@@ -52,7 +52,7 @@
 .range-btn {
     background: transparent;
     border: 1px solid rgba(255,255,255,0.08);
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary, var(--text-secondary));
     font-size: 0.72rem;
     font-weight: 600;
     /* Minimum touch target */
@@ -72,8 +72,8 @@
 
 .range-btn.active {
     background: rgba(245,158,11,0.18);
-    border-color: #f59e0b;
-    color: #f59e0b;
+    border-color: var(--amber-500);
+    color: var(--amber-500);
 }
 
 /* Stats subheader below chart title */
@@ -103,8 +103,8 @@
     font-weight: 600;
 }
 
-.tsh-up   { color: #10b981; }
-.tsh-down { color: #f43f5e; }
+.tsh-up   { color: var(--emerald-500); }
+.tsh-down { color: var(--rose-500); }
 
 .canvas-wrapper {
     flex: 1;

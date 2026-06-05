@@ -57,7 +57,7 @@
 .user-filter-item:focus-visible {
     outline: 2px solid var(--text-accent);
     outline-offset: 1px;
-    border-radius: 4px;
+    border-radius: var(--radius-xs);
 }
 
 /* ── Chart Empty Overlay (IMP-02: remove inline style.cssText) ────────────── */
@@ -79,7 +79,7 @@
     width: 11px;
     height: 11px;
     flex-shrink: 0;
-    color: var(--sky-400, #38bdf8);
+    color: var(--sky-400, var(--sky-400));
     animation: status-spinner-rotate 0.9s linear infinite;
 }
 

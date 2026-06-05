@@ -1,9 +1,40 @@
 <?php
 
-function api_group_cfg_storage_dir() {
-    $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'disk_usage_group_config';
-    if (!is_dir($dir)) @mkdir($dir, 0777, true);
+// Durable storage: lives beside admin.db under {root}/database/, NOT in the
+// system temp dir. /tmp is wiped on reboot and by tmp-cleaners, which would
+// silently destroy every user's group config (the only user-authored state in
+// this otherwise read-only app). Owner-only perms (0700/0600) since each file
+// is private per-identity.
+function api_group_cfg_storage_dir($root_dir) {
+    $dir = $root_dir . DIRECTORY_SEPARATOR . DU_ADMIN_DB_DIRNAME . DIRECTORY_SEPARATOR . 'group_config';
+    if (!is_dir($dir)) @mkdir($dir, 0700, true);
     return $dir;
+}
+
+// Pre-migration location. Kept only so existing configs are moved to the
+// durable dir on first access; nothing new is ever written here.
+function api_group_cfg_legacy_dir() {
+    return sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'disk_usage_group_config';
+}
+
+function api_group_cfg_filename($user_key) {
+    return 'cfg_' . md5((string)$user_key) . '.json';
+}
+
+// One-time best-effort move of a user's config from the legacy temp dir to the
+// durable dir. Runs only when the durable copy does not exist yet, so it's a
+// no-op on every request after the first.
+function api_group_cfg_migrate_legacy($root_dir, $user_key) {
+    $fp = api_group_cfg_path_for_user($root_dir, $user_key);
+    if (is_file($fp)) return;
+    $legacy = api_group_cfg_legacy_dir() . DIRECTORY_SEPARATOR . api_group_cfg_filename($user_key);
+    if (!is_file($legacy)) return;
+    // Ensure the durable dir exists before moving into it.
+    api_group_cfg_storage_dir($root_dir);
+    if (@rename($legacy, $fp) === false) {
+        @copy($legacy, $fp);
+    }
+    @chmod($fp, 0600);
 }
 
 function api_group_cfg_user_identity() {
@@ -64,8 +95,8 @@ function api_group_cfg_user_identity() {
     return 'cookie_' . $uid;
 }
 
-function api_group_cfg_path_for_user($user_key) {
-    return api_group_cfg_storage_dir() . DIRECTORY_SEPARATOR . 'cfg_' . md5((string)$user_key) . '.json';
+function api_group_cfg_path_for_user($root_dir, $user_key) {
+    return api_group_cfg_storage_dir($root_dir) . DIRECTORY_SEPARATOR . api_group_cfg_filename($user_key);
 }
 
 function api_group_cfg_sanitize($payload) {
@@ -121,20 +152,20 @@ function api_group_cfg_sanitize($payload) {
     return $out;
 }
 
-function api_group_cfg_load($user_key) {
-    $fp = api_group_cfg_path_for_user($user_key);
+function api_group_cfg_load($root_dir, $user_key) {
+    $fp = api_group_cfg_path_for_user($root_dir, $user_key);
     $parsed = api_load_json_file($fp);
     return api_group_cfg_sanitize($parsed);
 }
 
-function api_group_cfg_save($user_key, $payload) {
-    $dir = api_group_cfg_storage_dir();
+function api_group_cfg_save($root_dir, $user_key, $payload) {
+    $dir = api_group_cfg_storage_dir($root_dir);
     if (!is_dir($dir) || !is_writable($dir)) {
         b64_error('Server config storage is not writable.', 500);
     }
 
     $clean = api_group_cfg_sanitize($payload);
-    $fp = api_group_cfg_path_for_user($user_key);
+    $fp = api_group_cfg_path_for_user($root_dir, $user_key);
     $tmp = $fp . '.tmp.' . getmypid() . '.' . mt_rand(1000, 9999);
     $json = json_encode($clean);
     if ($json === false) b64_error('Failed to encode config payload.', 500);
@@ -144,13 +175,14 @@ function api_group_cfg_save($user_key, $payload) {
         b64_error('Failed to write server config.', 500);
     }
     @rename($tmp, $fp);
-    @chmod($fp, 0666);
+    @chmod($fp, 0600);
 
     return $clean;
 }
 
 function api_handle_group_config($root_dir) {
     $user_key = api_group_cfg_user_identity();
+    api_group_cfg_migrate_legacy($root_dir, $user_key);
     $action = trim((string)param('action', 'get'));
 
     if ($action === 'save') {
@@ -163,14 +195,14 @@ function api_handle_group_config($root_dir) {
             b64_error('Invalid config JSON payload.', 400);
         }
 
-        $saved = api_group_cfg_save($user_key, $parsed);
+        $saved = api_group_cfg_save($root_dir, $user_key, $parsed);
         b64_success(array(
             'user_key' => $user_key,
             'config' => $saved,
         ));
     }
 
-    $loaded = api_group_cfg_load($user_key);
+    $loaded = api_group_cfg_load($root_dir, $user_key);
     b64_success(array(
         'user_key' => $user_key,
         'config' => $loaded,

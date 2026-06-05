@@ -206,7 +206,7 @@
         flex-basis: 100%;
         padding: 4px 10px;
         border: 1px solid rgba(255,255,255,0.06);
-        border-radius: 8px;
+        border-radius: var(--radius-sm);
         font-size: 0.75rem;
     }
 

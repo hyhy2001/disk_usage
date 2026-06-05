@@ -12,13 +12,13 @@
     /* Solid dark background — no backdrop-filter (causes blur rectangle artifact) */
     background: rgba(10, 14, 22, 0.97);
     border: 1px solid rgba(255, 255, 255, 0.13);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     padding: 6px 11px;
     /* Typography */
     font-size: 0.71rem;
     font-weight: 500;
     font-family: inherit;
-    color: #e2e8f0;
+    color: var(--text-primary);
     letter-spacing: 0.015em;
     line-height: 1.4;
     white-space: pre;

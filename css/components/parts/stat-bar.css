@@ -25,7 +25,7 @@
 
 .unknown-note code {
     font-family: 'JetBrains Mono', monospace;
-    color: #94a3b8;
+    color: var(--text-secondary);
     background: rgba(255,255,255,0.06);
     padding: 1px 5px;
     border-radius: 3px;
@@ -63,12 +63,12 @@
 }
 
 .trend-up {
-    color: #10b981;
+    color: var(--emerald-500);
     background: rgba(16, 185, 129, 0.13);
 }
 
 .trend-down {
-    color: #f43f5e;
+    color: var(--rose-500);
     background: rgba(244, 63, 94, 0.13);
 }
 
@@ -93,7 +93,7 @@
 }
 
 .uc-icon {
-    color: #f59e0b;
+    color: var(--amber-500);
     opacity: 0.8;
     margin-bottom: 8px;
     filter: drop-shadow(0 0 20px rgba(245,158,11,0.3));
@@ -104,8 +104,8 @@
     padding: 4px 14px;
     background: rgba(245, 158, 11, 0.12);
     border: 1px solid rgba(245, 158, 11, 0.3);
-    color: #fbbf24;
-    border-radius: 20px;
+    color: var(--amber-400);
+    border-radius: var(--radius-xl);
     font-size: 0.8rem;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -173,7 +173,7 @@
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #f59e0b;
+    color: var(--amber-500);
     opacity: 0.7;
     white-space: nowrap;
 }
@@ -226,7 +226,7 @@
 .ssb-val {
     font-size: 0.9rem;
     font-weight: 700;
-    color: #f59e0b;
+    color: var(--amber-500);
     font-family: 'JetBrains Mono', monospace;
 }
 
@@ -255,7 +255,7 @@
 
 .ssb-fill {
     height: 100%;
-    background: linear-gradient(90deg, #f59e0b, #f43f5e);
+    background: linear-gradient(90deg, var(--amber-500), var(--rose-500));
     border-radius: 3px;
     width: 0%;
     transition: width 0.8s ease;
@@ -264,7 +264,7 @@
 .ssb-pct {
     font-size: 0.8rem;
     font-weight: 700;
-    color: #f43f5e;
+    color: var(--rose-500);
     font-family: 'JetBrains Mono', monospace;
     white-space: nowrap;
 }
@@ -292,7 +292,7 @@
     min-width: 2px;
 }
 
-.seg-amber { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.seg-amber { background: linear-gradient(90deg, var(--amber-500), var(--amber-400)); }
 .seg-slate  { background: rgba(148,163,184,0.35); }
 
 /* Mini legend in the subrow */
@@ -310,7 +310,7 @@
     flex-shrink: 0;
 }
 
-.dot-amber { background: #f59e0b; }
+.dot-amber { background: var(--amber-500); }
 .dot-slate  { background: rgba(148,163,184,0.5); }
 
 /* Metric card -- Used Space merged with Scan Result */
@@ -324,7 +324,7 @@
 .metric-scan-sub {
     font-size: 2rem;
     font-weight: 700;
-    color: #f59e0b;
+    color: var(--amber-500);
     display: flex;
     align-items: baseline;
     gap: 3px;
@@ -358,7 +358,7 @@
 .stat-subscan {
     font-size: 1.6rem;
     font-weight: 700;
-    color: #f59e0b;
+    color: var(--amber-500);
     font-family: 'JetBrains Mono', monospace;
     letter-spacing: -0.02em;
     white-space: nowrap;

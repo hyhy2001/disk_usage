@@ -17,10 +17,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     background: rgba(245,158,11,0.1);
     border: 1px solid rgba(245,158,11,0.2);
-    color: #f59e0b;
+    color: var(--amber-500);
     margin-bottom: 4px;
     flex-shrink: 0;
 }

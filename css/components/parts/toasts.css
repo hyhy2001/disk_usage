@@ -42,10 +42,10 @@
 }
 
 .toast.toast-warning {
-    border-left-color: #f59e0b;
+    border-left-color: var(--amber-500);
 }
 .toast.toast-warning .toast-icon {
-    color: #f59e0b;
+    color: var(--amber-500);
 }
 
 .toast.toast-exiting {
