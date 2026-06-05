@@ -17,7 +17,7 @@
     flex-wrap: wrap;
 }
 
-.perm-meta-date { color: var(--amber-500); font-weight: 500; }
+.perm-meta-date { color: var(--amber-500); font-weight: var(--font-medium); }
 
 .perm-meta-dir {
     font-family: 'JetBrains Mono', monospace;
@@ -41,14 +41,14 @@
 .perm-summary-num {
     font-family: 'JetBrains Mono', monospace;
     font-size: 1.8rem;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     color: var(--text-primary);
     line-height: 1;
 }
 
 .perm-summary-label {
     font-size: 0.7rem;
-    font-weight: 500;
+    font-weight: var(--font-medium);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--text-secondary);
@@ -76,7 +76,7 @@
 
 .perm-user-name {
     font-size: 0.88rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     color: var(--text-primary);
 }
 
@@ -122,7 +122,7 @@
     background: rgba(56,189,248,0.1);
     color: var(--sky-400);
     font-size: 0.65rem;
-    font-weight: 500;
+    font-weight: var(--font-medium);
     border: 1px solid rgba(56,189,248,0.2);
     white-space: nowrap;
 }

@@ -40,7 +40,7 @@
     background: rgba(255,255,255,0.04);
     color: var(--text-secondary);
     font-size: 0.78rem;
-    font-weight: 500;
+    font-weight: var(--font-medium);
     cursor: pointer;
     transition: all 0.15s;
     letter-spacing: 0.03em;
@@ -48,7 +48,7 @@
 }
 
 .hrange-btn:hover { background: rgba(245,158,11,0.12); border-color: rgba(245,158,11,0.4); color: var(--amber-400); }
-.hrange-btn.active { background: rgba(245,158,11,0.15); border-color: var(--amber-500); color: var(--amber-400); font-weight: 600; }
+.hrange-btn.active { background: rgba(245,158,11,0.15); border-color: var(--amber-500); color: var(--amber-400); font-weight: var(--font-semibold); }
 
 .timerange-custom {
     display: flex;
@@ -97,7 +97,7 @@
 
 .history-chart-title {
     font-size: 0.82rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--text-secondary);
@@ -106,14 +106,14 @@
 .history-chart-stat {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.8rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     color: var(--amber-400);
 }
 
 .scale-toggle-btn {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.7rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     padding: 3px 9px;
     border-radius: 5px;
     border: 1px solid rgba(255,255,255,0.12);
@@ -210,7 +210,7 @@
 
 .chart-modal-title {
     font-size: 0.85rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -310,7 +310,7 @@
 
 .user-bar-label {
     font-size: 0.78rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--text-secondary);
@@ -324,7 +324,7 @@
     background: rgba(255,255,255,0.05);
     color: var(--text-secondary);
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: var(--font-medium);
     cursor: pointer;
     transition: all 0.15s;
 }
@@ -374,7 +374,7 @@
     background: rgba(255,255,255,0.04);
     color: var(--text-secondary);
     font-size: 0.74rem;
-    font-weight: 500;
+    font-weight: var(--font-medium);
     cursor: pointer;
     transition: all 0.14s;
     user-select: none;
@@ -391,6 +391,6 @@
     background: rgba(245,158,11,0.18);
     border-color: var(--amber-500);
     color: var(--amber-400);
-    font-weight: 600;
+    font-weight: var(--font-semibold);
 }
 

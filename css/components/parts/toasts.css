@@ -76,7 +76,7 @@
 
 .toast-title {
     font-size: 0.85rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     color: var(--text-primary);
     line-height: 1.3;
 }

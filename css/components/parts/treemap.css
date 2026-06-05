@@ -113,7 +113,7 @@
 
 .tm-name {
     font-size: 0.77rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -486,7 +486,7 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: rgba(148,163,184,0.9);
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     flex: 0 0 auto;
 }
 
@@ -595,7 +595,7 @@
 }
 
 .tmx-size-val {
-    font-weight: 500;
+    font-weight: var(--font-medium);
 }
 
 .tmx-size-pct {
@@ -900,7 +900,7 @@
     border-left: none;
     border-right: none;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: var(--font-medium);
     transition: all 0.2s;
 }
 
@@ -946,7 +946,7 @@
     background: transparent;
     color: var(--text-muted);
     font-size: 14px;
-    font-weight: 500;
+    font-weight: var(--font-medium);
     font-family: inherit;
     cursor: pointer;
     transition: color 0.2s;
@@ -972,7 +972,7 @@
 
 .workspace-nav-tabs .tab-btn.active {
     color: var(--text-primary);
-    font-weight: 600;
+    font-weight: var(--font-semibold);
 }
 
 .workspace-nav-tabs .tab-btn.active::after {
@@ -996,7 +996,7 @@
     border: 1px solid rgba(16, 185, 129, 0.3);
     border-radius: 6px;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     font-family: inherit;
     cursor: pointer;
     transition: all 0.2s;
@@ -1239,7 +1239,7 @@
 
 .team-disk-card .disk-name {
     font-size: 1.05rem;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     color: var(--text-primary);
 }
 
@@ -1277,7 +1277,7 @@
     background: rgba(251, 191, 36, 0.12);
     color: var(--amber-400, var(--amber-400));
     font-size: 0.68rem;
-    font-weight: 500;
+    font-weight: var(--font-medium);
     line-height: 1.2;
     white-space: nowrap;
     flex-shrink: 0;
@@ -1386,7 +1386,7 @@
         text-transform: none;
         font-size: 0.75rem;
         letter-spacing: normal;
-        font-weight: 400;
+        font-weight: var(--font-normal);
         white-space: nowrap;
         display: flex;
         align-items: center;
@@ -1408,7 +1408,7 @@
     :root[data-theme='light'] .extended-stat.stat-free .label::before { background: rgba(0, 0, 0, 0.1); }
     .extended-stat .value {
         color: var(--text-primary);
-        font-weight: 500;
+        font-weight: var(--font-medium);
         font-variant-numeric: tabular-nums;
         font-size: 0.8rem;
         white-space: nowrap;
@@ -1453,7 +1453,7 @@
 
 .team-disk-card .card-stat-val {
     font-size: 1.1rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     color: var(--text-primary);
 }
 
@@ -1572,7 +1572,7 @@ body.group-user-modal-open {
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--text-primary);
-    font-weight: 700;
+    font-weight: var(--font-bold);
 }
 
 .group-user-subtitle {
@@ -1594,7 +1594,7 @@ body.group-user-modal-open {
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     flex-shrink: 0;
 }
 
@@ -1712,7 +1712,7 @@ body.group-user-modal-open {
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--text-secondary);
-    font-weight: 700;
+    font-weight: var(--font-bold);
 }
 
 .group-user-pane-actions {
@@ -2145,7 +2145,7 @@ body.changelog-open {
     align-items: center;
     gap: var(--space-2);
     font-size: 0.9rem;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--text-primary);
@@ -2200,7 +2200,7 @@ body.changelog-open {
 
 .changelog-version {
     font-size: 0.74rem;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     color: var(--text-primary);
     letter-spacing: 0.04em;
 }
@@ -2220,7 +2220,7 @@ body.changelog-open {
     border-radius: var(--radius-pill);
     border: 1px solid transparent;
     font-size: 0.66rem;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     letter-spacing: 0.04em;
     text-transform: uppercase;
 }
@@ -2247,7 +2247,7 @@ body.changelog-open {
     margin: 8px 0 6px;
     font-size: 0.86rem;
     color: var(--text-primary);
-    font-weight: 600;
+    font-weight: var(--font-semibold);
 }
 
 .changelog-bullets {
@@ -2326,7 +2326,7 @@ body.changelog-open {
 }
 .team-disk-card.selected .disk-name {
     color: var(--accent);
-    font-weight: 600;
+    font-weight: var(--font-semibold);
 }
 
 /* Light mode overrides for selected card */

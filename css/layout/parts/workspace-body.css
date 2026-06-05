@@ -31,7 +31,7 @@
 .top-header h1 {
     /* Fluid typography */
     font-size: clamp(1.05rem, 2.5vw, 1.45rem);
-    font-weight: 700;
+    font-weight: var(--font-bold);
     letter-spacing: -0.02em;
     white-space: nowrap;
 }

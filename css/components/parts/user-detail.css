@@ -113,7 +113,7 @@
 .ud-dropdown-option.selected {
     background: rgba(56,189,248,0.15);
     color: var(--sky-400, var(--sky-400));
-    font-weight: 500;
+    font-weight: var(--font-medium);
 }
 .ud-dropdown-option.hidden { display: none; }
 
@@ -135,7 +135,7 @@
 
 .ud-picker-export-label {
     font-size: 0.68rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--text-secondary);
@@ -175,7 +175,7 @@
     align-items: center;
     gap: var(--space-1-5);
     font-size: 0.82rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     color: var(--text-primary);
 }
 .ud-card-badge {
@@ -221,7 +221,7 @@
     background: rgba(255,255,255,0.04);
     color: var(--text-secondary);
     font-size: 0.7rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     cursor: pointer;
     transition: all 0.14s;
     white-space: nowrap;
@@ -252,7 +252,7 @@
     background: rgba(255,255,255,0.04);
     color: var(--text-secondary);
     font-size: 0.73rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     cursor: pointer;
     transition: all 0.14s;
     white-space: nowrap;
@@ -401,7 +401,7 @@
     padding: 2px 5px;
     border-radius: var(--radius-xs);
     white-space: nowrap;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     flex-shrink: 0;
 }
 
@@ -425,7 +425,7 @@
     justify-content: center;
     color: var(--text-secondary);
 }
-.ud-empty-state h3 { font-size: 1rem; font-weight: 600; margin: 0; }
+.ud-empty-state h3 { font-size: 1rem; font-weight: var(--font-semibold); margin: 0; }
 .ud-empty-state p  { font-size: 0.83rem; color: var(--text-secondary); margin: 0; max-width: 300px; }
 
 /* Error */
@@ -463,7 +463,7 @@
     border: 1px solid rgba(245, 158, 11, 0.3);
     color: var(--amber-400);
     font-size: 0.68rem;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     text-transform: uppercase;
     letter-spacing: 0.07em;
 }
@@ -477,7 +477,7 @@
 
 .ud-beta-text strong {
     font-size: 0.8rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     color: #fcd34d;
 }
 
@@ -552,7 +552,7 @@
 .ud-dropdown-group-label {
     padding: 6px 12px 3px;
     font-size: 0.7rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-secondary);
@@ -571,7 +571,7 @@
 .ud-dropdown-option.ud-opt-other.selected {
     background: rgba(148,163,184,0.15);
     color: var(--text-secondary);
-    font-weight: 500;
+    font-weight: var(--font-medium);
 }
 
 /* No report hint in empty state */
@@ -600,7 +600,7 @@
     background: transparent;
     color: var(--text-secondary);
     font-size: 0.8rem;
-    font-weight: 500;
+    font-weight: var(--font-medium);
     cursor: pointer;
     transition: background 0.18s, color 0.18s, border-color 0.18s;
 }
@@ -641,7 +641,7 @@
     background: rgba(148,163,184,0.04);
     color: var(--text-secondary);
     font-size: 0.78rem;
-    font-weight: 500;
+    font-weight: var(--font-medium);
     letter-spacing: 0.01em;
     cursor: pointer;
     transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease;
@@ -662,7 +662,7 @@
     border-color: var(--accent, #3b82f6);
     color: #fff;
     cursor: default;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
 }
 .ud-page-btn.disabled {
     opacity: 0.35;
@@ -687,7 +687,7 @@
     border: 1px solid rgba(59,130,246,0.35);
     color: var(--accent, #3b82f6);
     font-size: 0.78rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     letter-spacing: 0.02em;
     user-select: none;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
@@ -731,7 +731,7 @@
     padding: 1px 7px;
     border-radius: 5px;
     font-size: 0.7rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     white-space: nowrap;
     background: rgba(59,130,246,0.15);
     color: #93c5fd;

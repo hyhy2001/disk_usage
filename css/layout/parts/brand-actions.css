@@ -16,7 +16,7 @@
     background: transparent;
     color: var(--text-secondary);
     text-decoration: none;
-    font-weight: 500;
+    font-weight: var(--font-medium);
     transition: background 0.2s, color 0.2s;
 }
 

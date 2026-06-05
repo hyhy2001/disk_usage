@@ -31,7 +31,7 @@
 .metric-label {
     color: var(--text-secondary);
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: var(--font-medium);
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -49,7 +49,7 @@
 
 .metric-value .unit {
     color: var(--text-secondary);
-    font-weight: 500;
+    font-weight: var(--font-medium);
 }
 
 /* Status Monitor (Sidebar) */
@@ -88,7 +88,7 @@
     align-items: center;
     gap: 5px;
     font-size: 0.68rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     text-transform: uppercase;
     letter-spacing: 0.07em;
     color: #475569;

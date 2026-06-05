@@ -8,7 +8,7 @@
 
 .disk-project-header {
     font-size: 0.68rem;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     text-transform: uppercase;
     letter-spacing: 0.12em;
     color: var(--text-muted);
@@ -43,7 +43,7 @@
 
 .disk-team-header {
     font-size: 0.82rem;
-    font-weight: 500;
+    font-weight: var(--font-medium);
     color: var(--text-secondary);
     padding: 10px 14px;
     display: flex;
@@ -53,7 +53,7 @@
 
 .disk-team-group.active-team .disk-team-header {
     color: var(--emerald-400);
-    font-weight: 600;
+    font-weight: var(--font-semibold);
 }
 
 .disk-team-group.standalone {
@@ -128,7 +128,7 @@
     align-items: center;
     gap: var(--space-2);
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: var(--font-medium);
     color: var(--text-secondary);
 }
 

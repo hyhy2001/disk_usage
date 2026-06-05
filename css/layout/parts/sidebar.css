@@ -33,7 +33,7 @@
     align-items: center;
     gap: var(--space-3);
     font-size: 1.25rem;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     letter-spacing: -0.02em;
 }
 

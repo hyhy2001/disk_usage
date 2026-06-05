@@ -986,7 +986,7 @@ body.sidebar-collapsed .sidebar .disk-flyout:hover {
 
 body.sidebar-collapsed .sidebar .disk-flyout-title { 
         font-size: 0.68rem;
-        font-weight: 700;
+        font-weight: var(--font-bold);
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: var(--text-secondary);

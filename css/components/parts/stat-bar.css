@@ -53,7 +53,7 @@
 .trend-down,
 .trend-neutral {
     font-size: 0.67rem;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     letter-spacing: 0.01em;
     border-radius: 3px;
     padding: 1px 5px;
@@ -107,13 +107,13 @@
     color: var(--amber-400);
     border-radius: var(--radius-xl);
     font-size: 0.8rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     letter-spacing: 0.04em;
 }
 
 .uc-title {
     font-size: 1.6rem;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     color: var(--text-primary);
     margin: 0;
 }
@@ -170,7 +170,7 @@
 
 .stat-section-label {
     font-size: 0.6rem;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--amber-500);
@@ -187,7 +187,7 @@
 .metric-sublabel {
     display: block;
     font-size: 0.65rem;
-    font-weight: 400;
+    font-weight: var(--font-normal);
     color: var(--text-secondary);
     text-transform: none;
     letter-spacing: 0;
@@ -217,7 +217,7 @@
 
 .ssb-label {
     font-size: 0.78rem;
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -225,7 +225,7 @@
 
 .ssb-val {
     font-size: 0.9rem;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     color: var(--amber-500);
     font-family: 'JetBrains Mono', monospace;
 }
@@ -240,7 +240,7 @@
 
 .ssb-gap-label {
     font-size: 0.72rem;
-    font-weight: 500;
+    font-weight: var(--font-medium);
     color: var(--text-secondary);
     white-space: nowrap;
 }
@@ -263,7 +263,7 @@
 
 .ssb-pct {
     font-size: 0.8rem;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     color: var(--rose-500);
     font-family: 'JetBrains Mono', monospace;
     white-space: nowrap;
@@ -323,7 +323,7 @@
 
 .metric-scan-sub {
     font-size: 2rem;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     color: var(--amber-500);
     display: flex;
     align-items: baseline;
@@ -341,7 +341,7 @@
 
 .metric-scan-hint {
     font-size: 0.62rem;
-    font-weight: 400;
+    font-weight: var(--font-normal);
     color: var(--text-secondary);
     opacity: 0.65;
     text-transform: uppercase;
@@ -357,7 +357,7 @@
 /* Detail stat bar -- Used / Scan sub-line */
 .stat-subscan {
     font-size: 1.6rem;
-    font-weight: 700;
+    font-weight: var(--font-bold);
     color: var(--amber-500);
     font-family: 'JetBrains Mono', monospace;
     letter-spacing: -0.02em;
