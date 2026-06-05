@@ -264,6 +264,12 @@ Watch mode is also available:
 npm run build:watch
 ```
 
+Cache busting is automatic: after emitting the bundles, `build.mjs` stamps the `?v=` query
+param on the bundle `<script>`/`<link>` tags in `index.html` with each bundle's content hash
+(JS and CSS hashed independently), so browsers refetch only when a bundle actually changes — no
+manual version bump. The stamp runs on a full `npm run build` only, not in `build:watch` (CSS
+isn't rebuilt there), so run a full build before deploying to finalize the hashes.
+
 ### `disks.json` format
 
 ```json
@@ -413,6 +419,9 @@ The tracked app includes generated `*.min.js` and `*.min.css` bundles. On deploy
 ```bash
 npm run build
 ```
+
+`build.mjs` also stamps a content-hash `?v=` onto the bundle tags in `index.html` on each full
+build, so cache invalidation is automatic (see "Frontend build" above).
 
 Because `.gitignore` ignores `*.json`, `package.json`, `package-lock.json`, and `disks.json` are treated as local deployment files unless explicitly force-added.
 
