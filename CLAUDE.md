@@ -10,22 +10,23 @@ indexed in codebase-memory) and serves them through a single PHP API to a vanill
 This repo never scans the filesystem itself — it only reads and presents `check_disk` output.
 
 Stack: PHP 5.4+ backend, vanilla ES2020 JS frontend (no framework), vanilla CSS3, Chart.js
-(self-hosted in `js/vendor/`). No build step is required to run.
+(self-hosted in `js/vendor/`). `index.html` loads built bundles, so editing source `.js`/`.css`
+requires a rebuild — see "Build is required after editing source".
 
 ## Commands
 
 ```bash
-# Build minified JS/CSS bundles (OPTIONAL — see "Build is optional" below)
+# Build the bundles index.html loads (REQUIRED after editing any source .js/.css)
 npm install            # one-time, installs esbuild only
-npm run build          # bundles js/**/*.js -> *.min.js and css/<bundle>/parts -> *.min.css
-npm run build:watch    # JS watch mode (CSS only builds once per invocation)
+npm run build          # emits js/app.min.js, css/app.min.css, css/core/{fonts,index}.min.css
+npm run build:watch    # rebuilds js/app.min.js on change (CSS only builds once per invocation)
 
 # Manual API testing (no test framework exists in this repo)
 curl "http://localhost/disk_usage/api.php?id=disk_sda" | python3 -m json.tool | head -30
 USER_B64="$(printf '%s' 'alice' | base64 | tr -d '\n')"
 curl "http://localhost/disk_usage/api.php?id=disk_sda&type=detail&user_b64=${USER_B64}&limit=50"
 
-# Runtime/env sanity check (PHP version, disabled functions)
+# Runtime/env sanity check — NOTE: gated behind admin auth, returns 401 unauthenticated
 curl "http://localhost/disk_usage/api.php?debug_runtime=1"
 ```
 
@@ -65,18 +66,16 @@ module-level store (`js/core/dataStore.js`, `AppState` in main.js).
 ### Build is required after editing source
 `index.html` references `js/app.min.js` + `css/app.min.css`, so editing a source `.js`/`.css`
 has **no effect until you rebuild**. Run `npm install` (one-time) then `npm run build`, or
-`npm run build:watch` during JS development. `build.mjs` (esbuild):
-- bundles `js/app.js` → `js/app.min.js` (one file, all modules inlined);
-- per-file minifies every other `js/**/*.js` → `*.min.js` (legacy `rewrite-imports-to-min`
-  path, kept for any standalone consumers);
-- bundles `css/app.css` → `css/app.min.css`, marking `*.ttf`/`*.woff*` as `external` and then
+`npm run build:watch` during JS development. `build.mjs` (esbuild) emits exactly four files:
+- `js/app.min.js` — bundles `js/app.js` (which imports all 14 modules in order) into one file;
+- `css/app.min.css` — bundles `css/app.css`, marking `*.ttf`/`*.woff*` as `external` then
   rebasing font `url(...)` from `../../fonts/` to `../fonts/` (the bundle sits one dir
   shallower than `css/core/fonts.css`);
-- still emits per-dir CSS (`css/core/index.min.css` etc.) — `setup.html` references those.
-Bump the `?v=` query param on the bundle tags in `index.html` when you want to bust caches.
-The tracked `.min.*` bundles
-are committed artifacts. If you edit a source `.js`/`.css`, the change is live immediately for
-dev; only run `npm run build` when you need to refresh the minified bundles.
+- `css/core/fonts.min.css` + `css/core/index.min.css` — minified in place (no bundling), because
+  `setup.html` loads those two directly.
+There is no longer a per-file `js/**/*.min.js` step (removed — nothing referenced those). The
+tracked `.min.*` files are committed build artifacts; rebuild and commit them with the source
+change. Bump the `?v=` query param on the bundle tags in `index.html` to bust caches.
 
 ## Critical constraints
 
@@ -99,6 +98,24 @@ on `(size, id)`, with WHERE clauses crafted to hit specific covering indexes. Wh
 paths for large export pages, `dir_id IN (...)` is **chunked to 500 IDs per query** to stay
 under SQLite's binding limit — preserve this chunking or large exports silently lose path data.
 Schemas and index names are documented in README.md.
+
+### Escape all API data rendered into HTML
+Renderers build HTML via template strings + `innerHTML`. API data (file names, dir paths,
+usernames, extensions, owners, error/status text, team/disk/group names) are real filesystem
+strings and **must** be wrapped in `escHtml` (from `js/utils/dom.js`) before interpolation —
+including inside `title="..."` and `data-tooltip="..."` attributes, since the tooltip renderer
+(`js/ui/tooltip.js`) injects `data-tooltip` via `innerHTML`. `escHtml` escapes `& < > "` but
+**not** `'`, so never interpolate API data into a single-quoted inline `onclick`; wire events
+with `addEventListener` instead. Numbers (`fmt`, `pct`, `toFixed`) are safe unescaped.
+
+### Detail/export paging and limits
+`detail`/`dirs`/`files` enforce `limit` max 50000 server-side (peak ~30MB JSON / ~7MB gzipped
+per page, safe under the 512MB memory cap). CSV export (`streamExportGzip` in
+`js/utils/csvExport.js`) pages via opaque cursor with a depth-1 prefetch pipeline — the next
+page is fetched while the current one is compressed/written, so do not lower the cap below the
+export `PAGE` size (50000 for files) or you multiply round-trips. The export callback mutates
+its `cursor` after each fetch resolves; the pipeline relies on never running two callbacks
+concurrently — preserve that ordering if you touch the loop.
 
 ## Git safety
 `.gitignore` is intentionally broad for production deployments: it ignores `*.json` (including
