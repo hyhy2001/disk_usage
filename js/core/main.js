@@ -25,11 +25,6 @@ export const AppState = {
     chartManagerInstance: null,
 };
 
-// Start application
-export function initApp() {
-    UINodes.statusText.textContent = "System Ready to Fetch";
-}
-
 // Simple CountUp animation for the numbers
 export function animateValue(obj, start, end, duration) {
     if (!obj) return;

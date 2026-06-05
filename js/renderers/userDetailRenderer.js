@@ -2,7 +2,7 @@
 // userDetailRenderer.js — Renders per-user detail reports (dirs + files)
 
 import { fmt, fmtDateSec }                  from '../utils/formatters.js';
-import { escHtml }                          from '../utils/dom.js';
+import { escHtml, debounce }                 from '../utils/dom.js';
 import { streamExportGzip }                 from '../utils/csvExport.js';
 import { AppState, showToast, showProgressToast, updateProgressToast, closeProgressToast } from '../core/main.js';
 
@@ -62,15 +62,6 @@ function _emitFilterConfigEvent(action) {
 
 function _hasExtFilter() {
     return !!(_currentFilters.ext && String(_currentFilters.ext).trim() !== '');
-}
-
-// ── Debounce utility ──────────────────────────────────────────────────────────
-function _debounce(fn, ms) {
-    let timer;
-    return function (...args) {
-        clearTimeout(timer);
-        timer = setTimeout(() => fn.apply(this, args), ms);
-    };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -541,7 +532,7 @@ function _attachFilterEvents(contentEl, root) {
 
         userBtn.addEventListener('click', e => { e.stopPropagation(); toggleUser(); });
 
-        userSearch?.addEventListener('input', _debounce(e => {
+        userSearch?.addEventListener('input', debounce(e => {
             _renderDropdownOptions(userOptions, e.target.value, true);
         }, 150));
 
@@ -1257,7 +1248,7 @@ function _attachPickerEvents(root) {
 
     btn.addEventListener('click', e => { e.stopPropagation(); toggle(); });
 
-    search?.addEventListener('input', _debounce(e => {
+    search?.addEventListener('input', debounce(e => {
         _renderDropdownOptions(options, e.target.value, true);
     }, 150));
 

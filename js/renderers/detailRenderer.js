@@ -232,70 +232,6 @@ function renderUserFilterBox(sortedNames, defaultSet) {
     updateCount();
 }
 
-// Keep old name as alias so resetFilters can call it too
-function renderPivotView(pivotData) {
-    const { dates, userNames, matrix } = pivotData;
-
-    if (!dates.length || !userNames.length) {
-        document.getElementById('detail-view-area').innerHTML =
-            '<p class="table-empty">No data for selected range.</p>';
-        return;
-    }
-
-    // Bar width = usage / total disk capacity (df -h total)
-    const totalCap = _store.latestStats.total || 1;
-
-    // Compute trend per user: latest vs prev snapshot in userTimelineMap
-    const userTrend = (name) => {
-        const tl = _store.userTimelineMap?.get(name);
-        if (!tl || tl.length < 2) return null;
-        const sorted = [...tl].sort((a, b) => a.timestamp - b.timestamp);
-        const prev = sorted[sorted.length - 2].used;
-        const curr = sorted[sorted.length - 1].used;
-        const delta = curr - prev;
-        const pct   = prev ? ((delta / prev) * 100).toFixed(1) : '0.0';
-        return { delta, pct };
-    };
-
-    const headerCols = userNames.map(u => {
-        const t = userTrend(u);
-        let badge = '<span class="trend-neutral pivot-trend">→</span>';
-        if (t && t.delta > 0) badge = `<span class="trend-up pivot-trend">▲ ${t.pct}%</span>`;
-        if (t && t.delta < 0) badge = `<span class="trend-down pivot-trend">▼ ${Math.abs(t.pct)}%</span>`;
-        return `<th class="pivot-user-th"><span class="user-name" title="${escHtml(u)}">${escHtml(u)}</span>${badge}</th>`;
-    }).join('');
-
-    const rows = dates.map(ts => {
-        const row = matrix.get(ts);
-        const cells = userNames.map(u => {
-            const v  = row.get(u);
-            const bp      = (((v || 0) / totalCap) * 100).toFixed(1);
-            const tooltip = v !== null
-                ? `${fmt(v)} · ${bp}% of ${fmt(totalCap)}`
-                : 'No data';
-            return `<td class="pivot-cell">
-                <span class="pivot-val">${v !== null ? fmt(v) : '—'}</span>
-                <div class="pivot-mini-bar" data-tooltip="${tooltip}"><div class="pivot-mini-fill" style="width:${bp}%"></div></div>
-            </td>`;
-        }).join('');
-        return `<tr><td class="pivot-date-cell">${fmtDate(ts)}</td>${cells}</tr>`;
-    }).join('');
-
-    document.getElementById('detail-view-area').innerHTML = `
-        <div class="result-section">
-            <div class="result-section-header">
-                <h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Usage Matrix</h3>
-                <span class="result-count">${dates.length} days × ${userNames.length} users</span>
-            </div>
-            <div class="table-wrapper pivot-wrapper" style="overflow-x:auto">
-                <table class="pivot-table">
-                    <thead><tr><th class="pivot-date-th">Date</th>${headerCols}</tr></thead>
-                    <tbody>${rows}</tbody>
-                </table>
-            </div>
-        </div>`;
-}
-
 let _logScale = false;
 
 export function initScaleToggle() {
@@ -728,6 +664,3 @@ function _toggleUserFilter(el) {
     if (wrap?._updateCount) wrap._updateCount();
     debouncedApplyFilters();
 }
-
-// Legacy compatibility
-window.__applyFilters = applyFilters;

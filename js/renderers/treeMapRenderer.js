@@ -1,5 +1,6 @@
 import { showToast } from '../core/main.js';
 import { fmt } from '../utils/formatters.js';
+import { escHtml } from '../utils/dom.js';
 
 let _diskId = null;
 let _diskTotal = 0;
@@ -61,14 +62,6 @@ function getNodeIconSvg(node) {
         return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
     }
     return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
-}
-
-function escHtml(s) {
-    return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
 }
 
 function toAbsoluteDisplayPath(path) {
