@@ -1,6 +1,7 @@
 import * as esbuild from 'esbuild';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 const isWatch = process.argv.includes('--watch');
 
@@ -71,10 +72,41 @@ async function buildCoreCss() {
   }
 }
 
+// Stamp index.html's ?v= query params with each bundle's content hash so the
+// browser refetches only when a bundle actually changes -- no manual version
+// bump. JS and CSS are hashed independently (a CSS-only change won't bust the
+// JS cache). Runs only on a full build, not in watch mode (CSS isn't rebuilt
+// there, so its hash would be stale).
+function stampIndexHtml() {
+  const indexFile = './index.html';
+  if (!fs.existsSync(indexFile)) return;
+  const hashes = {};
+  for (const rel of ['js/app.min.js', 'css/app.min.css']) {
+    if (!fs.existsSync(rel)) continue;
+    hashes[path.basename(rel)] = crypto
+      .createHash('sha1')
+      .update(fs.readFileSync(rel))
+      .digest('hex')
+      .slice(0, 8);
+  }
+  const html = fs.readFileSync(indexFile, 'utf8');
+  const stamped = html.replace(
+    /(app\.min\.(?:js|css))\?v=[A-Za-z0-9]+/g,
+    (match, file) => (hashes[file] ? `${file}?v=${hashes[file]}` : match)
+  );
+  if (stamped !== html) {
+    fs.writeFileSync(indexFile, stamped);
+    console.log(`Stamped index.html: ${Object.entries(hashes).map(([f, h]) => `${f}?v=${h}`).join(', ')}`);
+  } else {
+    console.log('index.html cache stamps already current.');
+  }
+}
+
 async function build() {
   await buildAppJs(isWatch);
   await buildAppCss();
   await buildCoreCss();
+  if (!isWatch) stampIndexHtml();
   console.log(isWatch
     ? 'Watching JS bundle (rerun build for CSS updates).'
     : 'Build complete.');

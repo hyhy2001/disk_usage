@@ -177,7 +177,7 @@ function _renderDirCard(dirData) {
         const cls = parseFloat(pct) > 70 ? 'ud-fill-rose' : parseFloat(pct) > 40 ? 'ud-fill-amber' : 'ud-fill-sky';
         return `
         <div class="ud-path-row">
-            <div class="ud-path-name" title="${_toAbsoluteDisplayPath(d.path)}" style="cursor: pointer;">${_shortPath(_toAbsoluteDisplayPath(d.path))}</div>
+            <div class="ud-path-name" title="${escHtml(_toAbsoluteDisplayPath(d.path))}" style="cursor: pointer;">${escHtml(_shortPath(_toAbsoluteDisplayPath(d.path)))}</div>
             <div class="ud-path-bar-wrap" data-tooltip="${fmt(d.used)} · ${pct}% of user total">
                 <div class="ud-path-bar-fill ${cls}" style="width:${pct}%"></div>
             </div>
@@ -261,7 +261,7 @@ function _renderFileCard(fileData) {
         return `
         <div class="ud-path-row">
             <span class="ud-ext-badge" style="background:${clr}20;color:${clr}">.${ext}</span>
-            <div class="ud-path-name" title="${_toAbsoluteDisplayPath(f.path)}" style="cursor: pointer;">${_shortPath(_toAbsoluteDisplayPath(f.path))}</div>
+            <div class="ud-path-name" title="${escHtml(_toAbsoluteDisplayPath(f.path))}" style="cursor: pointer;">${escHtml(_shortPath(_toAbsoluteDisplayPath(f.path)))}</div>
             <div class="ud-path-bar-wrap" data-tooltip="${fmt(f.size)} · ${pct}% of page total">
                 <div class="ud-path-bar-fill ud-fill-emerald" style="width:${pct}%"></div>
             </div>
