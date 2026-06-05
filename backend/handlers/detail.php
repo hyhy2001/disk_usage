@@ -291,7 +291,7 @@ function api_detail_format_files_page($pdo, $page) {
         foreach (array_chunk($dir_ids, 500) as $chunk) {
             $place = implode(',', array_fill(0, count($chunk), '?'));
             try {
-                $stmt = $pdo->prepare('SELECT DISTINCT id, path FROM dirs WHERE id IN (' . $place . ')');
+                $stmt = $pdo->prepare('SELECT id, path FROM dirs WHERE id IN (' . $place . ')');
                 $stmt->execute($chunk);
                 foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
                     $path_map[(int)$r['id']] = (string)$r['path'];
@@ -342,7 +342,7 @@ function api_handle_dirs($disk_path) {
     $who = sanitize_name(get_b64_param('user', ''));
     $cursor_raw = (string)param('cursor', '');
     $cursor = $cursor_raw !== '' ? api_detail_decode_cursor($cursor_raw) : null;
-    $limit = get_int('limit', 500, 1, 20000);
+    $limit = get_int('limit', 500, 1, 50000);
 
     $pdo = api_detail_open_db($disk_path);
     if (!$pdo) {
@@ -372,7 +372,7 @@ function api_handle_files($disk_path) {
     $who = sanitize_name(get_b64_param('user', ''));
     $cursor_raw = (string)param('cursor', '');
     $cursor = $cursor_raw !== '' ? api_detail_decode_cursor($cursor_raw) : null;
-    $limit = get_int('limit', 500, 1, 20000);
+    $limit = get_int('limit', 500, 1, 50000);
 
     $pdo = api_detail_open_db($disk_path);
     if (!$pdo) {
@@ -404,7 +404,7 @@ function api_handle_detail($disk_path) {
     $file_cursor_raw = (string)param('file_cursor', '');
     $dir_cursor = $dir_cursor_raw !== '' ? api_detail_decode_cursor($dir_cursor_raw) : null;
     $file_cursor = $file_cursor_raw !== '' ? api_detail_decode_cursor($file_cursor_raw) : null;
-    $limit = get_int('limit', 500, 1, 20000);
+    $limit = get_int('limit', 500, 1, 50000);
     $node_type = strtolower(trim(param('node_type', 'all')));
     if ($node_type !== 'dir' && $node_type !== 'file') $node_type = 'all';
 

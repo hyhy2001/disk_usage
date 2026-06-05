@@ -136,7 +136,7 @@ Returns directory and file breakdowns for a single user. Supports cursor paginat
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `user_b64` | required | Base64-encoded UTF-8 username |
-| `limit` | `500` | Rows per page (max 20000) |
+| `limit` | `500` | Rows per page (max 50000) |
 | `dir_cursor` | _(omit)_ | Opaque cursor for dir pagination (from previous `next_cursor`) |
 | `file_cursor` | _(omit)_ | Opaque cursor for file pagination |
 | `filter_query` | _(omit)_ | Comma-separated keywords — LIKE match on file basename or dir path |

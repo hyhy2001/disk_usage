@@ -117,14 +117,20 @@ export async function streamExportGzip(filename, headers, fetchChunkCallback, fo
         const headerLine = headers.map(escape).join(',');
         await writer.write(encoder.encode(bom + headerLine + '\r\n'));
 
-        let hasMore = true;
-        while (hasMore) {
-            const chunkData = await fetchChunkCallback();
+        // Pipeline: prefetch the next chunk while the current one is being
+        // serialized/compressed/written, so network+DB latency overlaps with
+        // compression+disk IO instead of running strictly back-to-back.
+        let pending = fetchChunkCallback();
+        while (pending) {
+            const chunkData = await pending;
             if (!chunkData) break;
 
-            hasMore = !chunkData.isLast;
-            const rows = chunkData.rows || [];
+            const isLast = !!chunkData.isLast;
+            // Kick off the next fetch BEFORE we spend time encoding/writing this
+            // one. Started only when more is expected, preserving order.
+            pending = isLast ? null : fetchChunkCallback();
 
+            const rows = chunkData.rows || [];
             if (rows.length > 0) {
                 const lines = rows.map(row =>
                     headers.map(h => {
