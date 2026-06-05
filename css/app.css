@@ -1,0 +1,7 @@
+/* Single production CSS entry — bundled by build.mjs into app.min.css.
+   @import order matches the original 4 <link> tags in index.html so the
+   cascade is preserved: fonts, design tokens, layout, components. */
+@import './core/fonts.css';
+@import './core/index.css';
+@import './layout/layout.css';
+@import './components/components.css';

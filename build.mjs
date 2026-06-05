@@ -28,7 +28,11 @@ function walk(dir, predicate) {
   return out;
 }
 
-const jsFiles = walk(jsDir, n => n.endsWith('.js') && !n.endsWith('.min.js'));
+// Per-file minify list excludes the single-bundle entry (built separately,
+// see buildAppBundle) so it isn't double-written by the rewrite-to-min path.
+const appEntry = path.join(jsDir, 'app.js');
+const jsFiles = walk(jsDir, n => n.endsWith('.js') && !n.endsWith('.min.js'))
+  .filter(f => path.resolve(f) !== path.resolve(appEntry));
 
 const rewriteImportsToMin = {
   name: 'rewrite-imports-to-min',
@@ -144,18 +148,82 @@ async function buildJs(watchMode) {
   await esbuild.build(jsBuildOptions);
 }
 
+async function buildAppBundle() {
+  if (!fs.existsSync(appEntry)) return;
+  await esbuild.build({
+    entryPoints: [appEntry],
+    outfile: path.join(jsDir, 'app.min.js'),
+    bundle: true,
+    minify: true,
+    format: 'esm',
+    target: ['es2020'],
+    logLevel: 'info',
+  });
+  console.log(`JS bundle: ${path.join(jsDir, 'app.min.js')}`);
+}
+
+// fonts.css is @font-face only with url('../../fonts/*.ttf') and no @import,
+// so minify-in-place (bundle:false) — esbuild leaves url() verbatim and the
+// output sits beside the source in css/core/, keeping ../../fonts/ valid.
+// setup.html references css/core/fonts.min.css, so this must be emitted.
+async function buildFontsCss() {
+  const src = path.join(cssDir, 'core', 'fonts.css');
+  if (!fs.existsSync(src)) return;
+  const outFile = path.join(cssDir, 'core', 'fonts.min.css');
+  await esbuild.build({
+    entryPoints: [src],
+    outfile: outFile,
+    bundle: false,
+    minify: true,
+    target: ['es2020'],
+    loader: { '.css': 'css' },
+    logLevel: 'info',
+  });
+  console.log(`CSS bundle: ${outFile}`);
+}
+
+async function buildAppCssBundle() {
+  const appCss = path.join(cssDir, 'app.css');
+  if (!fs.existsSync(appCss)) return;
+  const outFile = path.join(cssDir, 'app.min.css');
+  await esbuild.build({
+    entryPoints: [appCss],
+    outfile: outFile,
+    bundle: true,
+    minify: true,
+    target: ['es2020'],
+    loader: { '.css': 'css' },
+    external: ['*.ttf', '*.woff', '*.woff2'],
+    logLevel: 'info',
+  });
+  // esbuild leaves external url() paths verbatim (e.g. ../../fonts/ from the
+  // original css/core/fonts.css). The bundle lives one level shallower at
+  // css/app.min.css, and every font asset resolves to webroot/fonts, so
+  // rebase any */fonts/ ref to ../fonts/ relative to the bundle.
+  const css = fs.readFileSync(outFile, 'utf8')
+    .replace(/url\((['"]?)(?:\.\.\/)+fonts\//g, 'url($1../fonts/');
+  fs.writeFileSync(outFile, css);
+  console.log(`CSS bundle: ${outFile}`);
+}
+
 async function build() {
   console.log(`Found ${jsFiles.length} JS files to minify.`);
 
   if (isWatch) {
     await buildJs(true);
+    await buildAppBundle();
     const cssCount = await buildCssBundles();
+    await buildFontsCss();
+    await buildAppCssBundle();
     console.log(`Watching JS files and built ${cssCount} CSS bundles (rerun build for CSS updates).`);
     return;
   }
 
   await buildJs(false);
+  await buildAppBundle();
   const cssCount = await buildCssBundles();
+  await buildFontsCss();
+  await buildAppCssBundle();
   console.log(`Build complete. (${cssCount} CSS bundles)`);
 }
 
