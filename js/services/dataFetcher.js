@@ -8,6 +8,7 @@ import { fmt, smartFmtTick } from '../utils/formatters.js';
 import { saveFilters, loadFilters } from '../utils/filterStorage.js';
 import { compareDiskCards, extractFromDataset, extractFromApiDisk } from '../utils/sort.js';
 import { createApiClient } from './api.js';
+import { escHtml } from '../utils/dom.js';
 
 // ── Sidebar live clock ────────────────────────────────────────────────────────
 // Cache formatter to avoid re-creating Intl.DateTimeFormat every second
@@ -258,11 +259,11 @@ class DataFetcher {
                 detail: 'Building user details', treemap: 'Building treemap',
                 sync: 'Syncing', done: 'Completed', error: 'Error',
             };
-            lines.push(`<b>Stage:</b> ${stageLabel[s.stage] || s.stage || 'unknown'}`);
-            if (s.message) lines.push(`<b>Status:</b> ${s.message}`);
-            if (s.error) lines.push(`<b>Error:</b> ${s.error}`);
-            if (s.host) lines.push(`<b>Host:</b> ${s.host}`);
-            if (s.pid) lines.push(`<b>PID:</b> ${s.pid}`);
+            lines.push(`<b>Stage:</b> ${escHtml(stageLabel[s.stage] || s.stage || 'unknown')}`);
+            if (s.message) lines.push(`<b>Status:</b> ${escHtml(s.message)}`);
+            if (s.error) lines.push(`<b>Error:</b> ${escHtml(s.error)}`);
+            if (s.host) lines.push(`<b>Host:</b> ${escHtml(s.host)}`);
+            if (s.pid) lines.push(`<b>PID:</b> ${escHtml(s.pid)}`);
             if (s.started_at) {
                 const d = new Date(s.started_at * 1000);
                 lines.push(`<b>Started:</b> ${d.toLocaleTimeString('en-GB')}`);
@@ -296,7 +297,7 @@ class DataFetcher {
 
         if (isError) {
             const errMsg = status.error || status.message || 'Scan failed';
-            badge.innerHTML = `<span class="scan-dot error"></span><span class="scan-label">${errMsg}</span>`;
+            badge.innerHTML = `<span class="scan-dot error"></span><span class="scan-label">${escHtml(errMsg)}</span>`;
             badge.setAttribute('data-tooltip', _buildTooltip(status));
             badge.setAttribute('data-tooltip-pos', 'top');
             badge.style.display = 'flex';
@@ -959,7 +960,7 @@ class DataFetcher {
                 const disks = teamNode.disks || [];
                 let html = '';
                 disks.forEach(d => {
-                    html += `<div class="disk-list-item" data-id="${d.id}" tabindex="0" data-search-terms="${d.name.toLowerCase()}">${d.name}</div>`;
+                    html += `<div class="disk-list-item" data-id="${escHtml(d.id)}" tabindex="0" data-search-terms="${escHtml(d.name.toLowerCase())}">${escHtml(d.name)}</div>`;
                 });
                 if (disks.length === 0) {
                     html = '<div class="disk-list-item" style="opacity:0.5; cursor:default;">No disks directly in this team</div>';
@@ -1001,8 +1002,8 @@ class DataFetcher {
             rawD.forEach((team, tIdx) => {
                 if (team.name && team.disks) {
                     phtml += `<div class="disk-project-group" style="margin-bottom: 8px;">
-                                <div class="disk-team-group" data-tidx="${tIdx}" data-tooltip="${team.name}" data-tooltip-pos="right" style="margin-bottom: 2px;">
-                                    <div class="disk-team-header" style="padding: 12px 14px; font-size: 0.85rem;">${teamSVG}<span style="font-weight: 600;">${team.name}</span></div>
+                                <div class="disk-team-group" data-tidx="${tIdx}" data-tooltip="${escHtml(team.name)}" data-tooltip-pos="right" style="margin-bottom: 2px;">
+                                    <div class="disk-team-header" style="padding: 12px 14px; font-size: 0.85rem;">${teamSVG}<span style="font-weight: 600;">${escHtml(team.name)}</span></div>
                                 </div>
                               </div>`;
                 }
@@ -1190,13 +1191,13 @@ class DataFetcher {
 
                 const freePct = Math.max(0, 100 - usedPct).toFixed(1);
 
-                cardsHTML += `<div class="team-disk-card" data-id="${diskId}" data-name="${diskName.toLowerCase().replace(/"/g, '&quot;')}" data-used-pct="${usedPct}" data-free-bytes="${free}" onclick="document.querySelector('.disk-list-item[data-id=\\'${diskId}\\']')?.click()" data-tooltip="${tooltipText}" data-tooltip-pos="top">
+                cardsHTML += `<div class="team-disk-card" data-id="${escHtml(diskId)}" data-name="${escHtml(diskName.toLowerCase())}" data-used-pct="${usedPct}" data-free-bytes="${free}" data-tooltip="${tooltipText}" data-tooltip-pos="top">
                     <div class="card-content-wrapper">
                         <div class="card-left">
                             <div class="card-header" style="display: flex; flex-direction: column; gap: 6px; width: 100%; align-items: flex-start; margin-bottom: 0;">
-                                <div class="disk-name" style="display: flex; align-items: flex-start; gap: 8px; width: 100%;" title="${diskName}">
+                                <div class="disk-name" style="display: flex; align-items: flex-start; gap: 8px; width: 100%;" title="${escHtml(diskName)}">
                                     <div style="margin-top:2px; flex-shrink:0; display:flex;">${diskIcon}</div>
-                                    <span style="white-space: normal; overflow-wrap: anywhere; line-height: 1.3; font-weight: 600;">${diskName}</span>
+                                    <span style="white-space: normal; overflow-wrap: anywhere; line-height: 1.3; font-weight: 600;">${escHtml(diskName)}</span>
                                 </div>
                                 <div class="disk-path ${usedClass}" style="white-space: nowrap; margin-left: 24px; align-self: flex-start;">${usedPct}% Used</div>
                             </div>
@@ -1217,6 +1218,20 @@ class DataFetcher {
             });
 
             grid.innerHTML = cardsHTML;
+
+            // Card click -> activate matching disk in the list. Replaces the
+            // former inline onclick (which interpolated diskId into a JS string
+            // and was an XSS/breakout risk). Delegated + guarded so repeated
+            // loadTeamOverview calls don't stack listeners on the same grid.
+            if (!grid.getAttribute('data-click-bound')) {
+                grid.setAttribute('data-click-bound', 'true');
+                grid.addEventListener('click', (e) => {
+                    const card = e.target.closest('.team-disk-card[data-id]');
+                    if (!card || !grid.contains(card)) return;
+                    const id = card.getAttribute('data-id');
+                    document.querySelector(`.disk-list-item[data-id="${id}"]`)?.click();
+                });
+            }
 
             // Start realtime scan status polling for all cards in team
             this._currentTeamName = teamName;

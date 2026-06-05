@@ -127,7 +127,21 @@ function api_admin_session_start() {
     if (session_id() !== '') return;
 
     $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
-    @session_set_cookie_params(0, '/', '', $secure, true);
+    // SameSite=Lax on the session cookie mitigates CSRF against the
+    // session-only admin endpoints (no CSRF token exists). PHP >= 7.3 takes an
+    // options array; older PHP has no SameSite arg, so smuggle it via the path
+    // field (same hack as group_config.php) — accepted by most browsers.
+    if (PHP_VERSION_ID >= 70300) {
+        @session_set_cookie_params(array(
+            'lifetime' => 0,
+            'path'     => '/',
+            'secure'   => $secure,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ));
+    } else {
+        @session_set_cookie_params(0, '/; SameSite=Lax', '', $secure, true);
+    }
     @session_start();
 }
 

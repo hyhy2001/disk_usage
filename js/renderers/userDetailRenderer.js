@@ -2,6 +2,7 @@
 // userDetailRenderer.js — Renders per-user detail reports (dirs + files)
 
 import { fmt, fmtDateSec }                  from '../utils/formatters.js';
+import { escHtml }                          from '../utils/dom.js';
 import { streamExportGzip }                 from '../utils/csvExport.js';
 import { AppState, showToast, showProgressToast, updateProgressToast, closeProgressToast } from '../core/main.js';
 
@@ -312,7 +313,7 @@ function _renderEmptyState() {
 }
 
 function _renderError(msg) {
-    return `<div class="ud-error">${msg}</div>`;
+    return `<div class="ud-error">${escHtml(msg)}</div>`;
 }
 
 function _formatBytesForInput(bytes) {
@@ -1007,7 +1008,7 @@ async function _loadAndRender(user) {
                     <div class="ud-empty-icon">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     </div>
-                    <h3>${user}</h3>
+                    <h3>${escHtml(user)}</h3>
                     <p>Total disk usage: <strong>${fmt(otherUser.used)}</strong></p>
                     <p class="ud-no-report-hint">No detailed breakdown available for this user.</p>
                 </div>`;
@@ -1046,7 +1047,7 @@ async function _loadAndRender(user) {
                     <div class="ud-empty-icon">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     </div>
-                    <h3>${user}</h3>
+                    <h3>${escHtml(user)}</h3>
                     <p>Total disk usage: <strong>${fmt(otherUser.used)}</strong></p>
                     <p class="ud-no-report-hint">No detailed breakdown available for this user.</p>
                 </div>`;
@@ -1119,8 +1120,8 @@ async function _fetchAndRenderFilePage(root, cursor) {
                 const clr = _extColor(ext);
                 return `
                 <div class="ud-path-row">
-                    <span class="ud-ext-badge" style="background:${clr}20;color:${clr}">.${ext}</span>
-                    <div class="ud-path-name" title="${_toAbsoluteDisplayPath(f.path)}" style="cursor: pointer;">${_shortPath(_toAbsoluteDisplayPath(f.path))}</div>
+                    <span class="ud-ext-badge" style="background:${clr}20;color:${clr}">.${escHtml(ext)}</span>
+                    <div class="ud-path-name" title="${escHtml(_toAbsoluteDisplayPath(f.path))}" style="cursor: pointer;">${escHtml(_shortPath(_toAbsoluteDisplayPath(f.path)))}</div>
                     <div class="ud-path-bar-wrap" data-tooltip="${fmt(f.size)} · ${pct}% of page total">
                         <div class="ud-path-bar-fill ud-fill-emerald" style="width:${pct}%"></div>
                     </div>
@@ -1181,7 +1182,7 @@ async function _fetchAndRenderDirPage(root, cursor) {
                 const cls = parseFloat(pct) > 70 ? 'ud-fill-rose' : parseFloat(pct) > 40 ? 'ud-fill-amber' : 'ud-fill-sky';
                 return `
                 <div class="ud-path-row">
-                    <div class="ud-path-name" title="${_toAbsoluteDisplayPath(d.path)}" style="cursor: pointer;">${_shortPath(_toAbsoluteDisplayPath(d.path))}</div>
+                    <div class="ud-path-name" title="${escHtml(_toAbsoluteDisplayPath(d.path))}" style="cursor: pointer;">${escHtml(_shortPath(_toAbsoluteDisplayPath(d.path)))}</div>
                     <div class="ud-path-bar-wrap" data-tooltip="${fmt(d.used)} · ${pct}% of page total">
                         <div class="ud-path-bar-fill ${cls}" style="width:${pct}%"></div>
                     </div>

@@ -2,6 +2,8 @@
 
 function api_handle_health($root_dir) {
     $status = api_cache_runtime_status();
+    // Don't expose the real cache directory path to unauthenticated callers.
+    unset($status['cache_dir']);
     $disks = api_load_disks_config($root_dir);
     $disk_count = api_count_disks($disks);
 

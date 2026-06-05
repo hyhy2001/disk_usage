@@ -2,7 +2,7 @@
  * Render the Inodes Stat tab
  * @param {Object} inodesData - The JSON object from inode_usage_report.json
  */
-import { pct } from '../utils/dom.js';
+import { pct, escHtml } from '../utils/dom.js';
 
 export function renderInodesTab(inodesData, chartMgr) {
     const container = document.getElementById('inodes-body');
@@ -76,9 +76,9 @@ export function renderInodesTab(inodesData, chartMgr) {
             const uPctUsed = pct(userInodes, inodes_used || 1);
             
             return `
-            <div class="inode-user-card" data-username="${u.name.toLowerCase()}">
+            <div class="inode-user-card" data-username="${escHtml(u.name.toLowerCase())}">
                 <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px;">
-                    <span style="font-weight: 500; font-size: 0.9rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${u.name}">${u.name}</span>
+                    <span style="font-weight: 500; font-size: 0.9rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escHtml(u.name)}">${escHtml(u.name)}</span>
                     <span style="font-size: 0.85rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary);">${userInodes.toLocaleString()}</span>
                 </div>
                 <div class="sbar-track" style="height: 6px; border-radius: 3px;" data-tooltip="${userInodes.toLocaleString()} inodes · ${uPctTotal}% of Total · ${uPctUsed}% of Used">

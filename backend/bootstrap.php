@@ -14,17 +14,6 @@ require_once __DIR__ . '/lib/cache.php';
 require_once __DIR__ . '/lib/db_connection.php';
 require_once __DIR__ . '/lib/path_resolver.php';
 
-if (isset($_GET['debug_runtime']) && $_GET['debug_runtime'] === '1') {
-    header('Content-Type: application/json');
-    echo json_encode(array(
-        'bootstrap_file' => __FILE__,
-        'php_version' => PHP_VERSION,
-        'disable_functions' => ini_get('disable_functions'),
-        'server_time' => date('Y-m-d H:i:s'),
-    ), JSON_PRETTY_PRINT);
-    exit;
-}
-
 require_once __DIR__ . '/handlers/disks.php';
 require_once __DIR__ . '/handlers/team.php';
 require_once __DIR__ . '/handlers/health.php';
@@ -37,6 +26,24 @@ require_once __DIR__ . '/handlers/aggregate.php';
 require_once __DIR__ . '/handlers/group_config.php';
 require_once __DIR__ . '/handlers/admin.php';
 require_once __DIR__ . '/handlers/scan_status.php';
+
+// Runtime diagnostics. Gated behind admin auth — it leaks PHP version and
+// disable_functions (exploit-surface recon) and is loaded after admin.php so
+// the auth helper is available. Unauthenticated callers get a generic 401.
+if (isset($_GET['debug_runtime']) && $_GET['debug_runtime'] === '1') {
+    header('Content-Type: application/json');
+    if (!api_admin_is_authenticated()) {
+        http_response_code(401);
+        echo json_encode(array('error' => 'Unauthorized'));
+        exit;
+    }
+    echo json_encode(array(
+        'php_version' => PHP_VERSION,
+        'disable_functions' => ini_get('disable_functions'),
+        'server_time' => date('Y-m-d H:i:s'),
+    ), JSON_PRETTY_PRINT);
+    exit;
+}
 
 require_once __DIR__ . '/router.php';
 

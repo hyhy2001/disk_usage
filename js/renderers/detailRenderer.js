@@ -1,7 +1,7 @@
 // Detail Page Renderer — 2 tabs: Latest Snapshot & History/Analysis
 import { AppState } from '../core/main.js';
 import { fmt, fmtDate } from '../utils/formatters.js';
-import { pct } from '../utils/dom.js';
+import { pct, escHtml } from '../utils/dom.js';
 import { saveFilters, loadFilters } from '../utils/filterStorage.js';
 import { getDetailTabFromUrl, replaceRoute } from '../core/router.js?v=101';
 import { renderInodesTab } from './inodeRenderer.js';
@@ -101,14 +101,14 @@ function renderSnapshotView() {
 
     // ── Teams (relative to total disk capacity)
     const teamRows = teams.map(t =>
-        barRow(`<span class="team-badge">${t.name}</span>`, t.used, sys, 'fill-sky')
+        barRow(`<span class="team-badge">${escHtml(t.name)}</span>`, t.used, sys, 'fill-sky')
     ).join('') || '<p class="table-empty">No team data.</p>';
 
     // ── Top 10 Users (relative to total disk capacity)
     const top10 = users.slice(0, 10);
     const userRows = top10.map((u, i) =>
         `<div class="sbar-row">
-            <div class="sbar-name"><span class="rank-badge">#${i + 1}</span> <span class="user-name">${u.name}</span></div>
+            <div class="sbar-name"><span class="rank-badge">#${i + 1}</span> <span class="user-name">${escHtml(u.name)}</span></div>
             <div class="sbar-track" data-tooltip="${fmt(u.used)} · ${pct(u.used, sys)}% of total">
                 <div class="sbar-fill fill-sky" style="width:${Math.min(parseFloat(pct(u.used, sys)), 100)}%"></div>
             </div>
@@ -262,7 +262,7 @@ function renderPivotView(pivotData) {
         let badge = '<span class="trend-neutral pivot-trend">→</span>';
         if (t && t.delta > 0) badge = `<span class="trend-up pivot-trend">▲ ${t.pct}%</span>`;
         if (t && t.delta < 0) badge = `<span class="trend-down pivot-trend">▼ ${Math.abs(t.pct)}%</span>`;
-        return `<th class="pivot-user-th"><span class="user-name" title="${u}">${u}</span>${badge}</th>`;
+        return `<th class="pivot-user-th"><span class="user-name" title="${escHtml(u)}">${escHtml(u)}</span>${badge}</th>`;
     }).join('');
 
     const rows = dates.map(ts => {

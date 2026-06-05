@@ -1,4 +1,5 @@
 import { showToast } from '../../core/main.js';
+import { escHtml } from '../../utils/dom.js';
 
 const STORAGE_KEY = 'du_group_user_config_v2';
 const VIEW_STATE_KEY = 'du_group_user_view_state_v1';
@@ -1008,7 +1009,7 @@ function renderGroups() {
         const isPrimary = g.id === state.selectedGroupId;
         return `
             <button class="group-user-row ${isActive ? 'active' : ''} ${isPrimary ? 'primary' : ''}" data-group-id="${g.id}" data-drop-group-id="${g.id}" type="button">
-                <span class="group-user-row-main">${g.name}</span>
+                <span class="group-user-row-main">${escHtml(g.name)}</span>
                 <span class="group-user-row-meta">${g.userCount} users</span>
             </button>
         `;
@@ -1105,7 +1106,7 @@ function renderHeaderGroupSwitch() {
         '<option value="">Select team space...</option>',
         ...rows.map((r) => {
             const selected = r.name === state.selectedTeamSpace ? ' selected' : '';
-            return `<option value="${r.name}"${selected}>${r.name} (${r.diskCount})</option>`;
+            return `<option value="${escHtml(r.name)}"${selected}>${escHtml(r.name)} (${r.diskCount})</option>`;
         }),
     ].join('');
 }
@@ -1139,8 +1140,8 @@ function renderDisks() {
         const teamText = disk.teamNames?.join(', ') || 'Unknown Team';
         return `
             <button class="group-user-row ${active ? 'active' : ''}" data-disk-id="${disk.id}" type="button">
-                <span class="group-user-row-main">${disk.name}</span>
-                <span class="group-user-row-meta" title="${teamText}">${teamText}</span>
+                <span class="group-user-row-main">${escHtml(disk.name)}</span>
+                <span class="group-user-row-meta" title="${escHtml(teamText)}">${escHtml(teamText)}</span>
             </button>
         `;
     }).join('') || '<div class="group-user-empty">No disk matched this team space.</div>';
@@ -1213,7 +1214,7 @@ function renderUsers() {
 
             container.innerHTML = filteredUsers.map((user) => `
                 <div class="group-user-row included ${state.selectedUserNames.includes(user) ? 'active' : ''}" data-user-name="${encodeURIComponent(user)}" draggable="true">
-                    <span class="group-user-row-main">${user}</span>
+                    <span class="group-user-row-main">${escHtml(user)}</span>
                     ${canRemoveUsers
         ? `<button class="group-user-row-action" data-remove-user="${encodeURIComponent(user)}" type="button" title="Remove user">${iconTrash()}</button>`
         : ''}
@@ -1223,7 +1224,7 @@ function renderUsers() {
         })
         .catch((err) => {
             if (token !== state.usersLoadingToken) return;
-            container.innerHTML = `<div class="group-user-empty">Failed to load users: ${err.message || 'Unknown error'}</div>`;
+            container.innerHTML = `<div class="group-user-empty">Failed to load users: ${escHtml(err.message || 'Unknown error')}</div>`;
         });
 }
 
