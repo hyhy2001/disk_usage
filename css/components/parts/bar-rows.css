@@ -1,12 +1,10 @@
-/* -----------------------------------------
-   Detail Page -- 2-Column Layout
------------------------------------------ */
-.detail-layout {
-    display: grid;
-    grid-template-columns: 260px 1fr;
-    gap: 24px;
-    align-items: start;
-}
+/* ===========================================================================
+   bar-rows.css — Detail-page bar rows + filter sidebar.
+   NOTE: rules whose every property is also declared by detail-page.css (which
+   loads LAST via _index.css and therefore wins) were removed from here as dead
+   code. What remains either is unique to this file or contributes properties
+   detail-page.css does not override (live via per-property cascade merge).
+   =========================================================================== */
 
 /* -----------------------------------------
    Filter Sidebar
@@ -46,13 +44,7 @@
     border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
-.filter-section-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-secondary);
-}
+/* .filter-section-label removed — fully overridden by detail-page.css */
 
 .filter-date-row {
     display: flex;
@@ -91,10 +83,7 @@
 
 .select-input option { background: #1a1f27; }
 
-.quick-range-btns {
-    display: flex;
-    gap: 6px;
-}
+/* .quick-range-btns removed — fully overridden by detail-page.css */
 
 .quick-btn {
     flex: 1;
@@ -116,15 +105,7 @@
     color: var(--text-accent);
 }
 
-.chk-all-wrap {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-weight: 600;
-}
+/* .chk-all-wrap base removed — fully overridden by detail-page.css */
 
 .chk-all-wrap input, .chk-row input {
     accent-color: var(--emerald-500);
@@ -260,17 +241,7 @@
     align-items: center;
 }
 
-.filter-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 12px;
-    background: rgba(14,165,233,0.1);
-    border: 1px solid rgba(14,165,233,0.22);
-    border-radius: 100px;
-    font-size: 0.74rem;
-    font-weight: 500;
-    color: var(--sky-400);
-}
+/* .filter-chip removed — fully overridden by detail-page.css */
 
 .chips-empty {
     font-size: 0.75rem;
@@ -281,26 +252,9 @@
 /* -----------------------------------------
    Results Area
 ----------------------------------------- */
-.detail-results {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-}
+/* .detail-results removed — fully overridden by detail-page.css */
 
-.result-section {
-    background: var(--bg-surface);
-    border: var(--glass-border);
-    border-radius: var(--border-radius-lg);
-    overflow: hidden;
-}
-
-.result-section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 24px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-}
+/* .result-section removed — identical in detail-page.css */
 
 .result-section-header h3 {
     font-size: 0.95rem;
@@ -308,15 +262,7 @@
     color: var(--text-primary);
 }
 
-.result-count {
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--text-accent);
-    background: rgba(16,185,129,0.08);
-    border: 1px solid rgba(16,185,129,0.15);
-    border-radius: 100px;
-    padding: 2px 10px;
-}
+/* .result-count removed — fully overridden by detail-page.css */
 
 .result-section .table-wrapper { border-radius: 0; }
 
@@ -362,11 +308,7 @@
     border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
-.snapshot-section-title {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-primary);
-}
+/* .snapshot-section-title removed — identical in detail-page.css */
 
 .snapshot-rows {
     padding: 12px 20px;
@@ -400,35 +342,15 @@
     font-weight: 500;
 }
 
-.sbar-track {
-    height: 10px;
-    background: rgba(0,0,0,0.09);
-    border-radius: 6px;
-    overflow: hidden;
-    /* Allow track to shrink as 1fr column when space is tight */
-    min-width: 0;
-}
-:root:not([data-theme='light']) .sbar-track {
-    background: rgba(255,255,255,0.09);
-}
+/* .sbar-track (base + dark-theme override) removed — detail-page.css declares
+   the same properties (base fully overridden; the :root:not([data-theme='light'])
+   rule is identical there). */
 
-.sbar-fill {
-    height: 100%;
-    border-radius: 6px;
-    transition: width 0.6s cubic-bezier(.22,.61,.36,1);
-}
+/* .sbar-fill removed — fully overridden by detail-page.css */
 
-/* Fill color variants */
-.fill-emerald { background: linear-gradient(90deg, #10b981, #34d399); }
-.fill-amber   { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
-.fill-rose    { background: linear-gradient(90deg, #f43f5e, #fb7185); }
-.fill-sky     { background: linear-gradient(90deg, #0ea5e9, #38bdf8); }
+/* .fill-* gradients removed — detail-page.css overrides each with a flat color */
 
-.sbar-pct {
-    font-size: 0.82rem;
-    font-weight: 700;
-    text-align: right;
-}
+/* .sbar-pct removed — fully overridden by detail-page.css */
 
 .sbar-val {
     font-size: 0.8rem;
