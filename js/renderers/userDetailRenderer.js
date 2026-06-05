@@ -22,7 +22,18 @@ let _dirNextCursor      = null;
 let _dirHasMore         = false;
 let _currentSentDirCursor = null;
 const FILE_PAGE         = 500;  // rows per page
-let _currentFilters = JSON.parse(localStorage.getItem('ud_filters') || 'null') || { query: '', ext: '', minSize: 0, maxSize: 0 };
+const _DEFAULT_FILTERS  = { query: '', ext: '', minSize: 0, maxSize: 0 };
+// Guarded read: a corrupt localStorage value must not throw at module load and
+// white-screen the whole app — fall back to defaults instead.
+let _currentFilters = (() => {
+    try {
+        const raw = localStorage.getItem('ud_filters');
+        const parsed = raw ? JSON.parse(raw) : null;
+        return (parsed && typeof parsed === 'object') ? { ..._DEFAULT_FILTERS, ...parsed } : { ..._DEFAULT_FILTERS };
+    } catch (_) {
+        return { ..._DEFAULT_FILTERS };
+    }
+})();
 let _allUserNames   = [];
 let _scanRoot       = '';
 let _dropdownQuery  = '';
@@ -1267,10 +1278,14 @@ function _attachPickerEvents(root) {
         }
     });
 
-    // Close on outside click
-    document.addEventListener('click', e => {
+    // Close on outside click. Stored on `root` and removed before re-adding so
+    // repeated _attachPickerEvents calls don't stack listeners on `document`
+    // (same pattern as _attachContentEvents' _filterOuterClick above).
+    document.removeEventListener('click', root._pickerOuterClick);
+    root._pickerOuterClick = (e) => {
         if (!root.querySelector('#ud-dropdown')?.contains(e.target)) close();
-    }, { once: false, capture: false });
+    };
+    document.addEventListener('click', root._pickerOuterClick);
 
     // Keyboard: Escape to close
     list.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
