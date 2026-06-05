@@ -59,7 +59,7 @@ which generates the JSON reports this dashboard consumes.
 - **Breadcrumb navigation** — click any ancestor to jump back; resolves paths via tree-walk
 - **Global search** — find directories by name across the entire tree; results scoped to current path
 - **Size bars** — visual percentage of disk usage per node with colour coding
-- **Owner column** — shows directory owner for each node
+- **Owner column** — shows each directory's real inode owner (`st_uid`), resolved to a username
 - **Lazy loading** — fetches children on demand via `treemap.db` shard API
 - **Responsive layout** — 4-column grid collapses to 2-column then single-column at narrow widths
 
@@ -178,13 +178,13 @@ The API discovers report files from each disk `path` using the backend rules bel
 |-----------|----------|---------------|
 | Main usage/history reports | disk path root | JSON filenames containing `disk_usage_report` or `usage_report`, or starting with `report_` / `report-` |
 | Main report exclusions | disk path root | Files containing `permission_issue`, `detail_report`, or `inode_usage` are excluded from main usage/history aggregation |
-| Permission issues | disk path root | Latest JSON file whose name contains `permission_issue` |
+| Permission issues (preferred) | disk path root | `permission_issues.db` (SQLite) — server-side WHERE/LIMIT filtering |
+| Permission issues (legacy fallback) | disk path root | Latest JSON file whose name contains `permission_issue` |
 | Inode usage fallback | disk path root | Latest JSON file matching `*inode_usage_report*.json` |
 | Unified user detail | `detail_users/` | Preferred file is `data_detail.db` |
 | Legacy directory detail fallback | `detail_users/` | `detail_report_dir_<user>.json`, `detail_report_dirs_<user>.json`, or the same names with any prefix ending in `_` |
 | Legacy file detail fallback | `detail_users/` | `detail_report_file_<user>.json`, `detail_report_files_<user>.json`, or the same names with any prefix ending in `_` |
-| Treemap index | disk path root | Latest JSON file containing `tree_map_report` or `treemap_report` |
-| Treemap shard fallback | `tree_map_shards/` | `<shard_id>.json` when `tree_map_data.db` is unavailable |
+| Treemap data | `tree_map_data/` | `treemap.db` (SQLite, DB-only). The API `shard_id` is the decimal `dir_id`; there is no JSON shard fallback |
 
 For user detail, `data_detail.db` takes precedence over legacy per-user JSON files.
 
@@ -297,7 +297,7 @@ Each `path` directory should contain:
 | `meta` | `key`, `value` | scan_root, scan_timestamp |
 | `users` | `uid`, `username`, `team_id`, `total_files`, `total_dirs`, `total_size`, `permission_issues`, `is_target` | Per-user metadata and totals |
 | `file_names` | `id`, `name` | Unique file basename dictionary |
-| `dirs` | `id`, `uid`, `parent_id`, `path`, `owner_uid`, `size`, `files` | Directory rows — one per (dir, user) pair. `path` is absolute when DB is built fresh; when relative, frontend reconstructs from `scan_root`. PK: `(id, uid)` |
+| `dirs` | `id`, `uid`, `parent_id`, `path`, `owner_uid`, `size`, `files` | Directory rows — one per (dir, user) pair. `path` is absolute when DB is built fresh; when relative, frontend reconstructs from `scan_root`. `owner_uid` is a reserved placeholder (currently always 0, not populated/consumed — real dir-owner lives in `treemap.db`). PK: `(id, uid)` |
 | `files` | `dir_id`, `name_id`, `ext`, `uid`, `size` | File rows — `ext` stored inline (no dictionary) |
 
 Indexes (keyset-pagination optimized):
@@ -314,7 +314,7 @@ Indexes (keyset-pagination optimized):
 | `meta` | `key`, `value` | scan_root, scan_timestamp, max_level, total_size, total_dirs |
 | `names` | `id`, `name` | Directory segment dictionary |
 | `owners` | `uid`, `username` | UID → username mapping |
-| `dirs` | `id`, `parent_id`, `name_id`, `total_size`, `file_count`, `dir_count`, `owner_uid`, `has_files` | Full directory tree (all depths) |
+| `dirs` | `id`, `parent_id`, `name_id`, `total_size`, `file_count`, `dir_count`, `owner_uid`, `has_files` | Full directory tree (all depths). `owner_uid` is the directory's real inode owner (`st_uid`), resolved via `owners` — not the top space consumer |
 
 ### Backend reliability
 
@@ -474,7 +474,6 @@ check_disk (CLI, server-side)
         ├── permission_issues_20260322.json       (inaccessible paths)
         ├── detail_users/data_detail.db           (unified per-user dirs/files)
         └── tree_map_data/treemap.db              (directory tree for treemap explorer)
-
 api.php (PHP, web server)
   ├── Aggregates all disk_usage_report*.json → history timeline
   ├── Reads detail_users/data_detail.db → cursor-paginated user detail JSON
@@ -496,7 +495,7 @@ _Built for teams managing large shared storage environments._
 ## 🧭 Architecture Note
 
 This repository is the **dashboard/UI layer** of a two-part system:
-- `check_disk` generates reports (`disk_usage_report*.json`, `permission_issues*.json`, `detail_users/*.db`, `tree_map_data.db`)
+- `check_disk` generates reports (`disk_usage_report*.json`, `permission_issues*.json`, `detail_users/*.db`, `tree_map_data/treemap.db`)
 - `disk_usage` reads those reports and serves them via `api.php` + frontend renderers.
 
 For a full end-to-end sequence (scanner → report files → PHP API → UI), see:
