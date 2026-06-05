@@ -8,7 +8,7 @@
 @container main (max-width: 900px) {
     .snapshot-two-col {
         grid-template-columns: 1fr;
-        gap: 14px;
+        gap: var(--space-3-5);
     }
 
     /* History charts grid → single col */
@@ -84,7 +84,7 @@
     .detail-tabs {
         overflow-x: auto;
         flex-wrap: nowrap;
-        padding-bottom: 6px;
+        padding-bottom: var(--space-1-5);
     }
 
     .detail-tab-btn {
@@ -99,8 +99,8 @@
     .workspace-header {
         flex-wrap: wrap;
         height: auto;
-        gap: 8px;
-        padding-bottom: 4px;
+        gap: var(--space-2);
+        padding-bottom: var(--space-1);
     }
 
     /* stat bar in overview stacks */
@@ -114,7 +114,7 @@
     /* team card in list view stacks */
     .disk-card-grid.list-view .team-disk-card {
         flex-direction: column;
-        gap: 10px;
+        gap: var(--space-2-5);
         padding: 14px 16px;
     }
 
@@ -166,7 +166,7 @@
 .inode-user-card {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
     padding: 12px 16px;
     background: rgba(255,255,255,0.03);
     border-radius: var(--radius-sm);
@@ -209,7 +209,7 @@
     background: rgba(248, 250, 252, 0.78);
     border: 1px solid rgba(15, 23, 42, 0.08);
     border-radius: var(--radius-md);
-    padding: 10px;
+    padding: var(--space-2-5);
 }
 
 :root[data-theme='light'] #inode-user-grid {

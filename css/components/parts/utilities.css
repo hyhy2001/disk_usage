@@ -12,8 +12,8 @@
 
 /* ── Utility Classes (IMP-02) ─────────────────────────────────────────────── */
 /* Replace scattered inline styles with reusable utilities */
-.flex-row-g8 { display: flex; align-items: center; gap: 8px; }
-.flex-row-g6 { display: flex; align-items: center; gap: 6px; }
+.flex-row-g8 { display: flex; align-items: center; gap: var(--space-2); }
+.flex-row-g6 { display: flex; align-items: center; gap: var(--space-1-5); }
 .w-full { width: 100%; }
 
 /* ── SVG icon alignment in text contexts (IMP-01) ─────────────────────────── */

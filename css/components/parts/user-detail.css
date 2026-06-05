@@ -6,7 +6,7 @@
 .ud-picker-wrap {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
     padding: 14px 18px;
     margin-bottom: 18px;
     border-radius: var(--radius-md);
@@ -17,7 +17,7 @@
 .ud-picker-label {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     font-size: 0.8rem;
     color: var(--text-secondary);
     white-space: nowrap;
@@ -44,7 +44,7 @@
     font-size: 0.85rem;
     cursor: pointer;
     transition: border-color 0.15s, background 0.15s;
-    gap: 8px;
+    gap: var(--space-2);
     text-align: left;
 }
 .ud-dropdown-btn:hover,
@@ -127,10 +127,10 @@
 .ud-picker-export {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     margin-left: auto;
     border-left: 1px solid rgba(255,255,255,0.08);
-    padding-left: 12px;
+    padding-left: var(--space-3);
 }
 
 .ud-picker-export-label {
@@ -168,12 +168,12 @@
     justify-content: space-between;
     padding: 12px 16px 10px;
     border-bottom: 1px solid rgba(148, 163, 184, 0.15);
-    gap: 8px;
+    gap: var(--space-2);
 }
 .ud-card-title {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     font-size: 0.82rem;
     font-weight: 600;
     color: var(--text-primary);
@@ -191,7 +191,7 @@
     content: '';
     display: inline-block;
     width: 6px; height: 6px;
-    margin-left: 6px;
+    margin-left: var(--space-1-5);
     border-radius: 50%;
     background: var(--accent, #3b82f6);
     animation: ud-pulse 1.4s infinite;
@@ -206,7 +206,7 @@
 .ud-card-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     flex-shrink: 0;
 }
 
@@ -214,7 +214,7 @@
 .ud-export-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     padding: 3px 9px;
     border-radius: 5px;
     border: 1px solid rgba(255,255,255,0.1);
@@ -245,7 +245,7 @@
 .perm-export-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     padding: 4px 10px;
     border-radius: 6px;
     border: 1px solid rgba(255,255,255,0.1);
@@ -306,13 +306,13 @@
     max-height: 420px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
 }
 .ud-path-row {
     display: grid;
     grid-template-columns: 1fr 90px 60px;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     padding: 5px 4px;
     border-radius: 6px;
     transition: background 0.12s;
@@ -337,7 +337,7 @@
 .ud-sk-pathrow {
     display: grid;
     grid-template-columns: 1fr 90px 60px;
-    gap: 8px;
+    gap: var(--space-2);
     align-items: center;
     padding: 5px 4px;
     height: 28px;
@@ -413,7 +413,7 @@
     justify-content: center;
     padding: 60px 24px;
     text-align: center;
-    gap: 12px;
+    gap: var(--space-3);
 }
 .ud-empty-icon {
     width: 56px;
@@ -434,9 +434,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 14px;
+    gap: var(--space-3-5);
     padding: 12px 16px;
-    margin-bottom: 16px;
+    margin-bottom: var(--space-4);
     border-radius: var(--radius-md);
     background: rgba(245, 158, 11, 0.07);
     border: 1px solid rgba(245, 158, 11, 0.22);
@@ -448,7 +448,7 @@
 .ud-beta-banner-left {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
     min-width: 0;
 }
 
@@ -517,17 +517,17 @@
 :root[data-theme='light'] .ud-beta-close { color: #b45309; border-color: rgba(180,83,9,0.2); }
 
 .ud-error {
-    padding: 16px;
+    padding: var(--space-4);
     border-radius: 10px;
     background: rgba(244, 63, 94, 0.08);
     color: var(--rose-400, var(--rose-400));
     font-size: 0.83rem;
-    margin-top: 12px;
+    margin-top: var(--space-3);
 }
 
 /* Loading hint */
 .ud-loading {
-    padding: 40px;
+    padding: var(--space-10);
     text-align: center;
     color: var(--text-secondary);
     font-size: 0.85rem;
@@ -544,7 +544,7 @@
     border-radius: 6px;
 }
 @keyframes ud-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-.ud-skeleton-card { padding: 14px 16px; gap: 10px; display: flex; flex-direction: column; }
+.ud-skeleton-card { padding: 14px 16px; gap: var(--space-2-5); display: flex; flex-direction: column; }
 .ud-sk-title { height: 16px; width: 40%; border-radius: var(--radius-xs); }
 .ud-sk-row   { height: 10px; border-radius: var(--radius-xs); }
 
@@ -588,12 +588,12 @@
     justify-content: center;
     padding: 12px 0 4px;
     border-top: 1px solid rgba(148,163,184,0.1);
-    margin-top: 4px;
+    margin-top: var(--space-1);
 }
 .ud-load-more-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     padding: 7px 18px;
     border: 1px solid rgba(148,163,184,0.25);
     border-radius: var(--radius-sm);
@@ -622,17 +622,17 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
+    gap: var(--space-2-5);
     padding: 14px 0 6px;
     border-top: 1px solid rgba(148,163,184,0.08);
-    margin-top: 8px;
+    margin-top: var(--space-2);
     flex-wrap: wrap;
 }
 .ud-page-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-width: 32px;
     height: 32px;
     padding: 0 14px;
@@ -706,7 +706,7 @@
     gap: 0;
     border-radius: var(--radius-md);
     overflow: hidden;
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
     transition: opacity 0.2s;
 }
 
@@ -715,7 +715,7 @@
     display: grid;
     grid-template-columns: 20px 100px 2fr 100px 2fr;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     padding: 8px 14px;
     font-size: 0.8rem;
     border-bottom: 1px solid rgba(148,163,184,0.07);
@@ -773,10 +773,10 @@
     min-width: 0;
 }
 .perm-empty-filter {
-    padding: 24px;
+    padding: var(--space-6);
     text-align: center;
     color: var(--text-secondary);
     font-size: 0.85rem;
 }
-.perm-pagination { margin-top: 8px; }
+.perm-pagination { margin-top: var(--space-2); }
 

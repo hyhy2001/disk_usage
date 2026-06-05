@@ -7,7 +7,7 @@
     top: 0;
     display: flex;
     flex-direction: column;
-    padding: 24px;
+    padding: var(--space-6);
     z-index: 200;
     border-right: var(--glass-border);
     transition: width 0.25s ease, left 0.25s ease;
@@ -15,7 +15,7 @@
 }
 
 .brand {
-    margin-bottom: 32px;
+    margin-bottom: var(--space-8);
     position: relative;
     z-index: 300;
 }
@@ -25,13 +25,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 .logo {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
     font-size: 1.25rem;
     font-weight: 700;
     letter-spacing: -0.02em;
@@ -44,7 +44,7 @@
     padding: 32px 32px 32px 24px;
     display: flex;
     flex-direction: column;
-    gap: 32px;
+    gap: var(--space-8);
     min-width: 0;
     overflow-y: auto;
     overflow-x: hidden;

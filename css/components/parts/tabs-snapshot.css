@@ -92,7 +92,7 @@
     height: 6px;
     background: rgba(0,0,0,0.08);
     border-radius: 3px;
-    margin-top: 4px;
+    margin-top: var(--space-1);
     overflow: visible;
     position: relative;
 }
@@ -113,9 +113,9 @@
 ----------------------------------------- */
 .detail-tabs {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
     padding: 0 0 4px;
-    margin-bottom: 20px;
+    margin-bottom: var(--space-5);
     border-bottom: 1px solid rgba(255,255,255,0.06);
     min-width: 0;
     /* Always scrollable so tabs never get clipped */
@@ -170,7 +170,7 @@
 .snapshot-body {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: var(--space-5);
     /* Prevent body from overflowing its container */
     min-width: 0;
     width: 100%;
@@ -180,7 +180,7 @@
 .snapshot-two-col {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    gap: var(--space-5);
     align-items: start;
     /* CRITICAL: prevents grid from overflowing parent */
     min-width: 0;
@@ -192,7 +192,7 @@
 .snapshot-col {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: var(--space-5);
     /* CRITICAL: grid child must not overflow its cell */
     min-width: 0;
     box-sizing: border-box;
@@ -207,13 +207,13 @@
 @media (max-width: 1000px) {
     .snapshot-two-col {
         grid-template-columns: 1fr;
-        gap: 16px;
+        gap: var(--space-4);
     }
 }
 
 /* Inode Stat responsive layout */
 .inode-panel {
-    padding: 24px;
+    padding: var(--space-6);
     border-radius: var(--radius-md);
     display: flex;
     flex-direction: column;
@@ -223,7 +223,7 @@
     flex: 1;
     position: relative;
     width: 100%;
-    margin-top: 10px;
+    margin-top: var(--space-2-5);
     min-height: 220px;
 }
 

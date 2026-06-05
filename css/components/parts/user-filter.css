@@ -6,7 +6,7 @@
 .history-main-row {
     display: flex;
     flex-wrap: wrap;    /* filter box drops below on narrow screens */
-    gap: 14px;
+    gap: var(--space-3-5);
     align-items: stretch;
 }
 
@@ -132,7 +132,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: var(--space-3-5);
 }
 
 /* The filter panel box */
@@ -142,8 +142,8 @@
     flex-shrink: 1;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 14px;
+    gap: var(--space-2);
+    padding: var(--space-3-5);
     align-self: flex-start;
     min-height: 0;
     max-height: min(64dvh, calc(100dvh - 260px));
@@ -207,8 +207,8 @@
 .perm-filter-section {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding-bottom: 10px;
+    gap: var(--space-1-5);
+    padding-bottom: var(--space-2-5);
     border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 .perm-filter-section:last-child { border-bottom: none; padding-bottom: 0; }
@@ -222,13 +222,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 6px;
+    gap: var(--space-1-5);
 }
 
 /* File / Dir type toggle buttons */
 .perm-type-group {
     display: flex;
-    gap: 4px;
+    gap: var(--space-1);
 }
 
 .perm-type-btn {
@@ -283,7 +283,7 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
-    padding-bottom: 6px;
+    padding-bottom: var(--space-1-5);
     overscroll-behavior: contain;
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.1) transparent;
@@ -321,7 +321,7 @@
 .user-filter-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     padding: 6px 8px;
     border-radius: 6px;
     cursor: pointer;
@@ -362,7 +362,7 @@
     gap: 5px;
     flex-wrap: wrap;
     border-top: 1px solid rgba(255,255,255,0.06);
-    padding-top: 8px;
+    padding-top: var(--space-2);
     margin-top: 2px;
     flex-shrink: 0;
 }

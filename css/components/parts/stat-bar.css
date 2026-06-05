@@ -11,7 +11,7 @@
     font-style: italic;
 }
 
-.unknown-icon { margin-right: 4px; }
+.unknown-icon { margin-right: var(--space-1); }
 
 .unknown-note {
     font-size: 0.72rem;
@@ -38,7 +38,7 @@
 .chk-row {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
 }
 
 .chk-user-name {
@@ -89,13 +89,13 @@
     padding: 60px 40px;
     max-width: 560px;
     margin: 0 auto;
-    gap: 16px;
+    gap: var(--space-4);
 }
 
 .uc-icon {
     color: var(--amber-500);
     opacity: 0.8;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
     filter: drop-shadow(0 0 20px rgba(245,158,11,0.3));
 }
 
@@ -132,8 +132,8 @@
 .uc-features {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-top: 8px;
+    gap: var(--space-2-5);
+    margin-top: var(--space-2);
     width: 100%;
 }
 
@@ -165,7 +165,7 @@
     width: 1px;
     height: 32px;
     background: linear-gradient(to bottom, transparent, rgba(245,158,11,0.4), transparent);
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
 }
 
 .stat-section-label {
@@ -203,7 +203,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 10px 20px;
-    gap: 24px;
+    gap: var(--space-6);
     margin-bottom: 0;
     flex-wrap: wrap;
 }
@@ -211,7 +211,7 @@
 .ssb-left {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     flex-shrink: 0;
 }
 
@@ -233,7 +233,7 @@
 .ssb-right {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2-5);
     flex: 1;
     min-width: 200px;
 }
@@ -299,7 +299,7 @@
 .sbar-legend {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     margin-left: auto;
 }
 
@@ -317,7 +317,7 @@
 .metric-value-stack {
     display: flex;
     align-items: baseline;
-    gap: 6px;
+    gap: var(--space-1-5);
     flex-wrap: wrap;
 }
 
@@ -384,6 +384,6 @@
 .stat-block-scan .stat-numbers-row {
     display: flex;
     align-items: baseline;
-    gap: 4px;
+    gap: var(--space-1);
 }
 

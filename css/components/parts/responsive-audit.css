@@ -9,7 +9,7 @@
 @media (max-width: 768px) {
     .sbar-row {
         grid-template-columns: minmax(0, 130px) 1fr minmax(0, 48px) minmax(0, auto);
-        gap: 6px;
+        gap: var(--space-1-5);
     }
 }
 @media (max-width: 520px) {
@@ -50,7 +50,7 @@
     .general-subrow {
         padding-left: 0;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: var(--space-1-5);
     }
 }
 
@@ -133,8 +133,8 @@
     .perm-summary-bar {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        padding: 12px;
+        gap: var(--space-2-5);
+        padding: var(--space-3);
     }
     .perm-summary-bar .stat-divider { display: none; }
     .perm-summary-num { font-size: 1.25rem; }
@@ -147,7 +147,7 @@
 @media (max-width: 560px) {
     .timeline-header {
         flex-wrap: wrap;
-        gap: 8px;
+        gap: var(--space-2);
     }
     .chart-range-btns {
         flex-wrap: wrap;
@@ -198,7 +198,7 @@
         max-height: min(34dvh, 200px);
         flex-direction: column;
         flex-wrap: nowrap;
-        gap: 4px;
+        gap: var(--space-1);
     }
 
     .user-filter-item {
@@ -214,7 +214,7 @@
     .perm-filter-searches {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 8px;
+        gap: var(--space-2);
     }
 }
 
@@ -233,7 +233,7 @@
     }
 }
 @media (max-width: 480px) {
-    .chart-modal-body { padding: 12px; }
+    .chart-modal-body { padding: var(--space-3); }
     .chart-modal-title { font-size: 0.75rem; }
 }
 
@@ -243,7 +243,7 @@
 @media (max-width: 640px) {
     .scan-summary-bar {
         flex-direction: column;
-        gap: 10px;
+        gap: var(--space-2-5);
         padding: 10px 14px;
     }
     .ssb-right {
@@ -265,7 +265,7 @@
     .detail-tabs {
         overflow-x: auto;
         flex-wrap: nowrap;
-        padding-bottom: 8px;
+        padding-bottom: var(--space-2);
     }
     .detail-tab-btn {
         white-space: nowrap;
@@ -281,7 +281,7 @@
 @media (max-width: 500px) {
     .timerange-presets {
         flex-wrap: wrap;
-        gap: 4px;
+        gap: var(--space-1);
     }
     .hrange-btn {
         padding: 4px 10px;
@@ -330,10 +330,10 @@
    ------------------------------------------------------------------------- */
 @media (max-width: 520px) {
     .snapshot-section { padding: 14px 14px; }
-    .detail-panel { padding: 14px; }
+    .detail-panel { padding: var(--space-3-5); }
     .perm-user-card { padding: 12px 14px; }
     .result-section-header { padding: 10px 14px; }
-    .chart-container { padding: 14px; }
+    .chart-container { padding: var(--space-3-5); }
 }
 
 /* -------------------------------------------------------------------------

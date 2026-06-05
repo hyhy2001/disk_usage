@@ -2,7 +2,7 @@
 .charts-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 24px;
+    gap: var(--space-6);
     /* Prevent grid from overflowing its container */
     min-width: 0;
     width: 100%;
@@ -15,10 +15,10 @@
 }
 
 .chart-container {
-    padding: 24px;
+    padding: var(--space-6);
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: var(--space-4);
     min-height: 350px;
     /* CRITICAL: prevents grid/flex children from overflowing their container */
     min-width: 0;
@@ -41,12 +41,12 @@
     align-items: center;
     justify-content: space-between;
     flex-direction: row;
-    padding-bottom: 4px;
+    padding-bottom: var(--space-1);
 }
 
 .chart-range-btns {
     display: flex;
-    gap: 4px;
+    gap: var(--space-1);
 }
 
 .range-btn {
@@ -86,7 +86,7 @@
 .timeline-stat-header {
     display: flex;
     align-items: baseline;
-    gap: 8px;
+    gap: var(--space-2);
     font-family: 'Inter', sans-serif;
 }
 

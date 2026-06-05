@@ -1,10 +1,10 @@
 
 /* Metric Display Cards */
 .metric-card {
-    padding: 24px;
+    padding: var(--space-6);
     display: flex;
     align-items: flex-start;
-    gap: 16px;
+    gap: var(--space-4);
     transition: var(--transition-smooth);
 }
 
@@ -25,7 +25,7 @@
 .metric-info {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
 }
 
 .metric-label {
@@ -39,7 +39,7 @@
 .metric-value {
     display: flex;
     align-items: baseline;
-    gap: 4px;
+    gap: var(--space-1);
 }
 
 .metric-value .number {
@@ -66,7 +66,7 @@
     color: var(--text-secondary);
     font-family: 'JetBrains Mono', monospace;
     letter-spacing: 0.06em;
-    margin-top: 4px;
+    margin-top: var(--space-1);
     opacity: 0.8;
 }
 
@@ -92,7 +92,7 @@
     text-transform: uppercase;
     letter-spacing: 0.07em;
     color: #475569;
-    margin-bottom: 6px;
+    margin-bottom: var(--space-1-5);
 }
 
 .disk-list {
@@ -113,12 +113,12 @@
 .disk-search-wrap {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.07);
     border-radius: 7px;
     padding: 5px 10px;
-    margin-bottom: 6px;
+    margin-bottom: var(--space-1-5);
 }
 
 .disk-search-icon {

@@ -2,7 +2,7 @@
 .top-header {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
 }
 
 /* Row 1: disk name + path + stats on one line */
@@ -10,14 +10,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--space-4);
     flex-wrap: wrap;
 }
 
 .header-identity {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2-5);
     min-width: 0;
 }
 
@@ -70,6 +70,6 @@
 .metrics-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
+    gap: var(--space-6);
 }
 

@@ -5,7 +5,7 @@
 .history-layout {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: var(--space-3-5);
     min-height: 0;
 }
 
@@ -16,18 +16,18 @@
     justify-content: space-between;
     padding: 12px 20px;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: var(--space-2-5);
 }
 
 .timerange-presets {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
 }
 
 .timerange-label {
     font-size: 0.9rem;
-    margin-right: 4px;
+    margin-right: var(--space-1);
     color: var(--text-secondary);
 }
 
@@ -53,7 +53,7 @@
 .timerange-custom {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 /* -- ② History Charts Row -------------------------------------------------- */
@@ -61,7 +61,7 @@
     display: grid;
     /* 1 column since the second chart was removed */
     grid-template-columns: 1fr;
-    gap: 14px;
+    gap: var(--space-3-5);
     min-width: 0;
     width: 100%;
 }
@@ -81,7 +81,7 @@
     padding: 18px 20px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-3);
     /* CRITICAL: grid child must have min-width: 0 to not overflow cell */
     min-width: 0;
     box-sizing: border-box;
@@ -92,7 +92,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: var(--space-2-5);
 }
 
 .history-chart-title {
@@ -169,7 +169,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
+    padding: var(--space-6);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s ease;
@@ -219,7 +219,7 @@
 .chart-modal-actions {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 .chart-modal-btn {
@@ -252,7 +252,7 @@
 .chart-modal-body {
     flex: 1;
     min-height: 0;
-    padding: 20px;
+    padding: var(--space-5);
     position: relative;
 }
 
@@ -298,13 +298,13 @@
     padding: 14px 18px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-2-5);
 }
 
 .user-bar-controls {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     flex-wrap: wrap;
 }
 
@@ -314,7 +314,7 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--text-secondary);
-    margin-right: 4px;
+    margin-right: var(--space-1);
 }
 
 .user-bar-btn {
@@ -362,7 +362,7 @@
 .user-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--space-1-5);
     max-height: 120px;
     overflow-y: auto;
 }

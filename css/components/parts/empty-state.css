@@ -8,7 +8,7 @@
     justify-content: center;
     text-align: center;
     padding: 52px 40px;
-    gap: 12px;
+    gap: var(--space-3);
 }
 
 .empty-state-icon {
@@ -21,7 +21,7 @@
     background: rgba(245,158,11,0.1);
     border: 1px solid rgba(245,158,11,0.2);
     color: var(--amber-500);
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
     flex-shrink: 0;
 }
 

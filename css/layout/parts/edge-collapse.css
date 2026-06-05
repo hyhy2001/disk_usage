@@ -124,7 +124,7 @@
 
     .sidebar .nav-item {
         justify-content: center;
-        padding: 10px;
+        padding: var(--space-2-5);
         width: 40px;
         height: 40px;
         border-radius: 10px;
@@ -132,7 +132,7 @@
 
     /* Brand area compact */
     .brand {
-        margin-bottom: 24px;
+        margin-bottom: var(--space-6);
         display: flex;
         justify-content: center;
     }
@@ -140,7 +140,7 @@
     /* brand-row stacks to center everything */
     .brand-row {
         flex-direction: column;
-        gap: 6px;
+        gap: var(--space-1-5);
         align-items: center;
     }
 
@@ -150,7 +150,7 @@
 
     /* theme toggle: icon-only, square pill */
     .theme-toggle-btn {
-        padding: 6px;
+        padding: var(--space-1-5);
         border-radius: var(--radius-sm);
         font-size: 0;        /* hide text label */
         gap: 0;
@@ -283,14 +283,14 @@
     }
 
     .sidebar .logo {
-        gap: 10px;
+        gap: var(--space-2-5);
     }
 
     /* Nav section */
     .sidebar .nav-links {
         padding: 12px 12px;
         align-items: stretch;
-        gap: 4px;
+        gap: var(--space-1);
     }
 
     /* Restore all hidden nav text */
@@ -334,7 +334,7 @@
         height: auto;
         padding: 11px 16px;
         border-radius: 10px;
-        gap: 12px;
+        gap: var(--space-3);
         font-size: 0.9rem;
     }
 
@@ -342,7 +342,7 @@
     .sidebar .disk-selector-wrap {
         padding: 12px 16px;
         border-top: 1px solid rgba(255,255,255,0.06);
-        margin-top: 4px;
+        margin-top: var(--space-1);
         align-items: stretch;
         flex: 0 0 auto; /* don't grow in mobile drawer */
     }
@@ -393,7 +393,7 @@
     /* -- Main content: no left margin -- */
     .main-content {
         margin-left: 0;
-        padding: 16px;
+        padding: var(--space-4);
     }
 
     /* -- Fix settings dropdown: use fixed so it escapes sidebar transform
@@ -425,7 +425,7 @@
     .header-top-row {
         flex-direction: column;
         align-items: flex-start;
-        gap: 10px;
+        gap: var(--space-2-5);
     }
 
     .page-stat-bar {
@@ -445,7 +445,7 @@
     .page-stat-bar {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 4px;
+        gap: var(--space-1);
         padding: 8px 10px;
     }
 
@@ -455,7 +455,7 @@
 
     .top-header h1 { font-size: 1.1rem; }
 
-    .chart-container { padding: 12px; }
+    .chart-container { padding: var(--space-3); }
 
     /* Canvas smaller on very small screens */
     .canvas-wrapper {
@@ -477,7 +477,7 @@
     .timeline-header {
         flex-direction: column;
         align-items: flex-start;
-        gap: 8px;
+        gap: var(--space-2);
     }
 }
 
@@ -592,7 +592,7 @@
 
     .detail-tabs {
         flex-wrap: wrap;
-        gap: 4px;
+        gap: var(--space-1);
     }
 
     .detail-tab-btn {
@@ -864,7 +864,7 @@ body.sidebar-collapsed .sidebar .nav-links {
 
 body.sidebar-collapsed .sidebar .nav-item { 
         justify-content: center;
-        padding: 10px;
+        padding: var(--space-2-5);
         width: 40px;
         height: 40px;
         border-radius: 10px;
@@ -872,7 +872,7 @@ body.sidebar-collapsed .sidebar .nav-item {
 
     /* Brand area compact */
 body.sidebar-collapsed .brand { 
-        margin-bottom: 24px;
+        margin-bottom: var(--space-6);
         display: flex;
         justify-content: center;
     }
@@ -880,7 +880,7 @@ body.sidebar-collapsed .brand {
     /* brand-row stacks to center everything */
 body.sidebar-collapsed .brand-row { 
         flex-direction: column;
-        gap: 6px;
+        gap: var(--space-1-5);
         align-items: center;
     }
 
@@ -890,7 +890,7 @@ body.sidebar-collapsed .logo {
 
     /* theme toggle: icon-only, square pill */
 body.sidebar-collapsed .theme-toggle-btn { 
-        padding: 6px;
+        padding: var(--space-1-5);
         border-radius: var(--radius-sm);
         font-size: 0;        /* hide text label */
         gap: 0;
@@ -954,13 +954,13 @@ body.sidebar-collapsed .sidebar .disk-flyout {
         border: 1px solid rgba(255,255,255,0.12);
         border-radius: var(--radius-md);
         box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-        padding: 10px;
+        padding: var(--space-2-5);
         z-index: 500;
         /* Use opacity+pointer-events instead of display:none
            so we can (a) animate and (b) add a ::before bridge */
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: var(--space-1-5);
         opacity: 0;
         visibility: hidden;
         transition: opacity 0.2s ease, visibility 0s linear 0.25s;
@@ -1133,7 +1133,7 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
 @container main (max-width: 860px) {
     .snapshot-two-col {
         grid-template-columns: 1fr;
-        gap: 16px;
+        gap: var(--space-4);
     }
 }
 
@@ -1173,7 +1173,7 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
     /* stat bar wraps */
     .page-stat-bar {
         flex-wrap: wrap;
-        gap: 4px;
+        gap: var(--space-1);
     }
 
     /* snapshot bar rows stack */
@@ -1181,7 +1181,7 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
         display: flex;
         flex-direction: column;
         align-items: stretch;
-        gap: 6px;
+        gap: var(--space-1-5);
     }
 
     .general-row .sbar-name {
@@ -1220,7 +1220,7 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
     /* Detail tab buttons wrap */
     .detail-tabs {
         flex-wrap: wrap;
-        gap: 4px;
+        gap: var(--space-1);
     }
 
     .detail-tab-btn {
@@ -1240,21 +1240,21 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
     .header-top-row {
         flex-direction: column;
         align-items: flex-start;
-        gap: 8px;
+        gap: var(--space-2);
     }
 
     /* stat bar 2×2 grid */
     .page-stat-bar {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 4px;
+        gap: var(--space-1);
         padding: 8px 10px;
     }
 
     /* main-content padding reduces */
     .main-content {
-        padding: 12px;
-        gap: 16px;
+        padding: var(--space-3);
+        gap: var(--space-4);
     }
 
     /* chart canvas shrinks */
@@ -1345,7 +1345,7 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
     .perm-meta {
         flex-direction: column;
         align-items: flex-start;
-        gap: 4px;
+        gap: var(--space-1);
     }
 
     .perm-meta-dir {
@@ -1368,6 +1368,6 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
     }
 
     .header-identity {
-        gap: 6px;
+        gap: var(--space-1-5);
     }
 }

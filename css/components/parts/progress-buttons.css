@@ -21,7 +21,7 @@
 .status-details {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-3);
 }
 
 .status-details span {
@@ -44,7 +44,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: var(--space-2);
     transition: var(--transition-smooth);
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
 }

@@ -2,7 +2,7 @@
 .brand-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     flex-shrink: 0;
 }
 
@@ -10,7 +10,7 @@
 .sidebar-nav-item {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
     padding: 10px 12px;
     border-radius: 6px;
     background: transparent;
@@ -38,7 +38,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 6px;
+    padding: var(--space-1-5);
     width: 32px;
     height: 32px;
     background: transparent;

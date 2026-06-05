@@ -12,16 +12,16 @@
    viewport, có padding-bottom dưới page để chừa lề mép màn hình.            */
 @media (min-width: 1101px) and (min-height: 760px) {
     #page-overview {
-        padding-bottom: 16px;       /* breathing room with screen bottom edge */
+        padding-bottom: var(--space-4);       /* breathing room with screen bottom edge */
     }
 
     #page-overview .charts-grid {
-        gap: 14px;
+        gap: var(--space-3-5);
     }
 
     #page-overview .chart-container {
-        padding: 16px;
-        gap: 10px;
+        padding: var(--space-4);
+        gap: var(--space-2-5);
         min-height: 240px;
     }
 
