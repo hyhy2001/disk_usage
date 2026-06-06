@@ -385,6 +385,7 @@ disk_usage/
 │   └── vendor/                 # Self-hosted third-party browser assets
 │
 ├── fonts/                      # Self-hosted Inter/Fira/JetBrains font files
+├── tests/                      # Zero-dependency test suites (php/ + js/); see "Automated Tests"
 ├── playground/                  # Standalone UI playground assets
 └── database/                   # Contains .gitkeep; runtime DB/backups are ignored
 
@@ -424,6 +425,21 @@ npm run build
 build, so cache invalidation is automatic (see "Frontend build" above).
 
 Because `.gitignore` ignores `*.json`, `package.json`, `package-lock.json`, and `disks.json` are treated as local deployment files unless explicitly force-added.
+
+### Automated Tests
+
+Zero-dependency suites (no Composer, no jest) under `tests/`:
+
+```bash
+npm test            # runs both suites
+npm run test:php    # PHP — run on the 5.4 CLI so it also guards 5.4 syntax compat
+npm run test:js     # JS — Node built-in node:test
+```
+
+- **PHP** (`tests/php/`): a tiny hand-rolled assert harness (`helpers.php` + `run.php`) over `*_test.php`. Covers pure logic (request/keyword/disks-walker helpers, base64 cursor codec, group-config sanitize, aggregate JSON validation, admin pbkdf2/hash/CSRF) and keyset cursor pagination against an in-memory SQLite DB (including size-tie boundaries).
+- **JS** (`tests/js/`): `node:test`; `setup.mjs` stubs `document`/`window`/`localStorage` for modules that read the DOM at load. Covers formatters, `escHtml` (XSS contract), sort, normalize, the API client, route parsing, `DataStore` aggregation, plus a CSS layout guard asserting global-scope layout invariants.
+
+DOM-heavy code (dataFetcher, renderers) is verified in a browser, not unit-tested.
 
 ### API Testing
 
