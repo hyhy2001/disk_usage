@@ -84,25 +84,25 @@ function api_get_latest_main_report_info($disk_path) {
     $dh = @opendir($disk_path);
     $count = 0;
     $latest_file = false;
-    $latest_mtime = -1;
+    $latest_date = -1;
 
+    // "Latest" is decided by the embedded report "date" (via get_json_date),
+    // NOT filesystem mtime — this matches how aggregate.php sorts reports, so
+    // meta/users and the aggregate timeline always agree on which report is
+    // newest. (mtime could disagree, e.g. an older report copied in later.)
     while ($dh && ($f = readdir($dh)) !== false) {
         if (!api_is_main_report_json_filename($f)) continue;
         $count++;
         $fp = $disk_path . DIRECTORY_SEPARATOR . $f;
-        $mt = @filemtime($fp);
-        if (!is_int($mt)) $mt = 0;
-        if (!$latest_file || $mt > $latest_mtime) {
+        $d = (int)get_json_date($fp);
+        if (!$latest_file || $d > $latest_date) {
             $latest_file = $fp;
-            $latest_mtime = $mt;
+            $latest_date = $d;
         }
     }
     if ($dh) closedir($dh);
 
-    $latest_date = 0;
-    if ($latest_file && is_file($latest_file)) {
-        $latest_date = (int)get_json_date($latest_file);
-    }
+    if ($latest_date < 0) $latest_date = 0;
 
     return array(
         'report_files_count' => $count,
