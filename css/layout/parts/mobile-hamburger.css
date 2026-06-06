@@ -13,7 +13,7 @@
     cursor: pointer;
     font-size: 1.1rem;
     flex-shrink: 0;
-    transition: background 0.2s;
+    transition: background var(--duration-fast);
 }
 .hamburger-btn:hover { background: rgba(255,255,255,0.12); }
 
@@ -30,7 +30,7 @@
     z-index: 150;
     opacity: 0;
     pointer-events: none;   /* ← CRITICAL: don't intercept clicks when invisible */
-    transition: opacity 0.25s;
+    transition: opacity var(--duration-base);
 }
 .sidebar-backdrop.visible {
     opacity: 1;

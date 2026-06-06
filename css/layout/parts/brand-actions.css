@@ -17,7 +17,7 @@
     color: var(--text-secondary);
     text-decoration: none;
     font-weight: var(--font-medium);
-    transition: background 0.2s, color 0.2s;
+    transition: background var(--duration-fast), color var(--duration-fast);
 }
 
 .sidebar-nav-item:hover {
@@ -46,7 +46,7 @@
     color: var(--text-secondary);
     border-radius: 6px;
     cursor: pointer;
-    transition: background 0.2s, color 0.2s;
+    transition: background var(--duration-fast), color var(--duration-fast);
 }
 .settings-btn:hover {
     background: rgba(255,255,255,0.08);

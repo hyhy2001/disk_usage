@@ -79,7 +79,7 @@
     background: rgba(255,255,255,0.10);
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.18s;
+    transition: all var(--duration-fast);
 }
 .scale-toggle-btn .icon-log { display: none; }
 .scale-toggle-btn.active .icon-linear { display: none; }

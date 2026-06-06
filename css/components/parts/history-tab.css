@@ -39,10 +39,10 @@
     border: 1px solid rgba(255,255,255,0.1);
     background: rgba(255,255,255,0.04);
     color: var(--text-secondary);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     font-weight: var(--font-medium);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all var(--duration-fast);
     letter-spacing: 0.03em;
     font-family: inherit;
 }
@@ -105,14 +105,14 @@
 
 .history-chart-stat {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: var(--font-semibold);
     color: var(--amber-400);
 }
 
 .scale-toggle-btn {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem;
+    font-size: var(--text-xs);
     font-weight: var(--font-semibold);
     padding: 3px 9px;
     border-radius: 5px;
@@ -120,7 +120,7 @@
     background: rgba(255,255,255,0.05);
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all var(--duration-fast);
     letter-spacing: 0.04em;
 }
 
@@ -148,7 +148,7 @@
     background: rgba(255,255,255,0.04);
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all var(--duration-fast);
     flex-shrink: 0;
 }
 
@@ -164,15 +164,15 @@
     inset: 0;
     z-index: 1000;
     background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(var(--blur-md));
+    -webkit-backdrop-filter: blur(var(--blur-md));
     display: flex;
     align-items: center;
     justify-content: center;
     padding: var(--space-6);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.2s ease;
+    transition: opacity var(--duration-fast) ease;
 }
 
 .chart-modal-overlay.visible {
@@ -192,7 +192,7 @@
     overflow: hidden;
     box-shadow: 0 32px 80px rgba(0,0,0,0.6);
     transform: scale(0.96);
-    transition: transform 0.2s ease;
+    transition: transform var(--duration-fast) ease;
 }
 
 .chart-modal-overlay.visible .chart-modal-box {
@@ -231,9 +231,9 @@
     border: 1px solid rgba(255,255,255,0.1);
     background: rgba(255,255,255,0.05);
     color: var(--text-secondary);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all var(--duration-fast);
 }
 
 .chart-modal-btn:hover {
@@ -263,7 +263,7 @@
 
 .chart-modal-hint {
     padding: 10px 20px;
-    font-size: 0.7rem;
+    font-size: var(--text-xs);
     color: #334155;
     border-top: 1px solid rgba(255,255,255,0.04);
     flex-shrink: 0;
@@ -275,7 +275,7 @@
     border-radius: 3px;
     padding: 1px 5px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.65rem;
+    font-size: var(--text-2xs);
 }
 
 .history-chart-body {
@@ -309,7 +309,7 @@
 }
 
 .user-bar-label {
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     font-weight: var(--font-semibold);
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -323,10 +323,10 @@
     border: 1px solid rgba(255,255,255,0.1);
     background: rgba(255,255,255,0.05);
     color: var(--text-secondary);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: var(--font-medium);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all var(--duration-fast);
 }
 
 .user-bar-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
@@ -338,11 +338,11 @@
     border-radius: 6px;
     padding: 4px 10px;
     color: var(--text-primary);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     font-family: inherit;
     outline: none;
     width: 130px;
-    transition: border-color 0.15s;
+    transition: border-color var(--duration-fast);
 }
 
 .user-bar-search:focus { border-color: rgba(245,158,11,0.4); }
@@ -352,7 +352,7 @@
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 6px;
     color: var(--text-secondary);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-family: inherit;
     padding: 4px 8px;
     outline: none;
@@ -376,7 +376,7 @@
     font-size: 0.74rem;
     font-weight: var(--font-medium);
     cursor: pointer;
-    transition: all 0.14s;
+    transition: all var(--duration-fast);
     user-select: none;
     white-space: nowrap;
 }

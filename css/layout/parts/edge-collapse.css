@@ -20,7 +20,7 @@
         cursor: pointer;
         z-index: 210; /* Above sidebar 200 */
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        transition: left 0.25s ease, background 0.2s, color 0.2s, border-color 0.2s;
+        transition: left var(--duration-base) ease, background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
     }
     .sidebar-edge-collapse-btn:hover {
         background: #334155;
@@ -28,7 +28,7 @@
         border-color: rgba(255,255,255,0.2);
     }
     .sidebar-edge-collapse-btn svg {
-        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        transition: transform var(--duration-base) cubic-bezier(0.16, 1, 0.3, 1);
     }
     body.sidebar-collapsed .sidebar-edge-collapse-btn svg {
         transform: rotate(180deg);
@@ -58,7 +58,7 @@
     background: rgba(255,255,255,0.06);
     color: var(--text-secondary);
     cursor: pointer;
-    transition: background 0.18s, color 0.18s;
+    transition: background var(--duration-fast), color var(--duration-fast);
     flex-shrink: 0;
 }
 .sidebar-close-btn:hover {
@@ -196,8 +196,8 @@
         max-height: 400px;
         background-color: var(--bg-base);
         background-image: linear-gradient(var(--bg-surface-elevated), var(--bg-surface-elevated));
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
+        backdrop-filter: blur(var(--blur-lg));
+        -webkit-backdrop-filter: blur(var(--blur-lg));
         border: var(--glass-border);
         border-radius: var(--radius-md);
         box-shadow: var(--glass-shadow);
@@ -205,7 +205,7 @@
         opacity: 0;
         visibility: hidden;
         transform: translateX(-8px);
-        transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.25s;
+        transition: opacity var(--duration-fast) ease, transform var(--duration-fast) ease, visibility 0s linear var(--duration-base);
         display: flex !important;
         flex-direction: column;
     }
@@ -242,15 +242,15 @@
         padding: 0;
         z-index: 200;
         transform: translateX(-100%);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                    box-shadow 0.3s ease;
+        transition: transform var(--duration-base) cubic-bezier(0.4, 0, 0.2, 1),
+                    box-shadow var(--duration-base) ease;
         box-shadow: none;
         overflow-y: auto;
         overflow-x: hidden;
         /* Better OLED dark sidebar */
         background: rgba(9, 12, 18, 0.98);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
+        backdrop-filter: blur(var(--blur-lg));
+        -webkit-backdrop-filter: blur(var(--blur-lg));
         border-right: 1px solid rgba(255,255,255,0.08);
         flex-direction: column;
         gap: 0;
@@ -362,7 +362,7 @@
     .sidebar .sidebar-clock {
         display: flex !important;
         margin-left: auto;
-        font-size: 0.72rem;
+        font-size: var(--text-xs);
         padding: 12px 14px 4px;
         justify-content: flex-end;
         opacity: 0.55;
@@ -382,9 +382,9 @@
     .sidebar-backdrop {
         display: block;
         background: rgba(0, 0, 0, 0.6);
-        backdrop-filter: blur(4px);
-        -webkit-backdrop-filter: blur(4px);
-        transition: opacity 0.3s ease;
+        backdrop-filter: blur(var(--blur-sm));
+        -webkit-backdrop-filter: blur(var(--blur-sm));
+        transition: opacity var(--duration-base) ease;
     }
 
     /* -- Hamburger visible -- */
@@ -596,7 +596,7 @@
     }
 
     .detail-tab-btn {
-        font-size: 0.78rem;
+        font-size: var(--text-sm);
         padding: 7px 10px;
     }
 }
@@ -617,8 +617,8 @@
 
     /* Glassmorphism design matching app theme */
     background: rgba(16, 185, 129, 0.15);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(var(--blur-md));
+    -webkit-backdrop-filter: blur(var(--blur-md));
     border: 1px solid rgba(16, 185, 129, 0.35);
     border-radius: var(--radius-md);
     color: var(--accent);
@@ -634,10 +634,10 @@
     transform: translateY(12px) scale(0.9);
     pointer-events: none;
     transition:
-        opacity 0.25s ease,
-        transform 0.25s ease,
-        background 0.2s ease,
-        box-shadow 0.2s ease;
+        opacity var(--duration-base) ease,
+        transform var(--duration-base) ease,
+        background var(--duration-fast) ease,
+        box-shadow var(--duration-fast) ease;
 
     /* Subtle glow */
     box-shadow: 0 4px 20px rgba(16, 185, 129, 0.15);
@@ -661,7 +661,7 @@
 /* Active press */
 .scroll-top-fab:active {
     transform: translateY(0) scale(0.95);
-    transition-duration: 0.1s;
+    transition-duration: var(--duration-fast);
 }
 
 /* Light mode override */
@@ -678,7 +678,7 @@
 /* Respect prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
     .scroll-top-fab {
-        transition: opacity 0.1s ease;
+        transition: opacity var(--duration-fast) ease;
         transform: none !important;
     }
     .scroll-top-fab.visible {
@@ -798,7 +798,7 @@ body.sidebar-collapsed .sidebar {
         color: var(--text-secondary);
         cursor: pointer;
         margin: 0 auto 12px;
-        transition: background 0.2s, color 0.2s;
+        transition: background var(--duration-fast), color var(--duration-fast);
     }
     body.sidebar-collapsed .team-flyout-trigger:hover {
         background: rgba(255, 255, 255, 0.08);
@@ -819,8 +819,8 @@ body.sidebar-collapsed .sidebar {
         max-height: 400px;
         background-color: var(--bg-base);
         background-image: linear-gradient(var(--bg-surface-elevated), var(--bg-surface-elevated));
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
+        backdrop-filter: blur(var(--blur-lg));
+        -webkit-backdrop-filter: blur(var(--blur-lg));
         border: var(--glass-border);
         border-radius: var(--radius-md);
         box-shadow: var(--glass-shadow);
@@ -828,7 +828,7 @@ body.sidebar-collapsed .sidebar {
         opacity: 0;
         visibility: hidden;
         transform: translateX(-8px);
-        transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.25s;
+        transition: opacity var(--duration-fast) ease, transform var(--duration-fast) ease, visibility 0s linear var(--duration-base);
         display: flex !important;
         flex-direction: column;
     }
@@ -931,8 +931,8 @@ body.sidebar-collapsed .sidebar .disk-icon-trigger {
         background: transparent;
         color: var(--text-secondary);
         cursor: pointer;
-        font-size: 1rem;
-        transition: all 0.2s;
+        font-size: var(--text-md);
+        transition: all var(--duration-fast);
         position: relative;
     }
 body.sidebar-collapsed .sidebar .disk-icon-trigger:hover { 
@@ -963,7 +963,7 @@ body.sidebar-collapsed .sidebar .disk-flyout {
         gap: var(--space-1-5);
         opacity: 0;
         visibility: hidden;
-        transition: opacity 0.2s ease, visibility 0s linear 0.25s;
+        transition: opacity var(--duration-fast) ease, visibility 0s linear var(--duration-base);
     }
 
     /* Invisible bridge: fills the gap between icon and flyout panel.
@@ -985,7 +985,7 @@ body.sidebar-collapsed .sidebar .disk-flyout:hover {
     }
 
 body.sidebar-collapsed .sidebar .disk-flyout-title { 
-        font-size: 0.68rem;
+        font-size: var(--text-2xs);
         font-weight: var(--font-bold);
         text-transform: uppercase;
         letter-spacing: 0.08em;
@@ -1079,8 +1079,8 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
         opacity: 1;
         pointer-events: all;
         z-index: 90;
-        backdrop-filter: blur(4px);
-        -webkit-backdrop-filter: blur(4px);
+        backdrop-filter: blur(var(--blur-sm));
+        -webkit-backdrop-filter: blur(var(--blur-sm));
     }
     
     .team-disk-dropdown-content {
@@ -1089,8 +1089,8 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
         left: 0;
         width: 100%;
         background: var(--bg-base); /* Changed to base for solid opacity */
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
+        backdrop-filter: blur(var(--blur-lg));
+        -webkit-backdrop-filter: blur(var(--blur-lg));
         border: var(--glass-border);
         border-top: none;
         border-radius: 0 0 var(--border-radius-lg) var(--border-radius-lg);
@@ -1224,7 +1224,7 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
     }
 
     .detail-tab-btn {
-        font-size: 0.78rem;
+        font-size: var(--text-sm);
         padding: 7px 10px;
     }
 
@@ -1271,7 +1271,7 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
     /* range buttons smaller */
     .range-btn {
         padding: 5px 7px;
-        font-size: 0.68rem;
+        font-size: var(--text-2xs);
     }
 }
 
@@ -1363,7 +1363,7 @@ body.sidebar-collapsed .sidebar .disk-flyout .disk-search-wrap {
     }
 
     .header-disk-path {
-        font-size: 0.7rem;
+        font-size: var(--text-xs);
         max-width: 160px;
     }
 

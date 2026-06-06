@@ -26,12 +26,12 @@
     min-width: 260px;
     max-width: 340px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.45);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(var(--blur-md));
+    -webkit-backdrop-filter: blur(var(--blur-md));
     pointer-events: auto;
     cursor: pointer;
-    animation: toastSlideIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
-    transition: opacity 0.25s ease, transform 0.25s ease;
+    animation: toastSlideIn var(--duration-base) cubic-bezier(0.34,1.56,0.64,1);
+    transition: opacity var(--duration-base) ease, transform var(--duration-base) ease;
 }
 
 .toast.toast-error {
@@ -82,7 +82,7 @@
 }
 
 .toast-desc {
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     color: var(--text-secondary);
     line-height: 1.4;
 }

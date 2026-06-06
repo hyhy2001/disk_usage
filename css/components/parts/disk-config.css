@@ -7,7 +7,7 @@
 }
 
 .disk-project-header {
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     font-weight: var(--font-bold);
     text-transform: uppercase;
     letter-spacing: 0.12em;
@@ -16,7 +16,7 @@
     display: flex;
     align-items: center;
     user-select: none;
-    transition: color 0.2s ease;
+    transition: color var(--duration-fast) ease;
 }
 
 .disk-project-header:hover {
@@ -28,7 +28,7 @@
     margin: 0;
     color: var(--text-primary);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all var(--duration-fast) ease;
     border: 1px solid transparent;
 }
 
@@ -48,7 +48,7 @@
     padding: 10px 14px;
     display: flex;
     align-items: center;
-    transition: color 0.2s ease;
+    transition: color var(--duration-fast) ease;
 }
 
 .disk-team-group.active-team .disk-team-header {
@@ -71,10 +71,10 @@
 .disk-list-item {
     padding: 8px 10px;
     border-radius: 7px;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: var(--text-secondary);
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    transition: background var(--duration-fast), color var(--duration-fast);
     border: 1px solid transparent;
     display: flex;
     align-items: center;
@@ -101,7 +101,7 @@
     border-color: rgba(16,185,129,0.25);
     color: var(--accent-hover);
     /* Smooth active state transition */
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    transition: background var(--duration-fast) ease, border-color var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 
 .disk-list-item.active::before {
@@ -127,13 +127,13 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    font-size: 0.875rem;
+    font-size: var(--text-base);
     font-weight: var(--font-medium);
     color: var(--text-secondary);
 }
 
 .last-sync-time {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     color: var(--text-secondary);
     font-family: 'JetBrains Mono', monospace;
     margin-left: auto;

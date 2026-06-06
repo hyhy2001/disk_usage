@@ -38,13 +38,13 @@
 
 .subtitle {
     color: var(--text-secondary);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     padding-left: 2px;
 }
 
 .header-disk-path {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     color: var(--amber-500);
     opacity: 0.85;
     letter-spacing: 0.02em;

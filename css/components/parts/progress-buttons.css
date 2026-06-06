@@ -15,7 +15,7 @@
     height: 100%;
     background: linear-gradient(90deg, var(--emerald-500), var(--sky-500));
     border-radius: 3px;
-    transition: width 0.3s ease-out;
+    transition: width var(--duration-base) ease-out;
 }
 
 .status-details {
@@ -25,7 +25,7 @@
 }
 
 .status-details span {
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: var(--text-secondary);
     font-family: 'JetBrains Mono', monospace;
 }
@@ -37,7 +37,7 @@
     border: none;
     border-radius: var(--border-radius-sm);
     padding: 10px 16px;
-    font-size: 0.875rem;
+    font-size: var(--text-base);
     font-weight: var(--font-semibold);
     font-family: 'Inter', sans-serif;
     cursor: pointer;

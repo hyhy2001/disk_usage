@@ -10,7 +10,7 @@
     padding: var(--space-6);
     z-index: 200;
     border-right: var(--glass-border);
-    transition: width 0.25s ease, left 0.25s ease;
+    transition: width var(--duration-base) ease, left var(--duration-base) ease;
     overflow: hidden;
 }
 
