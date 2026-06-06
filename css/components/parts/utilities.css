@@ -2,8 +2,8 @@
 /* Glassmorphism Panel Component */
 .glass-panel {
     background: var(--bg-surface);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(var(--blur-md));
+    -webkit-backdrop-filter: blur(var(--blur-md));
     border: var(--glass-border);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--glass-shadow);
