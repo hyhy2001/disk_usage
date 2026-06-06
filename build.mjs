@@ -72,34 +72,47 @@ async function buildCoreCss() {
   }
 }
 
-// Stamp index.html's ?v= query params with each bundle's content hash so the
-// browser refetches only when a bundle actually changes -- no manual version
-// bump. JS and CSS are hashed independently (a CSS-only change won't bust the
-// JS cache). Runs only on a full build, not in watch mode (CSS isn't rebuilt
-// there, so its hash would be stale).
-function stampIndexHtml() {
-  const indexFile = './index.html';
-  if (!fs.existsSync(indexFile)) return;
+// Stamp an HTML file's ?v= query params with each asset's content hash so the
+// browser refetches only when an asset actually changes -- no manual version
+// bump. Each asset is hashed independently. `assets` maps the basename that
+// appears in the HTML (e.g. app.min.js) to the file on disk to hash.
+function stampHtml(htmlFile, assets) {
+  if (!fs.existsSync(htmlFile)) return;
   const hashes = {};
-  for (const rel of ['js/app.min.js', 'css/app.min.css']) {
-    if (!fs.existsSync(rel)) continue;
-    hashes[path.basename(rel)] = crypto
+  for (const [token, file] of Object.entries(assets)) {
+    if (!fs.existsSync(file)) continue;
+    hashes[token] = crypto
       .createHash('sha1')
-      .update(fs.readFileSync(rel))
+      .update(fs.readFileSync(file))
       .digest('hex')
       .slice(0, 8);
   }
-  const html = fs.readFileSync(indexFile, 'utf8');
-  const stamped = html.replace(
-    /(app\.min\.(?:js|css))\?v=[A-Za-z0-9]+/g,
-    (match, file) => (hashes[file] ? `${file}?v=${hashes[file]}` : match)
-  );
+  // Match any of the asset basenames followed by ?v=<token>. Escape dots.
+  const alt = Object.keys(hashes).map(t => t.replace(/[.]/g, '\\.')).join('|');
+  if (!alt) return;
+  const re = new RegExp(`(${alt})\\?v=[A-Za-z0-9]+`, 'g');
+  const html = fs.readFileSync(htmlFile, 'utf8');
+  const stamped = html.replace(re, (m, file) => (hashes[file] ? `${file}?v=${hashes[file]}` : m));
   if (stamped !== html) {
-    fs.writeFileSync(indexFile, stamped);
-    console.log(`Stamped index.html: ${Object.entries(hashes).map(([f, h]) => `${f}?v=${h}`).join(', ')}`);
+    fs.writeFileSync(htmlFile, stamped);
+    console.log(`Stamped ${htmlFile}: ${Object.entries(hashes).map(([f, h]) => `${f}?v=${h}`).join(', ')}`);
   } else {
-    console.log('index.html cache stamps already current.');
+    console.log(`${htmlFile} cache stamps already current.`);
   }
+}
+
+// Runs only on a full build, not in watch mode (CSS isn't rebuilt there, so its
+// hash would be stale). JS and CSS are hashed independently (a CSS-only change
+// won't bust the JS cache). admin/main.js is a flat (non-bundled) file loaded
+// directly by admin/index.html, so it's stamped by its own content hash too.
+function stampIndexHtml() {
+  stampHtml('./index.html', {
+    'app.min.js': 'js/app.min.js',
+    'app.min.css': 'css/app.min.css',
+  });
+  stampHtml('./admin/index.html', {
+    'main.js': 'admin/main.js',
+  });
 }
 
 async function build() {

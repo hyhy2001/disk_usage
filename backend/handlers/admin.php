@@ -150,6 +150,32 @@ function api_admin_is_authenticated() {
     return !empty($_SESSION['du_admin_auth']) && $_SESSION['du_admin_auth'] === true;
 }
 
+// --- CSRF (synchronizer token) ---------------------------------------------
+// A per-session random token is handed to the client via the `status` action
+// and required on state-changing actions. A cross-site attacker cannot read
+// the token (Same-Origin Policy blocks reading the JSON response), so they
+// cannot forge a matching request even with the session cookie auto-sent.
+function api_admin_csrf_token() {
+    api_admin_session_start();
+    if (empty($_SESSION['du_csrf'])) {
+        $raw = function_exists('openssl_random_pseudo_bytes')
+            ? openssl_random_pseudo_bytes(32)
+            : pack('N8', mt_rand(), mt_rand(), mt_rand(), mt_rand(),
+                          mt_rand(), mt_rand(), mt_rand(), mt_rand());
+        $_SESSION['du_csrf'] = bin2hex($raw);
+    }
+    return $_SESSION['du_csrf'];
+}
+
+function api_admin_require_csrf() {
+    $expected = api_admin_csrf_token();
+    $sent = isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? (string)$_SERVER['HTTP_X_CSRF_TOKEN'] : '';
+    if ($sent === '') $sent = (string)param('csrf_token', '');
+    if ($sent === '' || !api_admin_hash_equals($expected, $sent)) {
+        b64_error('Invalid or missing CSRF token.', 403);
+    }
+}
+
 function api_admin_current_user() {
     api_admin_session_start();
     return isset($_SESSION['du_admin_user']) ? (string)$_SESSION['du_admin_user'] : '';
@@ -285,6 +311,7 @@ function api_admin_handle_status($root_dir) {
         'has_admin' => $has_admin,
         'authenticated' => api_admin_is_authenticated(),
         'username' => api_admin_current_user(),
+        'csrf_token' => api_admin_csrf_token(),
     ));
 }
 
@@ -372,6 +399,7 @@ function api_admin_handle_login($root_dir) {
 }
 
 function api_admin_handle_logout() {
+    api_admin_require_csrf();
     api_admin_session_start();
     $_SESSION = array();
     if (session_id() !== '') {
@@ -483,6 +511,7 @@ function api_admin_list_backups($root_dir) {
 
 function api_admin_restore_backup($root_dir) {
     api_admin_require_auth();
+    api_admin_require_csrf();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         b64_error('Method not allowed.', 405);
     }
@@ -532,6 +561,7 @@ function api_admin_restore_backup($root_dir) {
 
 function api_admin_save_disks_json($root_dir) {
     api_admin_require_auth();
+    api_admin_require_csrf();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         b64_error('Method not allowed.', 405);
     }

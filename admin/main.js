@@ -42,8 +42,15 @@ function setMessage(text, kind) {
     els.msg.className = 'alert alert-secondary admin-alert' + (variant ? ' ' + variant : '');
 }
 
+let csrfToken = '';
+
 async function api(action, options) {
     const requestOptions = options || {};
+    // Attach the CSRF token (captured from the `status` response) to every
+    // request. State-changing admin actions require it server-side.
+    const headers = Object.assign({}, requestOptions.headers || {});
+    if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+    requestOptions.headers = headers;
     const res = await fetch('../api.php?type=admin&action=' + encodeURIComponent(action), requestOptions);
     let payload = null;
     try {
@@ -54,7 +61,10 @@ async function api(action, options) {
     if (!res.ok || payload.status === 'error') {
         throw new Error(payload && payload.message ? payload.message : 'Request failed.');
     }
-    return payload.data || {};
+    const data = payload.data || {};
+    // status (and any action that returns one) refreshes the token.
+    if (data.csrf_token) csrfToken = data.csrf_token;
+    return data;
 }
 
 function showPanel(name) {
