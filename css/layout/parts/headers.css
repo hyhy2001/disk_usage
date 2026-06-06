@@ -103,7 +103,7 @@
     font-weight: var(--font-semibold);
 }
 
-.tsh-up   { color: var(--emerald-500); }
+.tsh-up   { color: var(--status-success); }
 .tsh-down { color: var(--rose-500); }
 
 .canvas-wrapper {

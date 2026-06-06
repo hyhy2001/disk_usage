@@ -12,7 +12,13 @@
     --emerald-500: #10b981;
     --emerald-400: #34d399;
     --emerald-100: rgba(16, 185, 129, 0.1);
-    
+    --accent: var(--emerald-500);
+    --accent-hover: var(--emerald-400);
+    --accent-soft: var(--emerald-100);
+    --status-success: var(--emerald-500);
+    --status-success-strong: var(--emerald-400);
+    --status-success-soft: var(--emerald-100);
+
     --rose-500: #f43f5e;
     --rose-400: #fb7185;
     --rose-100: rgba(244, 63, 94, 0.1);

@@ -52,7 +52,7 @@
 }
 
 .disk-team-group.active-team .disk-team-header {
-    color: var(--emerald-400);
+    color: var(--accent-hover);
     font-weight: var(--font-semibold);
 }
 
@@ -99,14 +99,14 @@
 .disk-list-item.active {
     background: rgba(16,185,129,0.12);
     border-color: rgba(16,185,129,0.25);
-    color: var(--emerald-400);
+    color: var(--accent-hover);
     /* Smooth active state transition */
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .disk-list-item.active::before {
     opacity: 1;
-    background: var(--emerald-400);
+    background: var(--accent-hover);
 }
 
 .disk-list-item.loading {
@@ -149,7 +149,7 @@
 }
 
 .status-dot.idle {
-    background-color: var(--emerald-400, var(--emerald-400));
+    background-color: var(--status-success-strong);
     box-shadow: 0 0 8px rgba(52, 211, 153, 0.45);
 }
 

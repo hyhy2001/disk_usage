@@ -63,7 +63,7 @@
 }
 
 .trend-up {
-    color: var(--emerald-500);
+    color: var(--status-success);
     background: rgba(16, 185, 129, 0.13);
 }
 

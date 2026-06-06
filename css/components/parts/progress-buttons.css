@@ -32,7 +32,7 @@
 
 /* Primary Button */
 .btn-primary {
-    background: linear-gradient(135deg, var(--emerald-500) 0%, var(--emerald-400) 100%);
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
     color: #fff;
     border: none;
     border-radius: var(--border-radius-sm);
@@ -52,7 +52,7 @@
 .btn-primary:hover {
     transform: translateY(-1px);
     box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
-    background: linear-gradient(135deg, #059669 0%, var(--emerald-500) 100%);
+    background: linear-gradient(135deg, #059669 0%, var(--accent) 100%);
 }
 
 .btn-primary:disabled {

@@ -131,8 +131,8 @@
 
 .scale-toggle-btn.active {
     background: rgba(16, 185, 129, 0.15);
-    border-color: var(--emerald-500);
-    color: var(--emerald-500);
+    border-color: var(--accent);
+    color: var(--accent);
 }
 
 /* -- Chart Expand Button --------------------------------------------------- */

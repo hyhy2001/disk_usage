@@ -615,7 +615,7 @@
 .tmx-size-bar-fill {
     display: block;
     height: 100%;
-    background: var(--emerald-500);
+    background: var(--accent);
     border-radius: 2px;
 }
 
@@ -1183,7 +1183,7 @@
 :root[data-theme='light'] .team-disk-mini-bar {
     background: rgba(0,0,0,0.08);
 }
-.team-disk-mini-bar .segment.used-scanned { background: var(--emerald-400, var(--emerald-400)); transition: width 0.3s ease; }
+.team-disk-mini-bar .segment.used-scanned { background: var(--status-success-strong); transition: width 0.3s ease; }
 .team-disk-mini-bar .segment.used-unknown { background: var(--gray-500, #6b7280); transition: width 0.3s ease;}
 .team-disk-mini-bar .segment.free { background: transparent; }
 

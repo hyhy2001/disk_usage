@@ -157,7 +157,7 @@
 .sbar-fill { height: 100%; border-radius: 999px; transition: width 0.5s ease; }
 .sbar-seg  { height: 100%; transition: width 0.5s ease; }
 
-.fill-emerald,.seg-emerald { background: #34d399; }
+.fill-emerald,.seg-emerald { background: var(--status-success-strong); }
 .fill-sky,    .seg-sky     { background: #38bdf8; }
 .fill-amber,  .seg-amber   { background: #f59e0b; }
 .fill-rose,   .seg-rose    { background: #fb7185; }
