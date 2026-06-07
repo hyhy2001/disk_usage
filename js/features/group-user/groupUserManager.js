@@ -781,23 +781,6 @@ function onRemoveGroup() {
     renderAll();
 }
 
-function toggleDisk(group, diskId) {
-    if (!group) return;
-
-    if (group.diskUsers[diskId]) {
-        const ok = confirm(`Remove disk from group "${group.name}"?`);
-        if (!ok) return;
-        delete group.diskUsers[diskId];
-        if (state.selectedDiskId === diskId) state.selectedDiskId = null;
-    } else {
-        group.diskUsers[diskId] = [];
-        state.selectedDiskId = diskId;
-    }
-
-    persistConfigAndBroadcast();
-    renderAll();
-}
-
 function removeUserFromOtherGroupsForDisk(userName, diskId, keepGroupId) {
     state.config.groups.forEach((g) => {
         if (g.id === keepGroupId) return;
@@ -892,29 +875,6 @@ function applySystemGroupsSeedForDisk(diskId, systemGroups, allUsers = []) {
     }
     state.config.seeded_disks[id] = true;
     return changed;
-}
-
-function toggleUser(group, diskId, userName) {
-    if (!group || !group.diskUsers[diskId]) return;
-
-    const set = new Set(group.diskUsers[diskId]);
-    if (set.has(userName)) {
-        const ok = confirm(`Remove user "${userName}" from group "${group.name}"?`);
-        if (!ok) return;
-        set.delete(userName);
-    } else {
-        // Rule: one user belongs to only one group per disk.
-        removeUserFromOtherGroupsForDisk(userName, diskId, group.id);
-        set.add(userName);
-    }
-
-    group.diskUsers[diskId] = Array.from(set).sort((a, b) => a.localeCompare(b));
-    persistConfigAndBroadcast();
-    renderAll();
-}
-
-function moveUserToGroup(userName, diskId, targetGroupId) {
-    moveUsersToGroup([userName], diskId, targetGroupId);
 }
 
 function moveUsersToGroup(userNames, diskId, targetGroupId) {
