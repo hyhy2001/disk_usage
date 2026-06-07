@@ -7,45 +7,47 @@ import { streamExportGzip }                 from '../utils/csvExport.js';
 import { AppState, showToast, showProgressToast, updateProgressToast, closeProgressToast } from '../core/main.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let _selectedUser   = null;
-let _currentDisk    = null;
-let _abortCtrl      = null;
-let _otherUsers     = [];   // [{ name, used }] from snapshot
-let _filePage           = 1;    // 1-indexed current page
-let _fileCursorStack    = [];
-let _fileNextCursor     = null;
-let _fileHasMore        = false;
-let _currentSentFileCursor = null;
-let _dirPage            = 1;
-let _dirCursorStack     = [];
-let _dirNextCursor      = null;
-let _dirHasMore         = false;
-let _currentSentDirCursor = null;
 const FILE_PAGE         = 500;  // rows per page
+const DROPDOWN_PAGE     = 30;
 const _DEFAULT_FILTERS  = { query: '', ext: '', minSize: 0, maxSize: 0 };
 // Guarded read: a corrupt localStorage value must not throw at module load and
 // white-screen the whole app — fall back to defaults instead.
-let _currentFilters = (() => {
-    try {
-        const raw = localStorage.getItem('ud_filters');
-        const parsed = raw ? JSON.parse(raw) : null;
-        return (parsed && typeof parsed === 'object') ? { ..._DEFAULT_FILTERS, ...parsed } : { ..._DEFAULT_FILTERS };
-    } catch (_) {
-        return { ..._DEFAULT_FILTERS };
-    }
-})();
-let _allUserNames   = [];
-let _scanRoot       = '';
-let _dropdownQuery  = '';
-let _dropdownShown  = 0;
-const DROPDOWN_PAGE = 30;
+const state = {
+    selectedUser: null,
+    currentDisk: null,
+    abortCtrl: null,
+    otherUsers: [],
+    filePage: 1,
+    fileCursorStack: [],
+    fileNextCursor: null,
+    fileHasMore: false,
+    currentSentFileCursor: null,
+    dirPage: 1,
+    dirCursorStack: [],
+    dirNextCursor: null,
+    dirHasMore: false,
+    currentSentDirCursor: null,
+    currentFilters: (() => {
+        try {
+            const raw = localStorage.getItem('ud_filters');
+            const parsed = raw ? JSON.parse(raw) : null;
+            return (parsed && typeof parsed === 'object') ? { ..._DEFAULT_FILTERS, ...parsed } : { ..._DEFAULT_FILTERS };
+        } catch (_) {
+            return { ..._DEFAULT_FILTERS };
+        }
+    })(),
+    allUserNames: [],
+    scanRoot: '',
+    dropdownQuery: '',
+    dropdownShown: 0,
+};
 
 function _hasActiveFilters() {
     return !!(
-        (_currentFilters.query && String(_currentFilters.query).trim() !== '') ||
-        (_currentFilters.ext && String(_currentFilters.ext).trim() !== '') ||
-        ((_currentFilters.minSize || 0) > 0) ||
-        ((_currentFilters.maxSize || 0) > 0)
+        (state.currentFilters.query && String(state.currentFilters.query).trim() !== '') ||
+        (state.currentFilters.ext && String(state.currentFilters.ext).trim() !== '') ||
+        ((state.currentFilters.minSize || 0) > 0) ||
+        ((state.currentFilters.maxSize || 0) > 0)
     );
 }
 
@@ -53,15 +55,15 @@ function _emitFilterConfigEvent(action) {
     document.dispatchEvent(new CustomEvent('userDetailFilterConfigChanged', {
         detail: {
             action,
-            diskId: _currentDisk,
-            user: _selectedUser,
-            filters: Object.assign({}, _currentFilters),
+            diskId: state.currentDisk,
+            user: state.selectedUser,
+            filters: Object.assign({}, state.currentFilters),
         },
     }));
 }
 
 function _hasExtFilter() {
-    return !!(_currentFilters.ext && String(_currentFilters.ext).trim() !== '');
+    return !!(state.currentFilters.ext && String(state.currentFilters.ext).trim() !== '');
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -81,14 +83,14 @@ function _extColor(ext) {
 
 function _toAbsoluteDisplayPath(p) {
     const strip = (s) => String(s || '').replace(/\/+$/, '');
-    if (!p) return strip(_scanRoot);
+    if (!p) return strip(state.scanRoot);
     const path = String(p).replace(/\/+$/, '');
     // Already absolute
     if (path.startsWith('/')) return path;
     // Relative path from DB starts with scan root basename (e.g. "def/pathA")
     // Reconstruct absolute: /abc/def + /pathA
-    if (_scanRoot) {
-        const rootNorm = strip(_scanRoot);
+    if (state.scanRoot) {
+        const rootNorm = strip(state.scanRoot);
         const rootBasename = rootNorm.split('/').pop();
         if (rootBasename && path === rootBasename) return rootNorm;
         if (rootBasename && path.startsWith(rootBasename + '/')) {
@@ -186,8 +188,8 @@ function _renderDirCard(dirData) {
     }).join('');
 
 
-    const hasPrev = _dirPage > 1;
-    const hasNext = _dirHasMore;
+    const hasPrev = state.dirPage > 1;
+    const hasNext = state.dirHasMore;
 
     return `
     <div class="ud-card glass-panel" id="ud-dir-card">
@@ -204,7 +206,7 @@ function _renderDirCard(dirData) {
             </div>
         </div>
         <div class="ud-path-list" id="ud-dir-list">${rows}</div>
-        ${_renderPagination(_dirPage, hasPrev, hasNext, 'dir')}
+        ${_renderPagination(state.dirPage, hasPrev, hasNext, 'dir')}
     </div>`;
 }
 
@@ -269,8 +271,8 @@ function _renderFileCard(fileData) {
         </div>`;
     }).join('') : `<div class="ud-empty-row">No files matched the current filter.</div>`;
 
-    const hasPrev = _filePage > 1;
-    const hasNext = _fileHasMore;
+    const hasPrev = state.filePage > 1;
+    const hasNext = state.fileHasMore;
 
     return `
     <div class="ud-card glass-panel" id="ud-file-card">
@@ -287,7 +289,7 @@ function _renderFileCard(fileData) {
             </div>
         </div>
         <div class="ud-path-list" id="ud-file-list">${rows}</div>
-        ${_renderPagination(_filePage, hasPrev, hasNext, 'file')}
+        ${_renderPagination(state.filePage, hasPrev, hasNext, 'file')}
     </div>`;
 }
 
@@ -334,23 +336,23 @@ function _renderDropdownOptions(optionsEl, query, reset) {
     if (!optionsEl) return;
     const q = (query || '').toLowerCase().trim();
     const matches = q
-        ? _allUserNames.filter(n => n.toLowerCase().includes(q))
-        : _allUserNames.slice();
+        ? state.allUserNames.filter(n => n.toLowerCase().includes(q))
+        : state.allUserNames.slice();
     if (reset) {
-        _dropdownQuery = q;
-        _dropdownShown = 0;
+        state.dropdownQuery = q;
+        state.dropdownShown = 0;
         optionsEl.innerHTML = '';
     }
-    const from = _dropdownShown;
+    const from = state.dropdownShown;
     const batch = matches.slice(from, from + DROPDOWN_PAGE);
     batch.forEach(name => {
         const div = document.createElement('div');
-        div.className = 'ud-dropdown-option' + (name === _selectedUser ? ' selected' : '');
+        div.className = 'ud-dropdown-option' + (name === state.selectedUser ? ' selected' : '');
         div.dataset.value = name;
         div.textContent = name;
         optionsEl.appendChild(div);
     });
-    _dropdownShown = from + batch.length;
+    state.dropdownShown = from + batch.length;
     // Show/hide a "no results" message
     let noRes = optionsEl.querySelector('.ud-dropdown-noresults');
     if (matches.length === 0) {
@@ -369,19 +371,19 @@ function _renderDropdownOptions(optionsEl, query, reset) {
 function _renderFilterBar() {
     // Count active advanced filters
     let activeAdv = 0;
-    if (_currentFilters.ext !== '') activeAdv++;
-    if (_currentFilters.minSize > 0) activeAdv++;
-    if (_currentFilters.maxSize > 0) activeAdv++;
+    if (state.currentFilters.ext !== '') activeAdv++;
+    if (state.currentFilters.minSize > 0) activeAdv++;
+    if (state.currentFilters.maxSize > 0) activeAdv++;
     const badgeHtml = activeAdv > 0 ? `<span style="background:var(--sky-500); color:#fff; border-radius:50%; width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">${activeAdv}</span>` : '';
-    const minSizePair = _formatBytesForInput(_currentFilters.minSize);
-    const maxSizePair = _formatBytesForInput(_currentFilters.maxSize);
+    const minSizePair = _formatBytesForInput(state.currentFilters.minSize);
+    const maxSizePair = _formatBytesForInput(state.currentFilters.maxSize);
 
-    const selectedLabel = _selectedUser || 'Select User...';
-    const opts = _allUserNames.slice(0, DROPDOWN_PAGE).map(name =>
-        `<div class="ud-dropdown-option${name === _selectedUser ? ' selected' : ''}" data-value="${name}">${name}</div>`
+    const selectedLabel = state.selectedUser || 'Select User...';
+    const opts = state.allUserNames.slice(0, DROPDOWN_PAGE).map(name =>
+        `<div class="ud-dropdown-option${name === state.selectedUser ? ' selected' : ''}" data-value="${name}">${name}</div>`
     ).join('');
     
-    const totalUsers = _allUserNames.length;
+    const totalUsers = state.allUserNames.length;
 
     return `
     <div style="display: flex; flex-wrap: wrap; gap: 6px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-surface); padding: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); align-items: stretch; position: relative; z-index: 50;">
@@ -397,7 +399,7 @@ function _renderFilterBar() {
             <div class="ud-dropdown" id="ud-dropdown" style="width: 100%;">
                 <button class="ud-dropdown-btn" id="ud-dropdown-btn" aria-haspopup="listbox" aria-expanded="false" style="height: 34px; padding: 0 10px; border-radius: 6px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.85rem; width: 100%; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
-                        <span class="ud-dropdown-btn-text${_selectedUser ? '' : ' placeholder'}" id="ud-dropdown-label" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; font-weight: 600;">${selectedLabel}</span>
+                        <span class="ud-dropdown-btn-text${state.selectedUser ? '' : ' placeholder'}" id="ud-dropdown-label" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; font-weight: 600;">${selectedLabel}</span>
                     </div>
                     <svg class="ud-dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
@@ -415,7 +417,7 @@ function _renderFilterBar() {
             <div id="ud-filter-query-container" style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; min-height: 34px; max-height: 85px; overflow-y: auto; padding: 4px 12px 4px 34px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-elevated); cursor: text;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 12px; top: 10px; color: var(--text-muted); pointer-events: none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 <input type="text" id="ud-filter-query-input" placeholder="Search (comma or tab)..." style="flex: 1; border: none; background: transparent; color: var(--text-primary); font-size: 0.85rem; outline: none; min-width: 120px;">
-                <input type="hidden" id="ud-filter-query" value="${_currentFilters.query}">
+                <input type="hidden" id="ud-filter-query" value="${state.currentFilters.query}">
             </div>
         </div>
         
@@ -431,7 +433,7 @@ function _renderFilterBar() {
                     <label style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">File Extension</label>
                     <div id="ud-filter-ext-container" style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; min-height: 34px; max-height: 85px; overflow-y: auto; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-elevated); cursor: text;">
                         <input type="text" id="ud-filter-ext-input" placeholder="e.g. csv, log" style="flex: 1; border: none; background: transparent; color: var(--text-primary); font-size: 0.85rem; outline: none; min-width: 100px;">
-                        <input type="hidden" id="ud-filter-ext" value="${_currentFilters.ext}">
+                        <input type="hidden" id="ud-filter-ext" value="${state.currentFilters.ext}">
                     </div>
                 </div>
                 
@@ -526,7 +528,7 @@ function _attachFilterEvents(contentEl, root) {
             userList.classList.remove('visible');
             userBtn.setAttribute('aria-expanded', 'false');
             if (userSearch) userSearch.value = '';
-            _dropdownQuery = '';
+            state.dropdownQuery = '';
         };
         const toggleUser = () => userList.classList.contains('visible') ? closeUser() : openUser();
 
@@ -551,7 +553,7 @@ function _attachFilterEvents(contentEl, root) {
         // Scroll-to-bottom loads more
         userList.addEventListener('scroll', () => {
             if (userList.scrollTop + userList.clientHeight >= userList.scrollHeight - 40) {
-                _renderDropdownOptions(userOptions, _dropdownQuery, false);
+                _renderDropdownOptions(userOptions, state.dropdownQuery, false);
             }
         });
 
@@ -741,8 +743,8 @@ function _attachFilterEvents(contentEl, root) {
                 }
             }
 
-            _currentFilters.query = qInput.value.trim();
-            _currentFilters.ext = extInput.value.trim();
+            state.currentFilters.query = qInput.value.trim();
+            state.currentFilters.ext = extInput.value.trim();
             
             const minSizeVal = parseFloat(minSizeValInput.value) || 0;
             let minSizeBytes = minSizeVal;
@@ -758,21 +760,21 @@ function _attachFilterEvents(contentEl, root) {
             else if (maxSizeUnitInput.value === 'GB') maxSizeBytes *= 1024 ** 3;
             else if (maxSizeUnitInput.value === 'TB') maxSizeBytes *= 1024 ** 4;
             
-            _currentFilters.minSize = Math.floor(minSizeBytes);
-            _currentFilters.maxSize = Math.floor(maxSizeBytes);
+            state.currentFilters.minSize = Math.floor(minSizeBytes);
+            state.currentFilters.maxSize = Math.floor(maxSizeBytes);
 
-            localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
+            localStorage.setItem('ud_filters', JSON.stringify(state.currentFilters));
             _emitFilterConfigEvent('apply');
 
             if (optionsDropdown) optionsDropdown.style.display = 'none';
-            if (_selectedUser) _loadAndRender(_selectedUser);
+            if (state.selectedUser) _loadAndRender(state.selectedUser);
         });
     }
     
     if (resetBtn) {
         resetBtn.addEventListener('click', () => {
-            _currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0 };
-            localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
+            state.currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0 };
+            localStorage.setItem('ud_filters', JSON.stringify(state.currentFilters));
             _emitFilterConfigEvent('reset');
             qInput.value = '';
             extInput.value = '';
@@ -790,13 +792,13 @@ function _attachFilterEvents(contentEl, root) {
             if (maxSizeUnitInput) maxSizeUnitInput.value = 'MB';
 
             if (optionsDropdown) optionsDropdown.style.display = 'none';
-            if (_selectedUser) _loadAndRender(_selectedUser);
+            if (state.selectedUser) _loadAndRender(state.selectedUser);
         });
     }
 
     if (exportBtn) {
         exportBtn.addEventListener('click', () => {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(_currentFilters, null, 2));
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.currentFilters, null, 2));
             const dlAnchorElem = document.createElement('a');
             dlAnchorElem.setAttribute("href", dataStr);
             dlAnchorElem.setAttribute("download", `search_config.json`);
@@ -815,13 +817,13 @@ function _attachFilterEvents(contentEl, root) {
             reader.onload = (e) => {
                 try {
                     const parsed = JSON.parse(e.target.result);
-                    if (parsed.query !== undefined) _currentFilters.query = parsed.query;
-                    if (parsed.ext !== undefined) _currentFilters.ext = parsed.ext;
-                    if (parsed.minSize !== undefined) _currentFilters.minSize = parsed.minSize;
-                    if (parsed.maxSize !== undefined) _currentFilters.maxSize = parsed.maxSize;
-                    localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
+                    if (parsed.query !== undefined) state.currentFilters.query = parsed.query;
+                    if (parsed.ext !== undefined) state.currentFilters.ext = parsed.ext;
+                    if (parsed.minSize !== undefined) state.currentFilters.minSize = parsed.minSize;
+                    if (parsed.maxSize !== undefined) state.currentFilters.maxSize = parsed.maxSize;
+                    localStorage.setItem('ud_filters', JSON.stringify(state.currentFilters));
                     _emitFilterConfigEvent('import');
-                    if (_selectedUser) _loadAndRender(_selectedUser);
+                    if (state.selectedUser) _loadAndRender(state.selectedUser);
                 } catch (err) {
                     alert('Invalid JSON config file');
                 }
@@ -865,16 +867,16 @@ function _parseApiJson(text) {
 }
 
 async function _fetchDir(diskId, user, cursor = null, limit = FILE_PAGE) {
-    if (_abortCtrl) _abortCtrl.abort();
-    _abortCtrl = new AbortController();
+    if (state.abortCtrl) state.abortCtrl.abort();
+    state.abortCtrl = new AbortController();
     const b64User = btoa(unescape(encodeURIComponent(user)));
     let url = `api.php?id=${encodeURIComponent(diskId)}&type=dirs&user_b64=${encodeURIComponent(b64User)}&limit=${limit}`;
     if (cursor !== null && cursor !== undefined && String(cursor) !== '') url += `&cursor=${encodeURIComponent(cursor)}`;
-    if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
-    if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
-    if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
+    if (state.currentFilters.query) url += `&filter_query=${encodeURIComponent(state.currentFilters.query)}`;
+    if (state.currentFilters.minSize > 0) url += `&filter_min_size=${state.currentFilters.minSize}`;
+    if (state.currentFilters.maxSize > 0) url += `&filter_max_size=${state.currentFilters.maxSize}`;
     const t0 = performance.now();
-    const text = await _fetchApiText(url, { signal: _abortCtrl.signal });
+    const text = await _fetchApiText(url, { signal: state.abortCtrl.signal });
     const t1 = performance.now();
     console.log(`[Detail User] fetchDir: cursor=${cursor} limit=${limit} time=${(t1-t0).toFixed(0)}ms`);
     const json = _parseApiJson(text);
@@ -883,18 +885,18 @@ async function _fetchDir(diskId, user, cursor = null, limit = FILE_PAGE) {
 }
 
 async function _fetchDetail(diskId, user, dirCursor = null, fileCursor = null, limit = FILE_PAGE) {
-    if (_abortCtrl) _abortCtrl.abort();
-    _abortCtrl = new AbortController();
+    if (state.abortCtrl) state.abortCtrl.abort();
+    state.abortCtrl = new AbortController();
     const b64User = btoa(unescape(encodeURIComponent(user)));
     let url = `api.php?id=${encodeURIComponent(diskId)}&type=detail&user_b64=${encodeURIComponent(b64User)}&limit=${limit}`;
     if (dirCursor !== null && dirCursor !== undefined && String(dirCursor) !== '') url += `&dir_cursor=${encodeURIComponent(dirCursor)}`;
     if (fileCursor !== null && fileCursor !== undefined && String(fileCursor) !== '') url += `&file_cursor=${encodeURIComponent(fileCursor)}`;
-    if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
-    if (_currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
-    if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
-    if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
+    if (state.currentFilters.query) url += `&filter_query=${encodeURIComponent(state.currentFilters.query)}`;
+    if (state.currentFilters.ext) url += `&filter_ext=${encodeURIComponent(state.currentFilters.ext)}`;
+    if (state.currentFilters.minSize > 0) url += `&filter_min_size=${state.currentFilters.minSize}`;
+    if (state.currentFilters.maxSize > 0) url += `&filter_max_size=${state.currentFilters.maxSize}`;
     const t0 = performance.now();
-    const text = await _fetchApiText(url, { signal: _abortCtrl.signal });
+    const text = await _fetchApiText(url, { signal: state.abortCtrl.signal });
     const t1 = performance.now();
     console.log(`[Detail User] fetchDetail: dirCursor=${dirCursor} fileCursor=${fileCursor} limit=${limit} time=${(t1-t0).toFixed(0)}ms`);
     const json = _parseApiJson(text);
@@ -906,10 +908,10 @@ async function _fetchFilePage(diskId, user, cursor = null, limit = FILE_PAGE) {
     const b64User = btoa(unescape(encodeURIComponent(user)));
     let url = `api.php?id=${encodeURIComponent(diskId)}&type=files&user_b64=${encodeURIComponent(b64User)}&limit=${limit}`;
     if (cursor !== null && cursor !== undefined && String(cursor) !== '') url += `&cursor=${encodeURIComponent(cursor)}`;
-    if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
-    if (_currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
-    if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
-    if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
+    if (state.currentFilters.query) url += `&filter_query=${encodeURIComponent(state.currentFilters.query)}`;
+    if (state.currentFilters.ext) url += `&filter_ext=${encodeURIComponent(state.currentFilters.ext)}`;
+    if (state.currentFilters.minSize > 0) url += `&filter_min_size=${state.currentFilters.minSize}`;
+    if (state.currentFilters.maxSize > 0) url += `&filter_max_size=${state.currentFilters.maxSize}`;
 
     const t0 = performance.now();
     const text = await _fetchApiText(url);
@@ -937,10 +939,10 @@ function _getRoot() { return document.getElementById('ud-root'); }
 
 function _visibleFilterSummary() {
     return {
-        query: String(_currentFilters.query || '').trim(),
-        ext: String(_currentFilters.ext || '').trim(),
-        minSize: Number(_currentFilters.minSize || 0) || 0,
-        maxSize: Number(_currentFilters.maxSize || 0) || 0,
+        query: String(state.currentFilters.query || '').trim(),
+        ext: String(state.currentFilters.ext || '').trim(),
+        minSize: Number(state.currentFilters.minSize || 0) || 0,
+        maxSize: Number(state.currentFilters.maxSize || 0) || 0,
     };
 }
 
@@ -951,19 +953,19 @@ function _isEffectivelyUnfiltered() {
 
 async function _loadAndRender(user) {
     const root = _getRoot();
-    if (!root || !_currentDisk) return;
+    if (!root || !state.currentDisk) return;
 
-    _selectedUser   = user;
-    _filePage       = 1;
-    _fileCursorStack = [];
-    _fileNextCursor = null;
-    _fileHasMore = false;
-    _currentSentFileCursor = null;
-    _dirPage        = 1;
-    _dirCursorStack = [];
-    _dirNextCursor = null;
-    _dirHasMore = false;
-    _currentSentDirCursor = null;
+    state.selectedUser   = user;
+    state.filePage       = 1;
+    state.fileCursorStack = [];
+    state.fileNextCursor = null;
+    state.fileHasMore = false;
+    state.currentSentFileCursor = null;
+    state.dirPage        = 1;
+    state.dirCursorStack = [];
+    state.dirNextCursor = null;
+    state.dirHasMore = false;
+    state.currentSentDirCursor = null;
 
     const toolbar = root.querySelector('#ud-unified-toolbar');
     if (toolbar) {
@@ -976,8 +978,8 @@ async function _loadAndRender(user) {
 
     try {
         let [dirData, fileData] = await Promise.all([
-            _fetchDir(_currentDisk, user, null, FILE_PAGE),
-            _fetchFilePage(_currentDisk, user, null, FILE_PAGE)
+            _fetchDir(state.currentDisk, user, null, FILE_PAGE),
+            _fetchFilePage(state.currentDisk, user, null, FILE_PAGE)
         ]);
 
         const suspiciousEmpty = _isEffectivelyUnfiltered()
@@ -987,21 +989,21 @@ async function _loadAndRender(user) {
             && (fileData.files?.length ?? 0) === 0;
 
         if (suspiciousEmpty) {
-            _currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0 };
-            localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
+            state.currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0 };
+            localStorage.setItem('ud_filters', JSON.stringify(state.currentFilters));
             if (toolbar) {
                 toolbar.innerHTML = _renderFilterBar();
                 _attachFilterEvents(toolbar, root);
             }
             [dirData, fileData] = await Promise.all([
-                _fetchDir(_currentDisk, user, null, FILE_PAGE),
-                _fetchFilePage(_currentDisk, user, null, FILE_PAGE)
+                _fetchDir(state.currentDisk, user, null, FILE_PAGE),
+                _fetchFilePage(state.currentDisk, user, null, FILE_PAGE)
             ]);
         }
 
-        _scanRoot = String((dirData && dirData.scan_root) || (fileData && fileData.scan_root) || _scanRoot || '');
+        state.scanRoot = String((dirData && dirData.scan_root) || (fileData && fileData.scan_root) || state.scanRoot || '');
 
-        const otherUser = _otherUsers.find(o => o.name === user);
+        const otherUser = state.otherUsers.find(o => o.name === user);
         const noDirBreakdown = (dirData.total_dirs_full ?? dirData.dirs.length ?? 0) === 0 && (dirData.dirs?.length ?? 0) === 0;
         const noFileBreakdown = (fileData.total_files_full ?? fileData.files.length ?? 0) === 0 && (fileData.files?.length ?? 0) === 0;
         if (otherUser && noDirBreakdown && noFileBreakdown) {
@@ -1022,15 +1024,15 @@ async function _loadAndRender(user) {
         const dirDisableReason = hasExtFilter ? 'ext' : '';
 
         // Initialize cursor state BEFORE render so _renderDirCard/_renderFileCard see has_more
-        _fileNextCursor = fileData?.next_cursor ?? null;
-        _fileHasMore    = !!fileData?.has_more;
-        _currentSentFileCursor = null;
-        _fileCursorStack = [];
+        state.fileNextCursor = fileData?.next_cursor ?? null;
+        state.fileHasMore    = !!fileData?.has_more;
+        state.currentSentFileCursor = null;
+        state.fileCursorStack = [];
 
-        _dirNextCursor  = dirData?.next_cursor ?? null;
-        _dirHasMore     = !!dirData?.has_more;
-        _currentSentDirCursor = null;
-        _dirCursorStack = [];
+        state.dirNextCursor  = dirData?.next_cursor ?? null;
+        state.dirHasMore     = !!dirData?.has_more;
+        state.currentSentDirCursor = null;
+        state.dirCursorStack = [];
 
         if (contentBody) {
             contentBody.innerHTML = `
@@ -1042,7 +1044,7 @@ async function _loadAndRender(user) {
         }
     } catch (err) {
         if (err.name === 'AbortError') return;
-        const otherUser = _otherUsers.find(o => o.name === user);
+        const otherUser = state.otherUsers.find(o => o.name === user);
         if (otherUser && err.status === 404) {
             if (contentBody) contentBody.innerHTML = `
                 <div class="ud-empty-state">
@@ -1099,18 +1101,18 @@ function _attachContentEvents(contentEl, root) {
 }
 
 async function _fetchAndRenderFilePage(root, cursor) {
-    if (!_currentDisk || !_selectedUser) return;
+    if (!state.currentDisk || !state.selectedUser) return;
     const list  = root.querySelector('#ud-file-list');
     const pager = root.querySelector('#ud-pagination-file');
     if (list) list.style.opacity = '0.4';
     if (pager) pager.style.pointerEvents = 'none';
 
     try {
-        const fileData = await _fetchFilePage(_currentDisk, _selectedUser, cursor, FILE_PAGE);
-        _scanRoot = String((fileData && fileData.scan_root) || _scanRoot || '');
-        _currentSentFileCursor = cursor;
-        _fileNextCursor = fileData?.next_cursor ?? null;
-        _fileHasMore = !!fileData?.has_more;
+        const fileData = await _fetchFilePage(state.currentDisk, state.selectedUser, cursor, FILE_PAGE);
+        state.scanRoot = String((fileData && fileData.scan_root) || state.scanRoot || '');
+        state.currentSentFileCursor = cursor;
+        state.fileNextCursor = fileData?.next_cursor ?? null;
+        state.fileHasMore = !!fileData?.has_more;
 
         const rows = Array.isArray(fileData?.files) ? fileData.files.map(_normalizeFileRow) : [];
 
@@ -1134,7 +1136,7 @@ async function _fetchAndRenderFilePage(root, cursor) {
         }
 
         const pgWrap = root.querySelector('#ud-pagination-file');
-        const newPg = _renderPagination(_filePage, _filePage > 1, _fileHasMore, 'file');
+        const newPg = _renderPagination(state.filePage, state.filePage > 1, state.fileHasMore, 'file');
         if (pgWrap) {
             pgWrap.outerHTML = newPg;
         } else if (newPg) {
@@ -1148,32 +1150,32 @@ async function _fetchAndRenderFilePage(root, cursor) {
 }
 
 async function _goToNextFile(root) {
-    if (!_fileHasMore || !_fileNextCursor) return;
-    _fileCursorStack.push(_currentSentFileCursor);
-    _filePage += 1;
-    await _fetchAndRenderFilePage(root, _fileNextCursor);
+    if (!state.fileHasMore || !state.fileNextCursor) return;
+    state.fileCursorStack.push(state.currentSentFileCursor);
+    state.filePage += 1;
+    await _fetchAndRenderFilePage(root, state.fileNextCursor);
 }
 
 async function _goToPrevFile(root) {
-    if (_filePage <= 1 || _fileCursorStack.length === 0) return;
-    const prevCursor = _fileCursorStack.pop();
-    _filePage -= 1;
+    if (state.filePage <= 1 || state.fileCursorStack.length === 0) return;
+    const prevCursor = state.fileCursorStack.pop();
+    state.filePage -= 1;
     await _fetchAndRenderFilePage(root, prevCursor);
 }
 
 async function _fetchAndRenderDirPage(root, cursor) {
-    if (!_currentDisk || !_selectedUser) return;
+    if (!state.currentDisk || !state.selectedUser) return;
     const list  = root.querySelector('#ud-dir-list');
     const pager = root.querySelector('#ud-pagination-dir');
     if (list) list.style.opacity = '0.4';
     if (pager) pager.style.pointerEvents = 'none';
 
     try {
-        const dirData = await _fetchDir(_currentDisk, _selectedUser, cursor, FILE_PAGE);
-        _scanRoot = String((dirData && dirData.scan_root) || _scanRoot || '');
-        _currentSentDirCursor = cursor;
-        _dirNextCursor = dirData?.next_cursor ?? null;
-        _dirHasMore = !!dirData?.has_more;
+        const dirData = await _fetchDir(state.currentDisk, state.selectedUser, cursor, FILE_PAGE);
+        state.scanRoot = String((dirData && dirData.scan_root) || state.scanRoot || '');
+        state.currentSentDirCursor = cursor;
+        state.dirNextCursor = dirData?.next_cursor ?? null;
+        state.dirHasMore = !!dirData?.has_more;
 
         const rows = Array.isArray(dirData?.dirs) ? dirData.dirs.map(_normalizeDirRow) : [];
 
@@ -1195,7 +1197,7 @@ async function _fetchAndRenderDirPage(root, cursor) {
         }
 
         const pgWrap = root.querySelector('#ud-pagination-dir');
-        const newPg = _renderPagination(_dirPage, _dirPage > 1, _dirHasMore, 'dir');
+        const newPg = _renderPagination(state.dirPage, state.dirPage > 1, state.dirHasMore, 'dir');
         if (pgWrap) {
             pgWrap.outerHTML = newPg;
         } else if (newPg) {
@@ -1209,18 +1211,18 @@ async function _fetchAndRenderDirPage(root, cursor) {
 }
 
 async function _goToNextDir(root) {
-    if (!_dirHasMore || !_dirNextCursor) return;
+    if (!state.dirHasMore || !state.dirNextCursor) return;
     if (_hasExtFilter()) return;
-    _dirCursorStack.push(_currentSentDirCursor);
-    _dirPage += 1;
-    await _fetchAndRenderDirPage(root, _dirNextCursor);
+    state.dirCursorStack.push(state.currentSentDirCursor);
+    state.dirPage += 1;
+    await _fetchAndRenderDirPage(root, state.dirNextCursor);
 }
 
 async function _goToPrevDir(root) {
-    if (_dirPage <= 1 || _dirCursorStack.length === 0) return;
+    if (state.dirPage <= 1 || state.dirCursorStack.length === 0) return;
     if (_hasExtFilter()) return;
-    const prevCursor = _dirCursorStack.pop();
-    _dirPage -= 1;
+    const prevCursor = state.dirCursorStack.pop();
+    state.dirPage -= 1;
     await _fetchAndRenderDirPage(root, prevCursor);
 }
 
@@ -1242,7 +1244,7 @@ function _attachPickerEvents(root) {
         btn.classList.remove('open'); list.classList.remove('visible');
         btn.setAttribute('aria-expanded', 'false');
         if (search) search.value = '';
-        _dropdownQuery = '';
+        state.dropdownQuery = '';
     };
     const toggle = () => list.classList.contains('visible') ? close() : open();
 
@@ -1265,7 +1267,7 @@ function _attachPickerEvents(root) {
 
     list.addEventListener('scroll', () => {
         if (list.scrollTop + list.clientHeight >= list.scrollHeight - 40) {
-            _renderDropdownOptions(options, _dropdownQuery, false);
+            _renderDropdownOptions(options, state.dropdownQuery, false);
         }
     });
 
@@ -1289,11 +1291,11 @@ async function _renderRoot(diskDir) {
     root.innerHTML = `<div class="ud-loading">Loading users...</div>`;
 
     const users = await _fetchUserList(diskDir);
-    _allUserNames = [
+    state.allUserNames = [
         ...users,
-        ..._otherUsers.map(o => o.name).filter(n => !users.includes(n)),
+        ...state.otherUsers.map(o => o.name).filter(n => !users.includes(n)),
     ].sort((a, b) => a.localeCompare(b));
-    const total = _allUserNames.length;
+    const total = state.allUserNames.length;
 
     if (!total) {
         root.innerHTML = `
@@ -1321,8 +1323,8 @@ async function _renderRoot(diskDir) {
     }
 
     // Restore previously selected user if still valid; otherwise wait for user to pick
-    if (_selectedUser && _allUserNames.includes(_selectedUser)) {
-        _loadAndRender(_selectedUser);
+    if (state.selectedUser && state.allUserNames.includes(state.selectedUser)) {
+        _loadAndRender(state.selectedUser);
     }
 }
 
@@ -1376,10 +1378,10 @@ async function _fetchExportPage(kind, diskId, user, cursor = null, limit = 20000
     const b64User = btoa(unescape(encodeURIComponent(user)));
     let url = `api.php?id=${encodeURIComponent(diskId)}&type=${kind === 'dirs' ? 'dirs' : 'files'}&user_b64=${encodeURIComponent(b64User)}&limit=${limit}`;
     if (cursor !== null && cursor !== undefined && String(cursor) !== '') url += `&cursor=${encodeURIComponent(cursor)}`;
-    if (_currentFilters.query) url += `&filter_query=${encodeURIComponent(_currentFilters.query)}`;
-    if (kind !== 'dirs' && _currentFilters.ext) url += `&filter_ext=${encodeURIComponent(_currentFilters.ext)}`;
-    if (_currentFilters.minSize > 0) url += `&filter_min_size=${_currentFilters.minSize}`;
-    if (_currentFilters.maxSize > 0) url += `&filter_max_size=${_currentFilters.maxSize}`;
+    if (state.currentFilters.query) url += `&filter_query=${encodeURIComponent(state.currentFilters.query)}`;
+    if (kind !== 'dirs' && state.currentFilters.ext) url += `&filter_ext=${encodeURIComponent(state.currentFilters.ext)}`;
+    if (state.currentFilters.minSize > 0) url += `&filter_min_size=${state.currentFilters.minSize}`;
+    if (state.currentFilters.maxSize > 0) url += `&filter_max_size=${state.currentFilters.maxSize}`;
     const text = await _fetchApiText(url, {});
     const json = _parseApiJson(text);
     if (json.status !== 'success') throw new Error(json.message || 'API error');
@@ -1388,7 +1390,7 @@ async function _fetchExportPage(kind, diskId, user, cursor = null, limit = 20000
 }
 
 function _exportFileName(kind) {
-    const safeUser = String(_selectedUser || 'user').replace(/[^A-Za-z0-9._-]+/g, '_');
+    const safeUser = String(state.selectedUser || 'user').replace(/[^A-Za-z0-9._-]+/g, '_');
     const now = new Date();
     const pad = n => String(n).padStart(2, '0');
     const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
@@ -1396,7 +1398,7 @@ function _exportFileName(kind) {
 }
 
 async function _startUserCsvExport(kind) {
-    if (!_currentDisk || !_selectedUser) return;
+    if (!state.currentDisk || !state.selectedUser) return;
 
     const btn = document.querySelector(kind === 'dirs' ? '#ud-export-dirs-user' : '#ud-export-files-user');
     const originalBtnHTML = btn ? btn.innerHTML : '';
@@ -1431,7 +1433,7 @@ async function _startUserCsvExport(kind) {
             async () => {
                 if (finished) return { rows: [], isLast: true };
 
-                const payload = await _fetchExportPage(kind, _currentDisk, _selectedUser, cursor, PAGE);
+                const payload = await _fetchExportPage(kind, state.currentDisk, state.selectedUser, cursor, PAGE);
                 const rows = kind === 'dirs' ? (payload?.dirs || []) : (payload?.files || []);
                 cursor = payload?.next_cursor ?? null;
                 const rawHint = kind === 'dirs'
@@ -1449,13 +1451,13 @@ async function _startUserCsvExport(kind) {
                 const mapped = rows.map(r => {
                     if (kind === 'dirs') {
                         return {
-                            user: _selectedUser,
+                            user: state.selectedUser,
                             path: _toAbsoluteDisplayPath(r?.path || ''),
                             used: Number(r?.used || 0),
                         };
                     }
                     return {
-                        user: _selectedUser,
+                        user: state.selectedUser,
                         path: _toAbsoluteDisplayPath(r?.path || ''),
                         size: Number(r?.size || 0),
                         xt: r?.xt || '',
@@ -1519,15 +1521,15 @@ async function _udExportFiles() {
  * Pass the current disk directory (e.g. "mock_reports/disk_sda").
  */
 export async function initUserDetailTab(diskId, otherUsers = []) {
-    const isNewDisk = diskId !== _currentDisk;
-    _currentDisk = diskId;
-    _otherUsers  = otherUsers;
+    const isNewDisk = diskId !== state.currentDisk;
+    state.currentDisk = diskId;
+    state.otherUsers  = otherUsers;
 
     if (isNewDisk) {
-        _selectedUser = null;
-        _currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0 };
-        localStorage.setItem('ud_filters', JSON.stringify(_currentFilters));
-        if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null; }
+        state.selectedUser = null;
+        state.currentFilters = { query: '', ext: '', minSize: 0, maxSize: 0 };
+        localStorage.setItem('ud_filters', JSON.stringify(state.currentFilters));
+        if (state.abortCtrl) { state.abortCtrl.abort(); state.abortCtrl = null; }
     }
 
     await _renderRoot(diskId);
@@ -1538,19 +1540,19 @@ export async function initUserDetailTab(diskId, otherUsers = []) {
  * Resets state so next tab activation reloads.
  */
 export function resetUserDetailTab() {
-    _selectedUser = null;
-    _currentDisk  = null;
-    _filePage = 1;
-    _fileCursorStack = [];
-    _fileNextCursor = null;
-    _fileHasMore = false;
-    _currentSentFileCursor = null;
-    _dirPage = 1;
-    _dirCursorStack = [];
-    _dirNextCursor = null;
-    _dirHasMore = false;
-    _currentSentDirCursor = null;
-    if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null; }
+    state.selectedUser = null;
+    state.currentDisk  = null;
+    state.filePage = 1;
+    state.fileCursorStack = [];
+    state.fileNextCursor = null;
+    state.fileHasMore = false;
+    state.currentSentFileCursor = null;
+    state.dirPage = 1;
+    state.dirCursorStack = [];
+    state.dirNextCursor = null;
+    state.dirHasMore = false;
+    state.currentSentDirCursor = null;
+    if (state.abortCtrl) { state.abortCtrl.abort(); state.abortCtrl = null; }
     const root = _getRoot();
     if (root) root.innerHTML = '';
 }
