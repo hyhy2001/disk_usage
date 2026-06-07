@@ -172,9 +172,14 @@ function api_group_cfg_save($root_dir, $user_key, $payload) {
 
     if (@file_put_contents($tmp, $json, LOCK_EX) === false) {
         @unlink($tmp);
+        error_log('group_config: failed to write temp file ' . $tmp);
         b64_error('Failed to write server config.', 500);
     }
-    @rename($tmp, $fp);
+    if (@rename($tmp, $fp) === false) {
+        @unlink($tmp);
+        error_log('group_config: failed to rename ' . $tmp . ' -> ' . $fp);
+        b64_error('Failed to write server config.', 500);
+    }
     @chmod($fp, 0600);
 
     return $clean;

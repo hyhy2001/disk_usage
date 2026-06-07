@@ -549,6 +549,7 @@ function api_admin_restore_backup($root_dir) {
 
     $ok = @file_put_contents($disks_path, $normalized . PHP_EOL, LOCK_EX);
     if ($ok === false) {
+        error_log('admin restore_backup: failed to write ' . $disks_path . ' from ' . $backup_name);
         b64_error('Failed to restore ' . DU_DISKS_CONFIG_FILENAME . ' from backup.', 500);
     }
 
@@ -592,6 +593,7 @@ function api_admin_save_disks_json($root_dir) {
     $backup_file = api_admin_create_disks_backup($root_dir, $path);
     $ok = @file_put_contents($path, $normalized . PHP_EOL, LOCK_EX);
     if ($ok === false) {
+        error_log('admin save_disks: failed to write ' . $path);
         b64_error('Failed to write ' . DU_DISKS_CONFIG_FILENAME . ' at: ' . $path . '. Check file permission.', 500);
     }
 

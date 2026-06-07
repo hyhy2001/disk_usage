@@ -30,13 +30,7 @@ function api_perm_open_db($disk_path) {
     try {
         $pdo = new PDO('sqlite:' . $db);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        // Same read-only PRAGMA bundle used by the other SQLite handlers.
-        $pdo->exec('PRAGMA query_only=1');
-        $pdo->exec('PRAGMA journal_mode=OFF');
-        $pdo->exec('PRAGMA locking_mode=EXCLUSIVE');
-        $pdo->exec('PRAGMA mmap_size=0');
-        $pdo->exec('PRAGMA cache_size=-32768');
-        $pdo->exec('PRAGMA temp_store=MEMORY');
+        api_db_apply_read_pragmas($pdo);
     } catch (Exception $e) {
         return $cache[$key] = false;
     }
