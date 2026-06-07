@@ -11,7 +11,7 @@ function applyTheme(theme) {
     document.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme } }));
 }
 
-function initThemeToggle() {
+export function initThemeToggle() {
     const btn = document.getElementById('btn-theme-toggle');
     if (!btn) return;
 
@@ -26,5 +26,3 @@ function initThemeToggle() {
         applyTheme(current === 'dark' ? 'light' : 'dark');
     });
 }
-
-document.addEventListener('DOMContentLoaded', initThemeToggle);

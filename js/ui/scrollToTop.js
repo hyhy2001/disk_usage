@@ -32,5 +32,3 @@ export function initScrollToTop() {
     // Initial check (in case page is already scrolled on load)
     onScroll();
 }
-
-document.addEventListener('DOMContentLoaded', initScrollToTop);

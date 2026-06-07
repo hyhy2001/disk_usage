@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+export function initPageBoot() {
     const btn = document.getElementById('btn-settings-toggle');
     const dropdown = document.getElementById('settings-dropdown');
     if (btn && dropdown) {
@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 0);
     });
-});
+}
 
 (function () {
     const resizer = document.getElementById('col2-resizer');

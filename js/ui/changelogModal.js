@@ -175,7 +175,7 @@ function closeChangeLogModal() {
     document.body.classList.remove("changelog-open");
 }
 
-function bindChangeLogEvents() {
+export function bindChangeLogEvents() {
     const trigger = document.getElementById("btn-open-changelog");
     if (!trigger) return;
 
@@ -198,5 +198,3 @@ function bindChangeLogEvents() {
         if (e.key === "Escape") closeChangeLogModal();
     });
 }
-
-document.addEventListener("DOMContentLoaded", bindChangeLogEvents);

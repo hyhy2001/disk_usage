@@ -1694,9 +1694,9 @@ function initMobileSidebar() {
     });
 }
 // Bootstrap
-document.addEventListener('DOMContentLoaded', () => {
+export function initAppFetcher() {
     initRouter();
     initScaleToggle();
     initMobileSidebar();
     window.appFetcher = new DataFetcher();
-});
+}

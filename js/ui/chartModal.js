@@ -157,7 +157,7 @@ function closeModal() {
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+export function initChartModal() {
     // Delegate expand button clicks
     document.addEventListener('click', (e) => {
         const btn = e.target.closest('.chart-expand-btn');
@@ -175,4 +175,4 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeModal();
     });
-});
+}

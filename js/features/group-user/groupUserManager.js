@@ -1632,7 +1632,7 @@ function onShowGroupUserHelp() {
     );
 }
 
-function init() {
+export function initGroupUser() {
     const btn = document.getElementById('btn-open-group-user');
     if (!btn) return;
 
@@ -1644,5 +1644,3 @@ function init() {
 
     bootstrapConfig();
 }
-
-document.addEventListener('DOMContentLoaded', init);
