@@ -126,6 +126,35 @@
     --amber-100: rgba(245, 158, 11, 0.1);
 }
 
+/* ====================================================================
+   RESPONSIVE BREAKPOINTS — reference map (no CSS here, doc only)
+   --------------------------------------------------------------------
+   This project uses TWO independent responsive systems. Know which one
+   you're touching before adding a query:
+
+   1. @media (viewport width) — for sidebar / global page chrome.
+      The 1px-offset pairs below are INTENTIONAL complementary boundaries,
+      NOT typos. max-width:N covers "<=N", min-width:N+1 covers ">=N+1",
+      so together they partition the range with no overlap and no gap.
+      DO NOT "consolidate" them — doing so creates overlap or a dead band.
+        - 640 / 641   primary sidebar cutover (<=640 mobile drawer + hamburger;
+                      >=641 sidebar visible, edge-collapse button shown)
+        - 850 / 851   tablet band edge; see the compound query
+                      `(min-width:641px) and (max-width:850px)`
+        - 960 / 961   sidebar shrinks to icon-only at <=960
+        - 1000 / 1001 secondary layout step
+        - 1100 / 1101 widest desktop step (some gated further by min-height)
+      Other one-off viewport stops: 420, 480, 500, 520, 560, 600, 760, 768,
+      900, 1024. Prefer an existing value over inventing a new nearby one.
+
+   2. @container (component width) — for content that must respond to its
+      OWN container, not the viewport (charts-grid, treemap, canvas). These
+      live on `@container main|canvas` and use their own scale (320..900).
+      A new component-level breakpoint belongs HERE, not in @media.
+
+   When in doubt: chrome/sidebar -> @media; content-area widget -> @container.
+   ==================================================================== */
+
 /* -- Light Theme -------------------------------------------------- */
 :root[data-theme='light'] {
     /* Cool slate base for better contrast */
