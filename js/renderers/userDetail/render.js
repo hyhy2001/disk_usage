@@ -108,7 +108,7 @@ export function _renderFileCard(fileData) {
 
     const rows = files.length ? files.map(f => {
         const pct = Math.min((f.size / grandTotal) * 100, 100).toFixed(1);
-        const ext = _ext(f.path);
+        const ext = f.xt || _ext(f.path);
         const clr = _extColor(ext);
         return `
         <div class="ud-path-row">
