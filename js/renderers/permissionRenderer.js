@@ -117,7 +117,7 @@ function _renderFilterSidebar(userSum) {
     const userItems = entries.map(([user, count]) => {
         const sel   = _activeUsers === null || _activeUsers.has(user);
         const label = user === '__unknown__' ? '<span style="opacity:.7">unknown</span>' : escHtml(user);
-        return `<div class="user-filter-item${sel?' selected':''}" data-key="${escHtml(user)}" onclick="window._permToggle(this)">
+        return `<div class="user-filter-item${sel?' selected':''}" data-key="${escHtml(user)}" data-action="toggle-user">
             <span class="user-filter-check">${sel?'✓':''}</span>
             <span class="user-filter-name">${label}</span>
             <span class="result-count" style="font-size:.65rem;padding:1px 5px">${count}</span>
@@ -125,7 +125,7 @@ function _renderFilterSidebar(userSum) {
     }).join('');
 
     const tb = (val, lbl) =>
-        `<button class="perm-type-btn${_itemType===val?' active':''}" onclick="window._permSetType('${val}')">${lbl}</button>`;
+        `<button class="perm-type-btn${_itemType===val?' active':''}" data-action="set-type" data-type="${val}">${lbl}</button>`;
 
     return `<div class="glass-panel user-filter-box">
         <div class="user-filter-header">
@@ -141,16 +141,16 @@ function _renderFilterSidebar(userSum) {
 
         <div class="perm-filter-section">
             <div class="perm-filter-label">Path</div>
-            <input type="text" id="perm-path-search" class="user-filter-search" placeholder="e.g. /var/log…" value="${escHtml(_pathSearch)}" oninput="window._permPathSearch(this.value)">
+            <input type="text" id="perm-path-search" class="user-filter-search" placeholder="e.g. /var/log…" value="${escHtml(_pathSearch)}">
         </div>
 
         <div class="perm-filter-section">
             <div class="perm-filter-label">Users <span class="user-filter-count" id="perm-filter-count">${_activeUsers === null ? entries.length : _activeUsers.size} selected</span></div>
-            <input type="text" id="perm-user-search" class="user-filter-search" placeholder="Search user…" oninput="window._permUserSearch(this.value)">
+            <input type="text" id="perm-user-search" class="user-filter-search" placeholder="Search user…">
             <div class="user-filter-list" id="perm-filter-list">${userItems}</div>
             <div class="user-filter-footer">
-                <button class="user-bar-btn" onclick="window._permSelectAll()">All</button>
-                <button class="user-bar-btn" onclick="window._permClearAll()">Clear</button>
+                <button class="user-bar-btn" data-action="select-all">All</button>
+                <button class="user-bar-btn" data-action="clear-all">Clear</button>
             </div>
         </div>
     </div>`;
@@ -229,7 +229,7 @@ function _refreshSidebar() {
     listEl.innerHTML = entries.map(([user, count]) => {
         const sel   = _activeUsers === null || _activeUsers.has(user);
         const label = user === '__unknown__' ? '<span style="opacity:.7">unknown</span>' : escHtml(user);
-        return `<div class="user-filter-item${sel?' selected':''}" data-key="${escHtml(user)}" onclick="window._permToggle(this)">
+        return `<div class="user-filter-item${sel?' selected':''}" data-key="${escHtml(user)}" data-action="toggle-user">
             <span class="user-filter-check">${sel?'✓':''}</span>
             <span class="user-filter-name">${label}</span>
             <span class="result-count" style="font-size:.65rem;padding:1px 5px">${count}</span>
@@ -270,6 +270,28 @@ function renderPermissions(data, diskId) {
         body._hasCopyEvent = true;
     }
 
+    if (!body._hasActionEvent) {
+        // Delegated click dispatch — replaces the former inline window._perm* onclicks.
+        body.addEventListener('click', e => {
+            const el = e.target.closest('[data-action]');
+            if (!el) return;
+            switch (el.dataset.action) {
+                case 'toggle-user':     _permToggle(el); break;
+                case 'set-type':        _permSetType(el.dataset.type); break;
+                case 'select-all':      _permSelectAll(); break;
+                case 'clear-all':       _permClearAll(); break;
+                case 'export-filtered': _permExportFiltered(el); break;
+                case 'export-all':      _permExportAll(el); break;
+            }
+        });
+        // Delegated input dispatch for the two filter search boxes (input bubbles).
+        body.addEventListener('input', e => {
+            if (e.target.id === 'perm-path-search') _permPathSearch(e.target.value);
+            else if (e.target.id === 'perm-user-search') _permUserSearch(e.target.value);
+        });
+        body._hasActionEvent = true;
+    }
+
     // Reset all state
     _diskId      = diskId;
     _userSummary = data.user_summary || {};
@@ -295,11 +317,11 @@ function renderPermissions(data, diskId) {
             <span class="perm-meta-dir"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> ${escHtml(data.directory || '—')}</span>
             <span class="result-count" id="perm-total-badge">Page 1 of ${totalPages} · ${_totalItems.toLocaleString()} items</span>
             <div class="perm-export-group">
-                <button class="perm-export-btn" onclick="window._permExportFiltered()" data-tooltip="Download CSV — current filters applied">
+                <button class="perm-export-btn" data-action="export-filtered" data-tooltip="Download CSV — current filters applied">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Export Filtered
                 </button>
-                <button class="perm-export-btn" onclick="window._permExportAll()" data-tooltip="Download full permission report as CSV">
+                <button class="perm-export-btn" data-action="export-all" data-tooltip="Download full permission report as CSV">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Export All
                 </button>
@@ -352,7 +374,7 @@ function _attachPagination(root) {
 }
 
 // ── Filter callbacks ──────────────────────────────────────────────────────────
-window._permToggle = function(el) {
+function _permToggle(el) {
     const key = el.dataset.key;
     if (_activeUsers === null) {
         _activeUsers = new Set(Object.keys(_userSummary));
@@ -370,9 +392,9 @@ window._permToggle = function(el) {
     if (countEl) countEl.textContent = `${_activeUsers.size} selected`;
     _permPage = 1;
     _fetchPage(1);
-};
+}
 
-window._permSelectAll = function() {
+function _permSelectAll() {
     _activeUsers = null;
     document.querySelectorAll('#perm-filter-list .user-filter-item').forEach(el => {
         el.classList.add('selected');
@@ -382,9 +404,9 @@ window._permSelectAll = function() {
     if (countEl) countEl.textContent = `${Object.keys(_userSummary).length} selected`;
     _permPage = 1;
     _fetchPage(1);
-};
+}
 
-window._permClearAll = function() {
+function _permClearAll() {
     _activeUsers = new Set();
     document.querySelectorAll('#perm-filter-list .user-filter-item').forEach(el => {
         el.classList.remove('selected');
@@ -394,29 +416,29 @@ window._permClearAll = function() {
     if (countEl) countEl.textContent = '0 selected';
     _permPage = 1;
     _fetchPage(1);
-};
+}
 
-window._permUserSearch = function(q) {
+function _permUserSearch(q) {
     const lq = q.toLowerCase();
     document.querySelectorAll('#perm-filter-list .user-filter-item').forEach(el => {
         el.style.display = (el.dataset.key || '').toLowerCase().includes(lq) ? '' : 'none';
     });
-};
+}
 
-window._permPathSearch = function(val) {
+function _permPathSearch(val) {
     _pathSearch = val.trim();
     clearTimeout(_searchTimer);
     _searchTimer = setTimeout(() => { _permPage = 1; _fetchPage(1); }, SEARCH_DELAY);
-};
+}
 
-window._permSetType = function(val) {
+function _permSetType(val) {
     _itemType = val;
     document.querySelectorAll('#perm-type-group .perm-type-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.textContent.trim().toLowerCase() === (val || 'all').toLowerCase());
+        btn.classList.toggle('active', btn.dataset.type === val);
     });
     _permPage = 1;
     _fetchPage(1);
-};
+}
 
 // ── CSV Export ────────────────────────────────────────────────────────────────
 const PERM_CSV_HEADERS = ['User', 'Path', 'Type', 'Error'];
@@ -561,15 +583,13 @@ async function _exportCsv(useFilters, btn) {
     }
 }
 
-window._permExportFiltered = function() {
-    const btn = document.querySelector('.perm-export-btn[onclick*="Filtered"]');
+function _permExportFiltered(btn) {
     _exportCsv(true, btn);
-};
+}
 
-window._permExportAll = function() {
-    const btn = document.querySelector('.perm-export-btn[onclick*="All"]');
+function _permExportAll(btn) {
     _exportCsv(false, btn);
-};
+}
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 document.addEventListener('permissionsLoaded', (e) => {
