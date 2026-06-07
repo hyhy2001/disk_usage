@@ -6,9 +6,10 @@ import { renderDetailTables, initScaleToggle, resetDashboardToEmpty } from '../r
 import { initUserDetailTab, resetUserDetailTab } from '../renderers/userDetailRenderer.js?v=101';
 import { fmt, smartFmtTick } from '../utils/formatters.js';
 import { saveFilters, loadFilters } from '../utils/filterStorage.js';
-import { compareDiskCards, extractFromDataset, extractFromApiDisk } from '../utils/sort.js';
+import { compareDiskCards, extractFromDataset } from '../utils/sort.js';
 import { createApiClient } from './api.js';
 import { escHtml } from '../utils/dom.js';
+import { renderTeamComparisonChart, getTeamChartApiMode } from './teamComparison.js';
 
 // ── Sidebar live clock ────────────────────────────────────────────────────────
 // Cache formatter to avoid re-creating Intl.DateTimeFormat every second
@@ -172,7 +173,7 @@ class DataFetcher {
             if (!this._lastTeamData || this._lastTeamData.length === 0) return;
             const overviewEmpty = document.getElementById('overview-empty-state');
             if (!overviewEmpty || overviewEmpty.style.display === 'none') return;
-            this._renderTeamComparisonChart(this._lastTeamData, this._getTeamChartApiMode());
+            renderTeamComparisonChart(this._lastTeamData, getTeamChartApiMode());
         });
     }
 
@@ -420,7 +421,7 @@ class DataFetcher {
             '<svg class="status-spinner-svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">' +
                 '<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>' +
             '</svg>' +
-            '<span class="status-text-label">' + this._escHtml(label) + '</span>';
+            '<span class="status-text-label">' + escHtml(label) + '</span>';
     }
 
     /** Restore plain idle text. */
@@ -429,12 +430,6 @@ class DataFetcher {
         if (!el) return;
         el.textContent = label;
     }
-
-    _escHtml(s) {
-        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
-                        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
 
     _getScanStageMeta(stage, _message) {
         const map = {
@@ -501,12 +496,6 @@ class DataFetcher {
         this.updateMetricCards();
     }
 
-    _getTeamChartApiMode() {
-        const storedMode = localStorage.getItem('teamChartViewMode') || 'absolute-linear';
-        if (storedMode === 'absolute-log') return 'logarithmic';
-        if (storedMode === 'percent') return 'percent';
-        return 'linear';
-    }
 
     _initSortUI() {
         const btnAlpha = document.getElementById('btn-sort-alpha');
@@ -544,7 +533,7 @@ class DataFetcher {
             if (this._lastTeamData) {
                 // Add minor timeout to ensure DOM container is available over the race-condition sync flow
                 setTimeout(() => {
-                    this._renderTeamComparisonChart(this._lastTeamData, this._getTeamChartApiMode());
+                    renderTeamComparisonChart(this._lastTeamData, getTeamChartApiMode());
                 }, 50);
             }
         };
@@ -636,172 +625,13 @@ class DataFetcher {
                     updateUI();
 
                     if (this._lastTeamData && window._teamCompChart) {
-                        this._renderTeamComparisonChart(this._lastTeamData, this._getTeamChartApiMode());
+                        renderTeamComparisonChart(this._lastTeamData, getTeamChartApiMode());
                     }
                 });
             });
         }
     }
 
-    _renderTeamComparisonChart(data, mode) {
-        const canvasWrapper = document.getElementById('team-comparison-canvas-wrapper');
-
-        if (window._teamCompChart) {
-            window._teamCompChart.destroy();
-        }
-
-        // Dynamically set width based on number of disks
-        if (canvasWrapper) {
-            const minW = Math.max(100, data.length * 60);
-            canvasWrapper.style.width = `max(100%, ${minW}px)`;
-        }
-
-        const ctx = document.getElementById('teamComparisonChart');
-        if (!ctx) return;
-
-        const labels = [];
-        const usedData = [];
-        const freeData = [];
-        const absoluteData = []; // for tooltips
-        const css = getComputedStyle(document.documentElement);
-        const textSecondary = (css.getPropertyValue('--text-secondary') || '').trim() || '#94a3b8';
-        const theme = document.documentElement.getAttribute('data-theme') || 'dark';
-        const gridColor = theme === 'light' ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.08)';
-
-        const currentSort = localStorage.getItem('teamDiskSort') || 'alpha-asc';
-
-        const sortedData = [...data].sort((a, b) =>
-            compareDiskCards(a, b, currentSort, extractFromApiDisk));
-
-        sortedData.forEach(d => {
-            const sys = d.general_system || {};
-            const total = sys.total || 0;
-            const used = sys.used || 0;
-            const free = Math.max(0, total - used);
-            const diskName = d._disk_name || 'Disk';
-
-            labels.push(diskName);
-            absoluteData.push({ total, used, free });
-
-            if (mode === 'percent' && total > 0) {
-                usedData.push({ x: diskName, y: (used / total) * 100 });
-                freeData.push({ x: diskName, y: (free / total) * 100 });
-            } else {
-                // Logarithmic scale cannot handle 0 values, use a tiny positive floor
-                const valUsed = mode === 'logarithmic' ? Math.max(0.1, used) : used;
-                const valFree = mode === 'logarithmic' ? Math.max(0.1, free) : free;
-                usedData.push({ x: diskName, y: valUsed });
-                freeData.push({ x: diskName, y: valFree });
-            }
-        });
-
-        window._teamCompChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Used',
-                        data: usedData,
-                        backgroundColor: '#f43f5e',
-                        stack: 'Stack 0',
-                        barPercentage: 0.7,
-                    },
-                    {
-                        label: 'Free',
-                        data: freeData,
-                        backgroundColor: '#10b981',
-                        stack: 'Stack 0',
-                        barPercentage: 0.7,
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function (context) {
-                                const dsLabel = context.dataset.label;
-                                const idx = context.dataIndex;
-                                const abs = absoluteData[idx];
-                                const rawVal = abs[dsLabel.toLowerCase()];
-                                const formatted = fmt(rawVal);
-                                if (mode === 'percent') {
-                                    return `${dsLabel}: ${context.parsed.y.toFixed(1)}% (${formatted})`;
-                                }
-                                return `${dsLabel}: ${formatted}`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        stacked: true,
-                        grid: { display: false, color: gridColor },
-                        ticks: {
-                            color: textSecondary,
-                            autoSkip: false,
-                            maxRotation: 45,
-                            minRotation: 45
-                        }
-                    },
-                    y: {
-                        type: mode === 'logarithmic' ? 'logarithmic' : 'linear',
-                        stacked: mode !== 'logarithmic',
-                        grid: { color: gridColor },
-                        ticks: {
-                            color: textSecondary,
-                            callback: function (value) {
-                                if (mode === 'percent') return value + '%';
-                                return fmt(value);
-                            }
-                        },
-                        max: mode === 'percent' ? 100 : undefined
-                    }
-                }
-            }
-        });
-
-        // --- Populate Team Insights Grid ---
-        const insightsGrid = document.getElementById('team-comparison-insights');
-        if (insightsGrid) {
-            let count30 = 0, count50 = 0, count70 = 0, count90 = 0;
-
-            data.forEach(d => {
-                const sys = d.general_system || {};
-                const t = sys.total || 0;
-                const u = sys.used || 0;
-                const ratio = t > 0 ? (u / t) : 0;
-
-                if (ratio >= 0.3 && ratio < 0.5) count30++;
-                else if (ratio >= 0.5 && ratio < 0.7) count50++;
-                else if (ratio >= 0.7 && ratio < 0.9) count70++;
-                else if (ratio >= 0.9) count90++;
-            });
-
-            insightsGrid.innerHTML = `
-                <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 12px; border: var(--glass-border);">
-                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Stable: 30-50%</div>
-                    <div style="font-size: 1.5rem; font-weight: 600; color: var(--emerald-500, #10b981);">${count30}</div>
-                </div>
-                <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 12px; border: var(--glass-border);">
-                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Attention: 50-70%</div>
-                    <div style="font-size: 1.5rem; font-weight: 600; color: var(--sky-500, #3b82f6);">${count50}</div>
-                </div>
-                <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 12px; border: var(--glass-border);">
-                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Warning: 70-90%</div>
-                    <div style="font-size: 1.5rem; font-weight: 600; color: var(--amber-500, #f59e0b);">${count70}</div>
-                </div>
-                <div class="stat-card" style="background: var(--bg-surface); padding: 16px; border-radius: 12px; border: var(--glass-border);">
-                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Critical: > 90%</div>
-                    <div style="font-size: 1.5rem; font-weight: 600; color: var(--rose-500, #f43f5e);">${count90}</div>
-                </div>
-            `;
-        }
-    }
 
     async _initDiskSelector() {
         try {
@@ -1322,7 +1152,7 @@ class DataFetcher {
                 if (this._lastTeamData && this._lastTeamData.length > 0) {
                     // Need a small timeout to allow display:flex to compute layout before Chart.js takes over
                     setTimeout(() => {
-                        this._renderTeamComparisonChart(this._lastTeamData, this._getTeamChartApiMode());
+                        renderTeamComparisonChart(this._lastTeamData, getTeamChartApiMode());
                     }, 50);
                 }
             }
