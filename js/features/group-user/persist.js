@@ -70,14 +70,25 @@ export async function loadServerConfig() {
     return sanitizeConfig(cfg);
 }
 
+// Read the du_csrf cookie the group_config endpoint issues (JS-readable by
+// design — see the double-submit note in group_config.php). Returns '' if absent.
+function readCsrfCookie() {
+    const m = document.cookie.match(/(?:^|;\s*)du_csrf=([0-9a-fA-F]{32})(?:;|$)/);
+    return m ? m[1] : '';
+}
+
 export async function saveServerConfigNow() {
     const payload = new URLSearchParams({
         config_b64: utf8ToB64(JSON.stringify(state.config)),
     });
 
+    const headers = { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' };
+    const csrf = readCsrfCookie();
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+
     await fetchJson('api.php?type=group_config&action=save', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        headers,
         body: payload.toString(),
         cache: 'no-store',
     });

@@ -99,6 +99,70 @@ function api_group_cfg_path_for_user($root_dir, $user_key) {
     return api_group_cfg_storage_dir($root_dir) . DIRECTORY_SEPARATOR . api_group_cfg_filename($user_key);
 }
 
+// --- CSRF (double-submit cookie) -------------------------------------------
+// group_config is intentionally stateless (cookie identity, no PHP session),
+// and the SPA calls action=get for every visitor at boot — starting a session
+// here would spawn a session file per anonymous visitor. So instead of the
+// admin synchronizer-token pattern (which needs $_SESSION), we use a
+// double-submit cookie: issue a JS-READABLE `du_csrf` cookie, and require the
+// client to echo it in an X-CSRF-Token header on writes. A cross-site attacker
+// cannot read the victim's cookie (Same-Origin Policy) nor set it cross-site
+// (SameSite=Lax), so cannot forge the matching header — even though the cookie
+// auto-sends. The compare reuses the canonical constant-time api_admin_hash_equals.
+
+// Issue the du_csrf cookie if absent, and return its value. Unlike du_uid this
+// cookie is NOT HttpOnly — the JS client must read it to echo in the header.
+function api_group_cfg_csrf_cookie() {
+    if (isset($_COOKIE['du_csrf'])) {
+        $tok = trim((string)$_COOKIE['du_csrf']);
+        if (strlen($tok) === 32 && preg_match('/^[0-9a-f]{32}$/i', $tok)) {
+            return $tok;
+        }
+    }
+    $raw = function_exists('openssl_random_pseudo_bytes')
+        ? openssl_random_pseudo_bytes(16)
+        : pack('N4', mt_rand(), mt_rand(), mt_rand(), mt_rand());
+    $tok = bin2hex($raw);
+
+    $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+    $expires = time() + (365 * 24 * 60 * 60);
+    if (PHP_VERSION_ID >= 70300) {
+        @setcookie('du_csrf', $tok, array(
+            'expires'  => $expires,
+            'path'     => '/',
+            'secure'   => $secure,
+            'httponly' => false,
+            'samesite' => 'Lax',
+        ));
+    } else {
+        @setcookie('du_csrf', $tok, $expires, '/; SameSite=Lax', '', $secure, false);
+    }
+    $_COOKIE['du_csrf'] = $tok;
+    return $tok;
+}
+
+// Pure predicate: does the client-sent token match the cookie token? Both must
+// be present and well-formed; compare is constant-time. Kept side-effect-free
+// so it's unit-testable without cookies/headers.
+function api_group_cfg_csrf_ok($cookie_token, $sent_token) {
+    $cookie_token = (string)$cookie_token;
+    $sent_token = (string)$sent_token;
+    if ($cookie_token === '' || $sent_token === '') return false;
+    if (!preg_match('/^[0-9a-f]{32}$/i', $cookie_token)) return false;
+    return api_admin_hash_equals($cookie_token, $sent_token);
+}
+
+// Enforce the double-submit check on a write; 403 + exit on mismatch.
+function api_group_cfg_require_csrf() {
+    $cookie = isset($_COOKIE['du_csrf']) ? (string)$_COOKIE['du_csrf'] : '';
+    $sent = isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? (string)$_SERVER['HTTP_X_CSRF_TOKEN'] : '';
+    if ($sent === '') $sent = (string)param('csrf_token', '');
+    if (!api_group_cfg_csrf_ok($cookie, $sent)) {
+        b64_error('Invalid or missing CSRF token.', 403);
+    }
+}
+
+
 function api_group_cfg_sanitize($payload) {
     $out = array(
         'schema_version' => 3,
@@ -188,9 +252,13 @@ function api_group_cfg_save($root_dir, $user_key, $payload) {
 function api_handle_group_config($root_dir) {
     $user_key = api_group_cfg_user_identity();
     api_group_cfg_migrate_legacy($root_dir, $user_key);
+    // Issue the double-submit CSRF cookie on every request (incl. the action=get
+    // the SPA fires at boot) so the client always has a token to echo on save.
+    api_group_cfg_csrf_cookie();
     $action = trim((string)param('action', 'get'));
 
     if ($action === 'save') {
+        api_group_cfg_require_csrf();
         $raw = get_b64_param('config', '');
         if (!is_string($raw) || trim($raw) === '') {
             b64_error('Missing config payload.', 400);
