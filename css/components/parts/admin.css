@@ -50,10 +50,12 @@ body.sidebar-collapsed #admin-avatar-dropdown {
     bottom: 0;
 }
 
-/* Responsive auto-narrow: at ≤960px the sidebar shrinks to 64px without the
-   .sidebar-collapsed class, so apply the same icon-only treatment here or the
-   label truncates to "adm...". */
-@media (max-width: 960px) {
+/* Responsive auto-narrow: in 641–960px the sidebar shrinks to a 64px icon rail
+   without the .sidebar-collapsed class, so apply the same icon-only treatment
+   here or the label truncates to "adm...". Bounded to ≥641px because ≤640px is
+   the full-width mobile drawer (overflow-x:hidden) — there the dropdown must
+   open in place, not fly out to the right where the drawer would clip it. */
+@media (min-width: 641px) and (max-width: 960px) {
     #admin-auth-wrap { padding: 10px 0 14px; }
     .admin-auth-btn { padding: 9px 0; }
     .admin-auth-btn span { display: none; }
