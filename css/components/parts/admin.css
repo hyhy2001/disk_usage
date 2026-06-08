@@ -273,3 +273,42 @@ body.admin-modal-open { overflow: hidden; }
     border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 .admin-create-wrap h4 { font-size: 0.9rem; margin: 0 0 10px; }
+
+/* Generated-password reveal after creating an admin */
+.admin-new-cred {
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: var(--radius-sm, 8px);
+    background: rgba(16, 185, 129, 0.08);
+}
+.admin-new-cred-label { font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 8px; }
+.admin-new-cred-row { display: flex; align-items: center; gap: 8px; }
+.admin-new-cred-pw {
+    flex: 1;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm, 8px);
+    background: rgba(0, 0, 0, 0.3);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.95rem;
+    letter-spacing: 0.04em;
+    color: var(--text-primary);
+    word-break: break-all;
+}
+
+/* Login captcha */
+.admin-captcha-row { display: flex; align-items: center; gap: 10px; }
+.admin-captcha-q {
+    flex-shrink: 0;
+    padding: 0 10px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    border-radius: var(--radius-sm, 8px);
+    background: rgba(255, 255, 255, 0.05);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+.admin-captcha-input { flex: 1; }

@@ -31,10 +31,16 @@ function createAccountsShell() {
                     <h4>Create admin account</h4>
                     <form id="acc-create-form" autocomplete="off" class="admin-stack-form">
                         <input id="acc-new-username" class="admin-input" type="text" placeholder="Username" autocomplete="off" />
-                        <input id="acc-new-password" class="admin-input" type="password" placeholder="Password (min 10 chars)" autocomplete="new-password" />
                         <button class="admin-btn admin-btn-primary" type="submit">Create Admin</button>
                     </form>
-                    <p class="admin-hint">Only the owner can create or delete admin accounts.</p>
+                    <p class="admin-hint">A strong password is generated automatically. Only the owner can create or delete admin accounts.</p>
+                    <div id="acc-new-cred" class="admin-new-cred hidden">
+                        <p class="admin-new-cred-label">Account created — copy this password now, it won't be shown again:</p>
+                        <div class="admin-new-cred-row">
+                            <code id="acc-new-cred-pw" class="admin-new-cred-pw"></code>
+                            <button id="acc-copy-pw" class="admin-btn admin-btn-sm" type="button">Copy</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -50,18 +56,35 @@ function createAccountsShell() {
     $('acc-create-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const u = $('acc-new-username').value.trim();
-        const p = $('acc-new-password').value;
         try {
-            const body = new URLSearchParams({ username: u, password_b64: utf8ToB64(p) });
-            await adminApi('create_admin', { method: 'POST', body: body.toString() });
+            const body = new URLSearchParams({ username: u });
+            const data = await adminApi('create_admin', { method: 'POST', body: body.toString() });
             showToast('Created', 'Created admin: ' + u, 'success');
             $('acc-create-form').reset();
+            revealNewPassword(data.password || '');
             await refreshAdmins();
         } catch (err) {
             showToast('Create failed', err.message, 'error');
         }
     });
+    $('acc-copy-pw').addEventListener('click', async () => {
+        const pw = $('acc-new-cred-pw').textContent || '';
+        try {
+            await navigator.clipboard.writeText(pw);
+            showToast('Copied', 'Password copied to clipboard.', 'success');
+        } catch (_err) {
+            showToast('Copy failed', 'Select the password and copy it manually.', 'error');
+        }
+    });
     accountsBuilt = true;
+}
+
+function revealNewPassword(pw) {
+    const box = $('acc-new-cred');
+    if (!box) return;
+    if (!pw) { box.classList.add('hidden'); return; }
+    $('acc-new-cred-pw').textContent = pw;
+    box.classList.remove('hidden');
 }
 
 export async function openAccountsModal() {

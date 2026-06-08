@@ -262,6 +262,25 @@ function api_admin_validate_password($password) {
     return $password;
 }
 
+// Generate a strong random password for an owner-created admin. Uses an
+// unambiguous alphabet (no 0/O/1/l/I) so it's safe to read aloud / copy.
+function api_admin_generate_password($length = 16) {
+    $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    $max = strlen($alphabet) - 1;
+    $out = '';
+    if (function_exists('openssl_random_pseudo_bytes')) {
+        $bytes = openssl_random_pseudo_bytes($length);
+        for ($i = 0; $i < $length; $i++) {
+            $out .= $alphabet[ord($bytes[$i]) % ($max + 1)];
+        }
+    } else {
+        for ($i = 0; $i < $length; $i++) {
+            $out .= $alphabet[mt_rand(0, $max)];
+        }
+    }
+    return $out;
+}
+
 function api_admin_json_error_message() {
     if (function_exists('json_last_error_msg')) {
         return json_last_error_msg();
@@ -406,6 +425,33 @@ function api_admin_handle_setup($root_dir) {
     ));
 }
 
+// Offline captcha: a small arithmetic challenge stored in the session. The
+// client shows the question and submits the answer with the login request.
+// Consumed (cleared) on every login attempt so each captcha is single-use.
+function api_admin_handle_captcha() {
+    api_admin_session_start();
+    $a = mt_rand(2, 9);
+    $b = mt_rand(2, 9);
+    $ops = array('+', '-', '*');
+    $op = $ops[mt_rand(0, 2)];
+    if ($op === '+') { $answer = $a + $b; }
+    elseif ($op === '-') { if ($b > $a) { $t = $a; $a = $b; $b = $t; } $answer = $a - $b; }
+    else { $answer = $a * $b; }
+
+    $_SESSION['du_captcha'] = (string)$answer;
+    b64_success(array('question' => $a . ' ' . $op . ' ' . $b . ' = ?'));
+}
+
+// Verify the submitted captcha answer against the session, then consume it so
+// it cannot be replayed. Returns true on match.
+function api_admin_captcha_ok($submitted) {
+    api_admin_session_start();
+    $expected = isset($_SESSION['du_captcha']) ? (string)$_SESSION['du_captcha'] : '';
+    unset($_SESSION['du_captcha']); // single-use regardless of outcome
+    if ($expected === '') return false;
+    return trim((string)$submitted) === $expected;
+}
+
 function api_admin_handle_login($root_dir) {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         b64_error('Method not allowed.', 405);
@@ -423,6 +469,13 @@ function api_admin_handle_login($root_dir) {
                 . (int)$cfg['window_seconds'] . ' seconds.',
             429
         );
+    }
+
+    // Captcha gate before any credential work — wrong/missing answer is a
+    // failed attempt (counts toward rate limit). Consumed single-use.
+    if (!api_admin_captcha_ok(param('captcha', ''))) {
+        api_admin_rate_limit_record_failure($pdo);
+        b64_error('Captcha answer is incorrect. Please try again.', 401);
     }
 
     $username = trim((string)param('username', ''));
@@ -498,12 +551,14 @@ function api_admin_handle_create_admin($root_dir) {
 
     $pdo = api_admin_ensure_db($root_dir);
     $username = api_admin_validate_username(param('username', ''));
-    $password = api_admin_validate_password(get_b64_param('password', ''));
 
     if (api_admin_get_by_username($pdo, $username)) {
         b64_error('That username already exists.', 409);
     }
 
+    // The owner doesn't pick the password — we generate a strong one and return
+    // the plaintext exactly once so it can be handed to the new admin.
+    $password = api_admin_generate_password(16);
     $hash = api_admin_hash_password($password);
     $created_at = gmdate('c');
     try {
@@ -513,7 +568,7 @@ function api_admin_handle_create_admin($root_dir) {
     } catch (Exception $e) {
         b64_error('Failed to create admin account.', 500);
     }
-    b64_success(array('created' => true, 'id' => $new_id, 'username' => $username, 'role' => 'admin'));
+    b64_success(array('created' => true, 'id' => $new_id, 'username' => $username, 'role' => 'admin', 'password' => $password));
 }
 
 // delete_admin: owner-only. Cannot delete an owner account, nor yourself.
@@ -811,6 +866,9 @@ function api_handle_admin($root_dir) {
     }
     if ($action === 'login') {
         api_admin_handle_login($root_dir);
+    }
+    if ($action === 'captcha') {
+        api_admin_handle_captcha();
     }
     if ($action === 'logout') {
         api_admin_handle_logout();

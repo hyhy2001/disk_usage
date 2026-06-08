@@ -171,3 +171,36 @@ test('disk-mapping handlers reject a non-owner admin (owner gate)', function () 
     assert_throws(function () use ($root) { api_admin_save_disks_json($root); }, 'save_disks owner-only');
     assert_throws(function () use ($root) { api_admin_restore_backup($root); }, 'restore_backup owner-only');
 });
+
+// --- auto-generated admin password ---
+test('generate_password yields the requested length from a safe alphabet', function () {
+    $pw = api_admin_generate_password(16);
+    assert_eq(16, strlen($pw));
+    // No ambiguous chars (0/O/1/l/I) — keeps it copy/read-safe.
+    assert_eq(0, preg_match('/[0O1lI]/', $pw), 'must avoid ambiguous characters');
+    // Alphanumeric only.
+    assert_eq(1, preg_match('/^[A-Za-z2-9]+$/', $pw));
+});
+
+test('generate_password is non-deterministic across calls', function () {
+    $a = api_admin_generate_password(20);
+    $b = api_admin_generate_password(20);
+    assert_eq(false, $a === $b, 'two generated passwords should differ');
+});
+
+// --- login captcha (session-backed, single-use) ---
+test('captcha_ok matches the session answer then consumes it', function () {
+    @session_start();
+    $_SESSION['du_captcha'] = '42';
+    assert_true(api_admin_captcha_ok('42'), 'correct answer passes');
+    // Single-use: the same answer must fail the second time (now consumed).
+    assert_eq(false, api_admin_captcha_ok('42'), 'captcha is single-use');
+});
+
+test('captcha_ok rejects a wrong answer and an empty session', function () {
+    @session_start();
+    $_SESSION['du_captcha'] = '15';
+    assert_eq(false, api_admin_captcha_ok('14'), 'wrong answer fails');
+    // Wrong attempt also consumed it, so a follow-up with no challenge fails.
+    assert_eq(false, api_admin_captcha_ok('15'), 'no challenge in session fails');
+});

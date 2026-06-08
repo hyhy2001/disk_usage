@@ -341,11 +341,6 @@ disk_usage/
 ├── build.mjs                   # Builds minified JS/CSS bundles
 ├── .htaccess                   # Apache security, SPA fallback, caching, compression
 │
-├── admin/                      # Browser admin UI for editing disks.json and backups
-│   ├── index.html
-│   ├── main.js
-│   └── style.css
-│
 ├── backend/                    # PHP API implementation
 │   ├── bootstrap.php           # Loads backend libs/handlers
 │   ├── constants.php           # Filename + report-pattern constants (mirrors check_disk/src/constants.py)

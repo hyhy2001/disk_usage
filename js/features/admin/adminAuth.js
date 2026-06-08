@@ -146,6 +146,10 @@ function createAuthModal() {
                     <input id="auth-username" class="admin-input" type="text" placeholder="Username" autocomplete="username" />
                     <input id="auth-password" class="admin-input" type="password" placeholder="Password" autocomplete="current-password" />
                     <input id="auth-password-confirm" class="admin-input hidden" type="password" placeholder="Confirm password" autocomplete="new-password" />
+                    <div id="auth-captcha-row" class="admin-captcha-row hidden">
+                        <span id="auth-captcha-q" class="admin-captcha-q"></span>
+                        <input id="auth-captcha" class="admin-input admin-captcha-input" type="text" inputmode="numeric" placeholder="Answer" autocomplete="off" />
+                    </div>
                     <button id="auth-submit" class="admin-btn admin-btn-primary" type="submit">Sign In</button>
                 </form>
             </div>
@@ -179,10 +183,24 @@ async function openAuthModal() {
     $('auth-password-confirm').classList.toggle('hidden', !isSetup);
     $('auth-form').dataset.mode = isSetup ? 'setup' : 'login';
 
+    // Captcha only gates login (not the one-time owner setup).
+    $('auth-captcha-row').classList.toggle('hidden', isSetup);
+    if (!isSetup) await loadCaptcha();
+
     const modal = $('admin-auth-modal');
     modal.classList.add('visible');
     document.body.classList.add('admin-modal-open');
     $('auth-username').focus();
+}
+
+async function loadCaptcha() {
+    try {
+        const data = await adminApi('captcha', { method: 'GET' });
+        $('auth-captcha-q').textContent = data.question || '';
+        $('auth-captcha').value = '';
+    } catch (_err) {
+        $('auth-captcha-q').textContent = '';
+    }
 }
 
 function closeAuthModal() {
@@ -206,7 +224,8 @@ async function onAuthSubmit(e) {
             await adminApi('setup', { method: 'POST', body: body.toString() });
             showToast('Owner created', 'Owner account created. You are now signed in.', 'success');
         } else {
-            const body = new URLSearchParams({ username, password_b64: utf8ToB64(password) });
+            const captcha = $('auth-captcha').value.trim();
+            const body = new URLSearchParams({ username, password_b64: utf8ToB64(password), captcha });
             await adminApi('login', { method: 'POST', body: body.toString() });
             showToast('Signed in', 'Login successful.', 'success');
         }
@@ -215,6 +234,8 @@ async function onAuthSubmit(e) {
         await onAuthChanged();
     } catch (err) {
         showToast(mode === 'setup' ? 'Setup failed' : 'Login failed', err.message, 'error');
+        // Captcha is single-use server-side — refresh it for the next attempt.
+        if (mode === 'login') await loadCaptcha();
     }
 }
 
