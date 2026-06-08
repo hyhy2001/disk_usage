@@ -120,6 +120,12 @@ export class ChartManager {
         if (this.usersChart) {
             const opts = this.usersChart.options;
             if (opts.scales?.x?.grid) opts.scales.x.grid.color = colors.grid;
+            // Tick labels (axis text) aren't set explicitly at creation — they
+            // fall back to Chart.defaults.color, which a live chart won't re-read
+            // on update('none'). Patch both axes' tick colors here so user names
+            // (y) and size ticks (x) actually flip with the theme.
+            if (opts.scales?.x?.ticks) opts.scales.x.ticks.color = colors.tick;
+            if (opts.scales?.y?.ticks) opts.scales.y.ticks.color = colors.tick;
             if (opts.plugins?.tooltip) {
                 opts.plugins.tooltip.backgroundColor = colors.tipBg;
                 opts.plugins.tooltip.titleColor      = colors.tipBody;
@@ -143,7 +149,29 @@ export class ChartManager {
 
         // ── Team doughnut — center text redraws automatically on update ─────
         if (this.teamChart) {
+            const opts = this.teamChart.options;
+            // legend (position:right) text + tooltip were dark-tuned at creation
+            // and won't re-read Chart.defaults on update('none') — patch here.
+            if (opts.plugins?.legend?.labels) opts.plugins.legend.labels.color = colors.tick;
+            if (opts.plugins?.tooltip) {
+                opts.plugins.tooltip.backgroundColor = colors.tipBg;
+                opts.plugins.tooltip.titleColor      = colors.tipBody;
+                opts.plugins.tooltip.bodyColor       = colors.tipBody;
+                opts.plugins.tooltip.borderColor     = colors.tipBdr;
+            }
             this.teamChart.update('none');
+        }
+
+        // ── Inode doughnut ──────────────────────────────────────────────────
+        if (this._inodePieChart) {
+            const opts = this._inodePieChart.options;
+            if (opts.plugins?.legend?.labels) opts.plugins.legend.labels.color = colors.tick;
+            if (opts.plugins?.tooltip) {
+                opts.plugins.tooltip.backgroundColor = colors.tipBg;
+                opts.plugins.tooltip.titleColor      = colors.tipBody;
+                opts.plugins.tooltip.bodyColor       = colors.tipBody;
+            }
+            this._inodePieChart.update('none');
         }
     }
 
@@ -1151,7 +1179,7 @@ export class ChartManager {
                     legend: {
                         position: 'bottom',
                         labels: {
-                            color: ct().tickDim,
+                            color: ct().tick,
                             font: { size: 12, family: "'Inter', sans-serif" },
                             usePointStyle: true,
                             padding: 20

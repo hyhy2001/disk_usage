@@ -122,7 +122,7 @@
 
 /* -- Glass panels / cards -------------------------------------------------- */
 :root[data-theme='light'] .glass-panel {
-    background: rgba(255,255,255,0.95);
+    background: rgba(251,250,247,0.95);
     border: 1px solid rgba(0,0,0,0.12);
     box-shadow: 0 4px 12px rgba(0,0,0,0.06);
 }
@@ -298,6 +298,29 @@
 :root[data-theme='light'] .rank-badge {
     background: rgba(0,0,0,0.05);
     color: #475569;
+}
+
+/* -- Treemap breadcrumb separators + search path -------------------------- */
+/* These hardcode white text (rgba(255,255,255,...)) or a faint slate, dark-tuned
+   with no light path → on a near-white surface they go near-invisible. Darken to
+   a readable slate for light mode. */
+:root[data-theme='light'] .tm-crumb-sep,
+:root[data-theme='light'] .tmx-crumb-sep,
+:root[data-theme='light'] .tmx-crumb-empty {
+    color: #64748b;
+}
+:root[data-theme='light'] .tmx-search-option-path {
+    color: #475569;
+}
+
+/* -- Column resizer grip --------------------------------------------------- */
+/* .resizer-icon hardcodes a dark slate bg rgba(40,48,60,0.8) (dark-tuned) — a
+   dark blob on a light page. Give it a light grip with a soft warm shadow. */
+:root[data-theme='light'] .resizer-icon {
+    background: #fbfaf7;
+    border: 1px solid rgba(60,50,40,0.14);
+    box-shadow: 0 2px 5px rgba(60,50,40,0.14);
+    color: #64748b;
 }
 
 

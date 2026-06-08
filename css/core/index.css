@@ -157,22 +157,24 @@
 
 /* -- Light Theme -------------------------------------------------- */
 :root[data-theme='light'] {
-    /* Cool slate base for better contrast */
-    --bg-base: #f8fafc;
-    --bg-surface: rgba(255, 255, 255, 0.96);
-    --bg-surface-elevated: rgba(241, 245, 249, 1);
+    /* Warm off-white palette — soft, airy, easy on the eyes. Cards lift off the
+       page via warm soft shadows (not via a darker base), so base sits only a
+       hair under the near-white card surface. */
+    --bg-base: #f4f1ec;
+    --bg-surface: #fbfaf7;
+    --bg-surface-elevated: #f7f4ef;
     --text-primary: #020617;       /* slate-950 */
     --text-secondary: #334155;     /* slate-700 for better contrast */
     --text-accent: #059669;        /* Deeper emerald for text */
     --emerald-500: #059669;
     --emerald-400: #10b981;
     --emerald-100: rgba(16, 185, 129, 0.2);
-    --glass-border: 1px solid rgba(15, 23, 42, 0.12);
-    --glass-shadow: 0 2px 8px rgba(15,23,42,0.06), 0 0 0 1px rgba(15,23,42,0.05);
-    /* Shadow tiers re-tuned for the light surface (G0 token parity) */
-    --shadow-sm: 0 1px 3px rgba(15,23,42,0.08), 0 0 0 1px rgba(15,23,42,0.04);
-    --shadow-md: 0 4px 16px rgba(15,23,42,0.10), 0 0 0 1px rgba(15,23,42,0.05);
-    --shadow-lg: 0 16px 48px rgba(15,23,42,0.18);
+    --glass-border: 1px solid rgba(60, 50, 40, 0.10);
+    --glass-shadow: 0 2px 8px rgba(60,50,40,0.06), 0 0 0 1px rgba(60,50,40,0.035);
+    /* Warm, soft shadow tiers — diffuse + low alpha so cards float gently */
+    --shadow-sm: 0 1px 3px rgba(60,50,40,0.07), 0 0 0 1px rgba(60,50,40,0.03);
+    --shadow-md: 0 4px 18px rgba(60,50,40,0.09), 0 0 0 1px rgba(60,50,40,0.035);
+    --shadow-lg: 0 18px 50px rgba(60,50,40,0.16);
     --shadow-glow-emerald: 0 4px 20px rgba(5,150,105,0.18);
     /* Deeper amber for adequate contrast on light backgrounds */
     --amber-500: #b45309;

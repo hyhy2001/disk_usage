@@ -1,5 +1,17 @@
 const ROADMAP_ITEMS = [
     {
+        version: "v4.0",
+        date: "2026-06-08",
+        status: "done",
+        title: "Light mode polish and chart theming fixes",
+        bullets: [
+            "Softened light mode to a warm off-white palette to reduce glare; cards now lift off the page with gentle shadows.",
+            "Fixed faint text in light mode: detail badges, treemap breadcrumb separators, and the column resizer grip are now clearly readable.",
+            "Charts (Users, Team, Inode) now recolor correctly when switching between light and dark mode.",
+            "Brightened the Inode chart legend in dark mode for better legibility.",
+        ],
+    },
+    {
         version: "v3.9",
         date: "2026-04-22",
         status: "done",
