@@ -51,6 +51,23 @@ function api_admin_ensure_db($root_dir) {
                 created_at TEXT NOT NULL
             )'
         );
+        // Migrate older DBs that predate roles: add a `role` column if missing.
+        // First account created via setup becomes 'owner'; others 'admin'.
+        $has_role = false;
+        foreach ($pdo->query('PRAGMA table_info(admins)')->fetchAll(PDO::FETCH_ASSOC) as $col) {
+            if (isset($col['name']) && $col['name'] === 'role') { $has_role = true; break; }
+        }
+        if (!$has_role) {
+            $pdo->exec("ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'");
+        }
+        // Backfill owner: a DB that predates roles (or any DB with no owner yet)
+        // promotes its earliest account to 'owner' so account management isn't
+        // locked out after the migration. No-op once an owner exists.
+        $owner_cnt = (int)$pdo->query("SELECT COUNT(*) FROM admins WHERE role = 'owner'")->fetchColumn();
+        if ($owner_cnt === 0) {
+            $pdo->exec("UPDATE admins SET role = 'owner'
+                        WHERE id = (SELECT id FROM admins ORDER BY id ASC LIMIT 1)");
+        }
         // Rate-limit table for login throttling. One row per failed attempt;
         // success wipes the row set for that IP.
         $pdo->exec(
@@ -145,8 +162,18 @@ function api_admin_session_start() {
     @session_start();
 }
 
-function api_admin_is_authenticated() {
+// Resume an existing session WITHOUT creating one for anonymous visitors.
+// The public group_config GET reads auth state on every page load; using the
+// creating variant there would spawn a session file + Set-Cookie for every
+// logged-out visitor. Only start when a session cookie is actually present.
+function api_admin_session_resume() {
+    if (session_id() !== '') return;
+    if (!isset($_COOKIE[session_name()])) return;
     api_admin_session_start();
+}
+
+function api_admin_is_authenticated() {
+    api_admin_session_resume();
     return !empty($_SESSION['du_admin_auth']) && $_SESSION['du_admin_auth'] === true;
 }
 
@@ -177,14 +204,40 @@ function api_admin_require_csrf() {
 }
 
 function api_admin_current_user() {
-    api_admin_session_start();
+    api_admin_session_resume();
     return isset($_SESSION['du_admin_user']) ? (string)$_SESSION['du_admin_user'] : '';
+}
+
+function api_admin_current_role() {
+    api_admin_session_resume();
+    return isset($_SESSION['du_admin_role']) ? (string)$_SESSION['du_admin_role'] : '';
+}
+
+function api_admin_current_id() {
+    api_admin_session_resume();
+    return isset($_SESSION['du_admin_id']) ? (int)$_SESSION['du_admin_id'] : 0;
 }
 
 function api_admin_require_auth() {
     if (!api_admin_is_authenticated()) {
         b64_error('Unauthorized', 401);
     }
+}
+
+// Owner-only gate for account management (create/delete admins). Regular admins
+// can edit config + disks but cannot manage other accounts.
+function api_admin_require_owner() {
+    api_admin_require_auth();
+    if (api_admin_current_role() !== 'owner') {
+        b64_error('Owner access required.', 403);
+    }
+}
+
+function api_admin_get_by_username($pdo, $username) {
+    $stmt = $pdo->prepare('SELECT id, username, password_hash, role FROM admins WHERE username = :u LIMIT 1');
+    $stmt->execute(array(':u' => $username));
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $row ? $row : null;
 }
 
 function api_admin_validate_username($username) {
@@ -311,6 +364,7 @@ function api_admin_handle_status($root_dir) {
         'has_admin' => $has_admin,
         'authenticated' => api_admin_is_authenticated(),
         'username' => api_admin_current_user(),
+        'role' => api_admin_current_role(),
         'csrf_token' => api_admin_csrf_token(),
     ));
 }
@@ -332,8 +386,9 @@ function api_admin_handle_setup($root_dir) {
     $created_at = gmdate('c');
 
     try {
-        $stmt = $pdo->prepare('INSERT INTO admins (username, password_hash, created_at) VALUES (:u, :p, :c)');
+        $stmt = $pdo->prepare("INSERT INTO admins (username, password_hash, created_at, role) VALUES (:u, :p, :c, 'owner')");
         $stmt->execute(array(':u' => $username, ':p' => $hash, ':c' => $created_at));
+        $new_id = (int)$pdo->lastInsertId();
     } catch (Exception $e) {
         b64_error('Failed to create admin account.', 500);
     }
@@ -341,10 +396,13 @@ function api_admin_handle_setup($root_dir) {
     api_admin_session_start();
     $_SESSION['du_admin_auth'] = true;
     $_SESSION['du_admin_user'] = $username;
+    $_SESSION['du_admin_role'] = 'owner';
+    $_SESSION['du_admin_id'] = $new_id;
 
     b64_success(array(
         'created' => true,
         'username' => $username,
+        'role' => 'owner',
     ));
 }
 
@@ -367,15 +425,14 @@ function api_admin_handle_login($root_dir) {
         );
     }
 
-    $account = api_admin_get_first_account($pdo);
-    if (!$account) {
-        b64_error('Admin setup has not been completed yet.', 409);
-    }
-
     $username = trim((string)param('username', ''));
     $password = (string)get_b64_param('password', '');
 
-    if (!api_admin_hash_equals((string)$account['username'], $username)) {
+    // Look up the account by the submitted username (multi-admin: any account,
+    // not just the first). A constant-ish flow keeps timing uniform: if the
+    // username is unknown we still record a failure and return the same error.
+    $account = $username !== '' ? api_admin_get_by_username($pdo, $username) : null;
+    if (!$account) {
         api_admin_rate_limit_record_failure($pdo);
         b64_error('Invalid username or password.', 401);
     }
@@ -388,13 +445,17 @@ function api_admin_handle_login($root_dir) {
     // Successful login wipes attempt history for this IP.
     api_admin_rate_limit_clear($pdo);
 
+    $role = isset($account['role']) && (string)$account['role'] !== '' ? (string)$account['role'] : 'admin';
     api_admin_session_start();
     $_SESSION['du_admin_auth'] = true;
     $_SESSION['du_admin_user'] = (string)$account['username'];
+    $_SESSION['du_admin_role'] = $role;
+    $_SESSION['du_admin_id'] = (int)$account['id'];
 
     b64_success(array(
         'authenticated' => true,
         'username' => (string)$account['username'],
+        'role' => $role,
     ));
 }
 
@@ -408,8 +469,142 @@ function api_admin_handle_logout() {
     b64_success(array('ok' => true));
 }
 
-function api_admin_read_disks_json($root_dir) {
+// ── Multi-admin account management ─────────────────────────────────────────
+// list_admins: any authenticated admin may view the roster (no hashes).
+function api_admin_handle_list_admins($root_dir) {
     api_admin_require_auth();
+    $pdo = api_admin_ensure_db($root_dir);
+    $rows = $pdo->query('SELECT id, username, role, created_at FROM admins ORDER BY id ASC')
+                ->fetchAll(PDO::FETCH_ASSOC);
+    $out = array();
+    foreach ($rows as $r) {
+        $out[] = array(
+            'id' => (int)$r['id'],
+            'username' => (string)$r['username'],
+            'role' => isset($r['role']) && (string)$r['role'] !== '' ? (string)$r['role'] : 'admin',
+            'created_at' => (string)$r['created_at'],
+        );
+    }
+    b64_success(array('admins' => $out));
+}
+
+// create_admin: owner-only. New accounts are always role 'admin'.
+function api_admin_handle_create_admin($root_dir) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        b64_error('Method not allowed.', 405);
+    }
+    api_admin_require_owner();
+    api_admin_require_csrf();
+
+    $pdo = api_admin_ensure_db($root_dir);
+    $username = api_admin_validate_username(param('username', ''));
+    $password = api_admin_validate_password(get_b64_param('password', ''));
+
+    if (api_admin_get_by_username($pdo, $username)) {
+        b64_error('That username already exists.', 409);
+    }
+
+    $hash = api_admin_hash_password($password);
+    $created_at = gmdate('c');
+    try {
+        $stmt = $pdo->prepare("INSERT INTO admins (username, password_hash, created_at, role) VALUES (:u, :p, :c, 'admin')");
+        $stmt->execute(array(':u' => $username, ':p' => $hash, ':c' => $created_at));
+        $new_id = (int)$pdo->lastInsertId();
+    } catch (Exception $e) {
+        b64_error('Failed to create admin account.', 500);
+    }
+    b64_success(array('created' => true, 'id' => $new_id, 'username' => $username, 'role' => 'admin'));
+}
+
+// delete_admin: owner-only. Cannot delete an owner account, nor yourself.
+function api_admin_handle_delete_admin($root_dir) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        b64_error('Method not allowed.', 405);
+    }
+    api_admin_require_owner();
+    api_admin_require_csrf();
+
+    $pdo = api_admin_ensure_db($root_dir);
+    $target_id = (int)param('id', 0);
+    if ($target_id <= 0) {
+        b64_error('Invalid admin id.', 422);
+    }
+    if ($target_id === api_admin_current_id()) {
+        b64_error('You cannot delete your own account.', 409);
+    }
+
+    $stmt = $pdo->prepare('SELECT id, username, role FROM admins WHERE id = :i LIMIT 1');
+    $stmt->execute(array(':i' => $target_id));
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        b64_error('Admin account not found.', 404);
+    }
+    if ((string)$row['role'] === 'owner') {
+        b64_error('Owner accounts cannot be deleted.', 409);
+    }
+
+    try {
+        $del = $pdo->prepare('DELETE FROM admins WHERE id = :i');
+        $del->execute(array(':i' => $target_id));
+    } catch (Exception $e) {
+        b64_error('Failed to delete admin account.', 500);
+    }
+    b64_success(array('deleted' => true, 'id' => $target_id));
+}
+
+// change_password: an admin changes their OWN password (must verify the old
+// one). An owner may also reset another account's password by passing target_id
+// (no old-password check in that branch — owner override).
+function api_admin_handle_change_password($root_dir) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        b64_error('Method not allowed.', 405);
+    }
+    api_admin_require_auth();
+    api_admin_require_csrf();
+
+    $pdo = api_admin_ensure_db($root_dir);
+    $new_password = api_admin_validate_password(get_b64_param('new_password', ''));
+    $target_id = (int)param('target_id', 0);
+    $self_id = api_admin_current_id();
+
+    if ($target_id > 0 && $target_id !== $self_id) {
+        // Owner resetting someone else's password.
+        if (api_admin_current_role() !== 'owner') {
+            b64_error('Owner access required.', 403);
+        }
+        $chk = $pdo->prepare('SELECT id FROM admins WHERE id = :i LIMIT 1');
+        $chk->execute(array(':i' => $target_id));
+        if (!$chk->fetch(PDO::FETCH_ASSOC)) {
+            b64_error('Account not found.', 404);
+        }
+        $acct_id = $target_id;
+    } else {
+        // Self-service: verify the current password first.
+        $acct_id = $self_id;
+        $stmt = $pdo->prepare('SELECT password_hash FROM admins WHERE id = :i LIMIT 1');
+        $stmt->execute(array(':i' => $acct_id));
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            b64_error('Account not found.', 404);
+        }
+        $old_password = (string)get_b64_param('old_password', '');
+        if (!api_admin_verify_password($old_password, (string)$row['password_hash'])) {
+            b64_error('Current password is incorrect.', 401);
+        }
+    }
+
+    $hash = api_admin_hash_password($new_password);
+    try {
+        $upd = $pdo->prepare('UPDATE admins SET password_hash = :p WHERE id = :i');
+        $upd->execute(array(':p' => $hash, ':i' => $acct_id));
+    } catch (Exception $e) {
+        b64_error('Failed to update password.', 500);
+    }
+    b64_success(array('updated' => true, 'id' => $acct_id));
+}
+
+function api_admin_read_disks_json($root_dir) {
+    api_admin_require_owner();
     $path = $root_dir . DIRECTORY_SEPARATOR . DU_DISKS_CONFIG_FILENAME;
     if (!is_file($path)) {
         b64_error(DU_DISKS_CONFIG_FILENAME . ' not found.', 404);
@@ -478,7 +673,7 @@ function api_admin_create_disks_backup($root_dir, $source_path) {
 }
 
 function api_admin_list_backups($root_dir) {
-    api_admin_require_auth();
+    api_admin_require_owner();
     $backup_dir = api_admin_backup_dir($root_dir);
     if (!is_dir($backup_dir)) {
         b64_success(array('items' => array()));
@@ -510,7 +705,7 @@ function api_admin_list_backups($root_dir) {
 }
 
 function api_admin_restore_backup($root_dir) {
-    api_admin_require_auth();
+    api_admin_require_owner();
     api_admin_require_csrf();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         b64_error('Method not allowed.', 405);
@@ -561,7 +756,7 @@ function api_admin_restore_backup($root_dir) {
 }
 
 function api_admin_save_disks_json($root_dir) {
-    api_admin_require_auth();
+    api_admin_require_owner();
     api_admin_require_csrf();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         b64_error('Method not allowed.', 405);
@@ -631,6 +826,18 @@ function api_handle_admin($root_dir) {
     }
     if ($action === 'restore_backup') {
         api_admin_restore_backup($root_dir);
+    }
+    if ($action === 'list_admins') {
+        api_admin_handle_list_admins($root_dir);
+    }
+    if ($action === 'create_admin') {
+        api_admin_handle_create_admin($root_dir);
+    }
+    if ($action === 'delete_admin') {
+        api_admin_handle_delete_admin($root_dir);
+    }
+    if ($action === 'change_password') {
+        api_admin_handle_change_password($root_dir);
     }
 
     b64_error('Unknown admin action.', 400);

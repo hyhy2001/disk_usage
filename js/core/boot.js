@@ -20,6 +20,7 @@ import { initChartModal } from '../ui/chartModal.js';
 import { bindChangeLogEvents } from '../ui/changelogModal.js';
 import { initScrollToTop } from '../ui/scrollToTop.js';
 import { initGroupUser } from '../features/group-user/groupUserManager.js';
+import { initAdminAuth } from '../features/admin/adminAuth.js';
 
 const INIT_SEQUENCE = [
     ['appFetcher', initAppFetcher],
@@ -29,6 +30,7 @@ const INIT_SEQUENCE = [
     ['changelog', bindChangeLogEvents],
     ['scrollToTop', initScrollToTop],
     ['groupUser', initGroupUser],
+    ['adminAuth', initAdminAuth],
 ];
 
 function runAll() {

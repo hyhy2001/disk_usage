@@ -226,6 +226,38 @@ export function renderAll() {
     renderUsers();
     persistViewState();
     syncHeaderActionState();
+    syncConfigModeBadge();
+}
+
+// Reflects whether the modal is editing the official config (admin), showing a
+// guest's own local copy, or showing the official default. Also toggles the
+// guest-only "Use official" button (only meaningful once a guest has edited).
+export function syncConfigModeBadge() {
+    const badge = document.getElementById('group-user-mode-badge');
+    const useOfficialBtn = document.getElementById('btn-group-user-use-official');
+    if (badge) {
+        let label = '';
+        let title = '';
+        if (state.isAdmin) {
+            label = 'Official';
+            title = 'Editing the official config — changes are saved for everyone.';
+        } else if (state.userDirty) {
+            label = 'Your config';
+            title = 'Showing your personal config (saved in this browser only).';
+        } else {
+            label = 'Official';
+            title = 'Showing the official config. Editing creates your own local copy.';
+        }
+        badge.textContent = label;
+        badge.title = title;
+        badge.className = 'group-user-mode-badge' + (state.isAdmin
+            ? ' mode-admin'
+            : (state.userDirty ? ' mode-local' : ' mode-official'));
+    }
+    if (useOfficialBtn) {
+        // Only guests who have diverged from official need a way back.
+        useOfficialBtn.style.display = (!state.isAdmin && state.userDirty) ? '' : 'none';
+    }
 }
 
 export function syncHeaderActionState() {

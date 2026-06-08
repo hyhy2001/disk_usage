@@ -3,7 +3,7 @@
 
 import { showToast } from '../../core/main.js';
 import {
-    STORAGE_KEY, VIEW_STATE_KEY, CURRENT_SCHEMA_VERSION,
+    STORAGE_KEY, VIEW_STATE_KEY, DIRTY_KEY,
     deepClone, utf8ToB64, b64ToUtf8, sanitizeConfig, makeDiskCatalog,
 } from './utils.js';
 import { state } from './state.js';
@@ -64,55 +64,109 @@ export async function fetchJson(url, options = {}) {
     }
 }
 
+// Fetch the server state for group config. New model: the server holds ONE
+// official config (set by admins). Returns { official, isAdmin, role } where
+// official is a sanitized config or null. Also records admin status in state.
 export async function loadServerConfig() {
     const res = await fetchJson('api.php?type=group_config&action=get', { cache: 'no-store' });
-    const cfg = res?.data?.config || { schema_version: CURRENT_SCHEMA_VERSION, groups: [] };
-    return sanitizeConfig(cfg);
+    const data = res?.data || {};
+    state.isAdmin = !!data.is_admin;
+    state.role = data.role || '';
+    const official = data.official
+        ? sanitizeConfig(data.official)
+        : null;
+    return { official, isAdmin: state.isAdmin, role: state.role };
 }
 
-// Read the du_csrf cookie the group_config endpoint issues (JS-readable by
-// design — see the double-submit note in group_config.php). Returns '' if absent.
-function readCsrfCookie() {
-    const m = document.cookie.match(/(?:^|;\s*)du_csrf=([0-9a-fA-F]{32})(?:;|$)/);
-    return m ? m[1] : '';
+// Read the admin CSRF token from the admin status endpoint. Saving the official
+// config is an admin action gated by the admin session + CSRF (not the guest
+// double-submit cookie). Returns '' if not an admin / no token.
+async function fetchAdminCsrfToken() {
+    try {
+        const res = await fetchJson('api.php?type=admin&action=status', { cache: 'no-store' });
+        return res?.data?.csrf_token || '';
+    } catch {
+        return '';
+    }
 }
 
-export async function saveServerConfigNow() {
+// Admin-only: persist the current config as the OFFICIAL server config. Guests
+// never call this (their edits stay in localStorage). Throws on failure so the
+// caller can surface it.
+export async function saveOfficialConfigNow() {
+    const csrf = await fetchAdminCsrfToken();
+    if (!csrf) throw new Error('Not authenticated as admin.');
+
     const payload = new URLSearchParams({
         config_b64: utf8ToB64(JSON.stringify(state.config)),
     });
-
-    const headers = { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' };
-    const csrf = readCsrfCookie();
-    if (csrf) headers['X-CSRF-Token'] = csrf;
-
     await fetchJson('api.php?type=group_config&action=save', {
         method: 'POST',
-        headers,
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'X-CSRF-Token': csrf,
+        },
         body: payload.toString(),
         cache: 'no-store',
     });
 }
 
-export function scheduleServerSave() {
+// Debounced official save for admins. On failure, surface a throttled toast.
+export function scheduleOfficialSave() {
     if (state.saveTimer) clearTimeout(state.saveTimer);
     state.saveTimer = setTimeout(async () => {
         try {
-            await saveServerConfigNow();
+            await saveOfficialConfigNow();
         } catch (err) {
             const now = Date.now();
             if ((now - state.saveErrorToastAt) > 5000) {
                 state.saveErrorToastAt = now;
-                showToast('Server save failed', err?.message || 'Could not save Group User config to server.', 'warning');
+                showToast('Official save failed', err?.message || 'Could not save the official Group User config.', 'warning');
             }
         }
     }, 260);
 }
 
+// Flush a pending debounced official save immediately (e.g. on modal close) so
+// an admin's last edit within the debounce window isn't lost. No-op for guests
+// or when nothing is pending.
+export function flushOfficialSave() {
+    if (!state.isAdmin || !state.saveTimer) return;
+    clearTimeout(state.saveTimer);
+    state.saveTimer = null;
+    saveOfficialConfigNow().catch((err) => {
+        const now = Date.now();
+        if ((now - state.saveErrorToastAt) > 5000) {
+            state.saveErrorToastAt = now;
+            showToast('Official save failed', err?.message || 'Could not save the official Group User config.', 'warning');
+        }
+    });
+}
+
+// Mark the guest's local copy as a deliberate edit so it wins over the official
+// config on the next boot. No-op semantics for admins (they set official).
+export function markGuestDirty() {
+    state.userDirty = true;
+    try { localStorage.setItem(DIRTY_KEY, '1'); } catch { /* ignore quota */ }
+}
+
+// Clear the guest dirty flag (used by "reset to official").
+export function clearGuestDirty() {
+    state.userDirty = false;
+    try { localStorage.removeItem(DIRTY_KEY); } catch { /* ignore */ }
+}
+
+// Called on every config edit. Admins push to the official server config;
+// guests keep a localStorage-only copy and mark it dirty so it persists across
+// reloads and overrides the official default for that browser.
 export function persistConfigAndBroadcast() {
     state.config.updated_at = new Date().toISOString();
     normalizeAndSaveLocal();
-    scheduleServerSave();
+    if (state.isAdmin) {
+        scheduleOfficialSave();
+    } else {
+        markGuestDirty();
+    }
     emitConfigEvent('groupUserConfigChanged');
 }
 

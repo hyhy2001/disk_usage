@@ -1,0 +1,275 @@
+/* admin.css — in-dashboard admin panel (login, avatar dropdown, disk-mapping
+   editor, accounts, change password). Reuses the app's modal + token system;
+   no Tabler dependency. */
+
+/* ── Header auth button ──────────────────────────────────────────────────── */
+.admin-auth-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.admin-dd-header {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 4px 8px 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 4px;
+    white-space: nowrap;
+}
+
+/* Avatar dropdown items: the shared .dropdown-item class only sets pointer
+   events; the original header dropdown styled its items with inline styles, so
+   ours need their layout declared here. */
+#admin-avatar-dropdown { min-width: 180px; }
+#admin-avatar-dropdown .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 8px 10px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+}
+#admin-avatar-dropdown .dropdown-item svg { flex-shrink: 0; opacity: 0.85; }
+
+.dropdown-item-danger { color: var(--rose-400, #fb7185) !important; }
+.dropdown-item-danger:hover { background: rgba(244, 63, 94, 0.1) !important; }
+
+/* ── Generic admin modal shell (mirrors .group-user-modal) ───────────────── */
+body.admin-modal-open { overflow: hidden; }
+
+.admin-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1850;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--duration-fast, 0.15s) ease;
+}
+.admin-modal.visible { opacity: 1; pointer-events: auto; }
+
+.admin-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.72);
+    backdrop-filter: blur(var(--blur-md, 8px));
+    -webkit-backdrop-filter: blur(var(--blur-md, 8px));
+}
+
+.admin-modal-box {
+    position: absolute;
+    inset: 24px;
+    width: min(1100px, calc(100vw - 48px));
+    max-height: calc(100dvh - 48px);
+    margin: 0 auto;
+    border-radius: var(--radius-lg, 14px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.admin-modal-box-sm {
+    inset: auto;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(460px, calc(100vw - 32px));
+    max-height: calc(100dvh - 48px);
+}
+
+.admin-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.admin-modal-title { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); }
+.admin-modal-subtitle { font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px; }
+.admin-modal-header-actions { display: inline-flex; align-items: center; gap: 10px; }
+
+.admin-modal-body {
+    padding: 18px 20px 20px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.admin-icon-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-sm, 8px);
+}
+.admin-icon-btn:hover { background: rgba(255, 255, 255, 0.06); color: var(--text-primary); }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.admin-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: var(--radius-sm, 8px);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+    background: var(--bg-surface, rgba(255, 255, 255, 0.04));
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease;
+}
+.admin-btn:hover { background: rgba(255, 255, 255, 0.08); }
+.admin-btn-sm { height: 28px; padding: 0 10px; font-size: 0.78rem; }
+.admin-btn-primary { background: var(--sky-500, #0ea5e9); border-color: transparent; color: #fff; }
+.admin-btn-primary:hover { background: var(--sky-400, #38bdf8); }
+.admin-btn-accent { background: rgba(14, 165, 233, 0.14); border-color: rgba(14, 165, 233, 0.3); color: var(--sky-400, #38bdf8); }
+.admin-btn-warn { background: rgba(245, 158, 11, 0.14); border-color: rgba(245, 158, 11, 0.3); color: var(--amber-400, #fbbf24); }
+.admin-btn-danger { background: rgba(244, 63, 94, 0.12); border-color: rgba(244, 63, 94, 0.3); color: var(--rose-400, #fb7185); }
+.admin-btn-danger:hover { background: rgba(244, 63, 94, 0.2); }
+
+/* ── Inputs ──────────────────────────────────────────────────────────────── */
+.admin-input,
+.admin-select {
+    width: 100%;
+    height: 34px;
+    padding: 0 10px;
+    border-radius: var(--radius-sm, 8px);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    background: var(--bg-base, rgba(0, 0, 0, 0.2));
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+.admin-input:focus,
+.admin-select:focus { outline: none; border-color: var(--sky-500, #0ea5e9); }
+
+.admin-stack-form { display: flex; flex-direction: column; gap: 10px; }
+
+.admin-hint { margin-top: 8px; font-size: 0.78rem; color: var(--text-muted); }
+
+/* ── Stats row ───────────────────────────────────────────────────────────── */
+.admin-stat-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.admin-stat {
+    flex: 1;
+    min-width: 90px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: var(--radius-sm, 8px);
+    background: rgba(255, 255, 255, 0.02);
+}
+.admin-stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.admin-stat-val { font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
+
+.admin-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 9px;
+    border-radius: 100px;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+.admin-badge-warn { background: rgba(245, 158, 11, 0.16); color: var(--amber-400, #fbbf24); }
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+.admin-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+
+/* ── Disk-mapping editor ─────────────────────────────────────────────────── */
+.dm-team-editor { display: flex; flex-direction: column; gap: 14px; }
+.dm-team-card {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md, 10px);
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.02);
+}
+.dm-team-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-bottom: 12px; }
+.dm-disk-list { display: flex; flex-direction: column; gap: 8px; }
+.dm-disk-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.4fr auto;
+    gap: 8px;
+    align-items: flex-end;
+}
+.dm-disk-actions { display: flex; align-items: flex-end; }
+.dm-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem; color: var(--text-secondary); }
+.dm-empty { color: var(--text-muted); font-size: 0.85rem; padding: 6px 0; }
+
+.dm-restore-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 16px; }
+.dm-restore-row .admin-select { width: auto; flex: 1; min-width: 200px; }
+
+.dm-raw-wrap { margin-top: 16px; }
+.dm-raw {
+    margin-top: 8px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: var(--radius-sm, 8px);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    overflow-x: auto;
+    max-height: 300px;
+}
+
+.dm-diff-box {
+    margin-top: 16px;
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-sm, 8px);
+}
+.dm-diff-box h4 { margin: 0 0 6px; font-size: 0.9rem; }
+.dm-diff-summary { font-size: 0.82rem; color: var(--text-secondary); margin: 0 0 8px; }
+.dm-diff-list { list-style: none; margin: 0; padding: 0; font-family: ui-monospace, Menlo, monospace; font-size: 0.78rem; }
+.dm-diff-list li { padding: 2px 0; }
+.dm-diff-list .diff-add { color: var(--emerald-400, #34d399); }
+.dm-diff-list .diff-remove { color: var(--rose-400, #fb7185); }
+.dm-diff-list .diff-change { color: var(--amber-400, #fbbf24); }
+
+/* ── Accounts ────────────────────────────────────────────────────────────── */
+.admin-accounts-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.admin-account-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-sm, 8px);
+}
+.admin-account-info { display: inline-flex; align-items: center; gap: 8px; }
+.admin-role-badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 100px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.admin-role-owner { background: rgba(180, 83, 9, 0.18); color: var(--amber-400, #fbbf24); }
+.admin-role-admin { background: rgba(14, 165, 233, 0.16); color: var(--sky-400, #38bdf8); }
+
+.admin-create-wrap {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.admin-create-wrap h4 { font-size: 0.9rem; margin: 0 0 10px; }

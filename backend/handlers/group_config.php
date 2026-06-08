@@ -249,16 +249,56 @@ function api_group_cfg_save($root_dir, $user_key, $payload) {
     return $clean;
 }
 
+// ── Official (shared) config ───────────────────────────────────────────────
+// New model: admins/owner save ONE official config the whole site reads as the
+// default. Guests no longer write to the server (they keep a localStorage-only
+// copy). Stored as a single file alongside the legacy per-user configs.
+function api_group_cfg_official_path($root_dir) {
+    return api_group_cfg_storage_dir($root_dir) . DIRECTORY_SEPARATOR . 'official.json';
+}
+
+function api_group_cfg_load_official($root_dir) {
+    $fp = api_group_cfg_official_path($root_dir);
+    if (!is_file($fp)) return null;
+    $parsed = api_load_json_file($fp);
+    if (!is_array($parsed)) return null;
+    return api_group_cfg_sanitize($parsed);
+}
+
+function api_group_cfg_save_official($root_dir, $payload) {
+    $dir = api_group_cfg_storage_dir($root_dir);
+    if (!is_dir($dir) || !is_writable($dir)) {
+        b64_error('Server config storage is not writable.', 500);
+    }
+    $clean = api_group_cfg_sanitize($payload);
+    $fp = api_group_cfg_official_path($root_dir);
+    $tmp = $fp . '.tmp.' . getmypid() . '.' . mt_rand(1000, 9999);
+    $json = json_encode($clean);
+    if ($json === false) b64_error('Failed to encode config payload.', 500);
+    if (@file_put_contents($tmp, $json, LOCK_EX) === false) {
+        @unlink($tmp);
+        error_log('group_config: failed to write official temp file ' . $tmp);
+        b64_error('Failed to write server config.', 500);
+    }
+    if (@rename($tmp, $fp) === false) {
+        @unlink($tmp);
+        error_log('group_config: failed to rename official ' . $tmp . ' -> ' . $fp);
+        b64_error('Failed to write server config.', 500);
+    }
+    @chmod($fp, 0600);
+    return $clean;
+}
+
 function api_handle_group_config($root_dir) {
-    $user_key = api_group_cfg_user_identity();
-    api_group_cfg_migrate_legacy($root_dir, $user_key);
-    // Issue the double-submit CSRF cookie on every request (incl. the action=get
-    // the SPA fires at boot) so the client always has a token to echo on save.
-    api_group_cfg_csrf_cookie();
     $action = trim((string)param('action', 'get'));
 
     if ($action === 'save') {
-        api_group_cfg_require_csrf();
+        // Saving the official config is an ADMIN action: it requires an admin
+        // session + the admin CSRF token (not the guest double-submit cookie).
+        // Guests can no longer write to the server — they save to localStorage.
+        api_admin_require_auth();
+        api_admin_require_csrf();
+
         $raw = get_b64_param('config', '');
         if (!is_string($raw) || trim($raw) === '') {
             b64_error('Missing config payload.', 400);
@@ -268,16 +308,20 @@ function api_handle_group_config($root_dir) {
             b64_error('Invalid config JSON payload.', 400);
         }
 
-        $saved = api_group_cfg_save($root_dir, $user_key, $parsed);
+        $saved = api_group_cfg_save_official($root_dir, $parsed);
         b64_success(array(
-            'user_key' => $user_key,
-            'config' => $saved,
+            'official' => $saved,
+            'saved' => true,
         ));
     }
 
-    $loaded = api_group_cfg_load($root_dir, $user_key);
+    // GET (anyone, no auth): return the official config (or null) plus whether
+    // the current visitor is an admin and their role, so the client knows
+    // whether to show "Save as official" vs guest localStorage-only behaviour.
+    $official = api_group_cfg_load_official($root_dir);
     b64_success(array(
-        'user_key' => $user_key,
-        'config' => $loaded,
+        'official' => $official,
+        'is_admin' => api_admin_is_authenticated(),
+        'role' => api_admin_current_role(),
     ));
 }

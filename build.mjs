@@ -103,15 +103,11 @@ function stampHtml(htmlFile, assets) {
 
 // Runs only on a full build, not in watch mode (CSS isn't rebuilt there, so its
 // hash would be stale). JS and CSS are hashed independently (a CSS-only change
-// won't bust the JS cache). admin/main.js is a flat (non-bundled) file loaded
-// directly by admin/index.html, so it's stamped by its own content hash too.
+// won't bust the JS cache).
 function stampIndexHtml() {
   stampHtml('./index.html', {
     'app.min.js': 'js/app.min.js',
     'app.min.css': 'css/app.min.css',
-  });
-  stampHtml('./admin/index.html', {
-    'main.js': 'admin/main.js',
   });
 }
 

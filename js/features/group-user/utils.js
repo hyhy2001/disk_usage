@@ -3,6 +3,10 @@
 
 export const STORAGE_KEY = 'du_group_user_config_v2';
 export const VIEW_STATE_KEY = 'du_group_user_view_state_v1';
+// Set when a GUEST edits their own config locally. Marks localStorage as the
+// guest's deliberate choice, so it wins over the server's official config on
+// boot. Admins never set this — their edits go to the official config.
+export const DIRTY_KEY = 'du_group_user_dirty';
 export const EXPORT_FILE = 'group_user_config.v2.json';
 export const CURRENT_SCHEMA_VERSION = 3;
 

@@ -15,6 +15,7 @@ import './ui/chartModal.js';
 import './ui/themeToggle.js';
 import './ui/changelogModal.js';
 import './features/group-user/groupUserManager.js';
+import './features/admin/adminAuth.js';
 import './ui/scrollToTop.js';
 import './ui/tooltip.js';
 import './ui/pageBoot.js';

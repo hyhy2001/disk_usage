@@ -3,7 +3,7 @@ import { CURRENT_SCHEMA_VERSION, EXPORT_FILE, iconPlus, iconTrash, isOtherGroup,
 import { state } from './state.js';
 import {
     emitConfigEvent, loadLocalViewStateRaw, persistViewState, normalizeAndSaveLocal,
-    loadServerConfig, scheduleServerSave, persistConfigAndBroadcast, loadDiskCatalog, loadUsersForDisk,
+    loadServerConfig, clearGuestDirty, flushOfficialSave, persistConfigAndBroadcast, loadDiskCatalog, loadUsersForDisk,
 } from './persist.js';
 import {
     ensureDefaultGroup, ensureGroupByName, removeUserFromOtherGroupsForDisk,
@@ -70,6 +70,7 @@ function createModalShell() {
                     </div>
                 </div>
                 <div class="group-user-header-actions">
+                    <span id="group-user-mode-badge" class="group-user-mode-badge" title=""></span>
                     <button id="btn-group-user-help" class="group-user-toolbar-btn" type="button" title="How to use">?</button>
                     <button id="btn-group-user-import" class="group-user-toolbar-btn" type="button">Import</button>
                     <div class="group-user-export-wrap">
@@ -79,6 +80,7 @@ function createModalShell() {
                             <button id="btn-group-export-full" class="group-user-export-option" type="button">Full config</button>
                         </div>
                     </div>
+                    <button id="btn-group-user-use-official" class="group-user-toolbar-btn" type="button" title="Discard your local changes and use the official config" style="display:none;">Use official</button>
                     <button id="btn-group-user-reset" class="group-user-toolbar-btn" type="button" title="Reset to system defaults">Reset</button>
                     <button id="btn-group-user-close" class="group-user-toolbar-btn group-user-close" type="button" aria-label="Close">x</button>
                 </div>
@@ -139,6 +141,7 @@ function createModalShell() {
         onExportConfig('full');
     });
     document.getElementById('btn-group-user-reset')?.addEventListener('click', onResetToSystemDefaults);
+    document.getElementById('btn-group-user-use-official')?.addEventListener('click', resetToOfficial);
     document.getElementById('btn-group-user-import')?.addEventListener('click', () => {
         document.getElementById('group-user-file-input')?.click();
     });
@@ -356,6 +359,7 @@ function openModal() {
 function closeModal() {
     const modal = document.getElementById('group-user-modal');
     if (!modal) return;
+    flushOfficialSave();
     modal.classList.remove('visible');
     document.body.classList.remove('group-user-modal-open');
     closeExportMenu();
@@ -799,14 +803,26 @@ async function bootstrapConfig() {
     ensureDefaultGroup();
 
     try {
-        const serverConfig = await loadServerConfig();
+        const { official, isAdmin } = await loadServerConfig();
 
-        if (serverConfig.groups.length > 0) {
-            state.config = serverConfig;
+        if (isAdmin) {
+            // Admins edit the OFFICIAL config directly. Load it as the working
+            // copy so their edits start from the current official state. When no
+            // official config exists yet, start from a clean default rather than
+            // inheriting whatever guest config this browser left in localStorage
+            // — otherwise the admin's first edit would publish stale guest groups.
+            state.config = (official && official.groups.length > 0)
+                ? official
+                : sanitizeConfig({ schema_version: CURRENT_SCHEMA_VERSION, groups: [] });
             normalizeAndSaveLocal();
-        } else if (state.config.groups.length > 0) {
-            // Keep local config and push it to server if server is still empty.
-            scheduleServerSave();
+        } else if (state.userDirty) {
+            // Guest has deliberately customized their own config — it wins over
+            // the official default on this browser. Keep state.config (local).
+        } else if (official && official.groups.length > 0) {
+            // Guest with no personal edits: show the official config as the
+            // default. Mirror to localStorage WITHOUT marking dirty.
+            state.config = official;
+            normalizeAndSaveLocal();
         }
     } catch (_err) {
         // Keep local config fallback silently.
@@ -817,6 +833,28 @@ async function bootstrapConfig() {
     state.selectedGroupIds = state.selectedGroupId ? [state.selectedGroupId] : [];
     state.selectedUserNames = [];
     emitConfigEvent('groupUserConfigReady');
+}
+
+// Guest action: discard the local personal config and revert to the official
+// one. Clears the dirty flag, reloads official, re-renders.
+async function resetToOfficial() {
+    clearGuestDirty();
+    try {
+        const { official } = await loadServerConfig();
+        state.config = official && official.groups.length > 0
+            ? official
+            : sanitizeConfig({ schema_version: CURRENT_SCHEMA_VERSION, groups: [] });
+        normalizeAndSaveLocal();
+    } catch (_err) {
+        showToast('Reset failed', 'Could not load the official config.', 'warning');
+        return;
+    }
+    ensureDefaultGroup();
+    state.selectedGroupId = state.config.groups[0]?.id || null;
+    state.selectedGroupIds = state.selectedGroupId ? [state.selectedGroupId] : [];
+    state.selectedUserNames = [];
+    emitConfigEvent('groupUserConfigChanged');
+    renderAll();
 }
 
 function onShowGroupUserHelp() {
@@ -852,4 +890,16 @@ export function initGroupUser() {
     });
 
     bootstrapConfig();
+}
+
+// Open the group-user modal from outside this module (e.g. the admin avatar
+// dropdown). Same flow the in-dropdown button uses.
+export function openGroupConfig() {
+    openGroupUserModalFlow();
+}
+
+// Re-fetch official config + admin status so state.isAdmin flips after an
+// admin logs in/out without a full page reload.
+export function rebootstrapGroupConfig() {
+    return bootstrapConfig();
 }
