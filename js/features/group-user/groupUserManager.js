@@ -668,10 +668,9 @@ async function onExportConfig(mode = 'changes') {
     }
 }
 
-async function onResetToSystemDefaults() {
-    const ok = confirm('Reset all Group User mappings to system defaults? Your custom groups and assignments will be removed.');
-    if (!ok) return;
-
+// Seed the current config with the system-default groups for the selected disk.
+// Used as the fallback when no official config exists. Mutates state.
+async function seedSystemDefaults() {
     state.config = sanitizeConfig({
         schema_version: CURRENT_SCHEMA_VERSION,
         groups: [],
@@ -695,11 +694,42 @@ async function onResetToSystemDefaults() {
             // Non-blocking reset even if a disk payload is temporarily unavailable.
         }
     }
+}
 
-    persistConfigAndBroadcast();
+// Reset discards local changes and restores the OFFICIAL config; when no
+// official config exists, it falls back to the system-default report.
+async function onResetToSystemDefaults() {
+    const ok = confirm('Reset Group User mappings? This discards your local changes and restores the official config (or system defaults if no official config exists).');
+    if (!ok) return;
+
+    clearGuestDirty();
+
+    let usedOfficial = false;
+    try {
+        const { official } = await loadServerConfig();
+        if (official && official.groups.length > 0) {
+            state.config = official;
+            state.selectedGroupId = official.groups[0]?.id || null;
+            state.selectedGroupIds = state.selectedGroupId ? [state.selectedGroupId] : [];
+            state.selectedUserNames = [];
+            usedOfficial = true;
+        }
+    } catch (_err) {
+        // Fall through to system defaults if official can't be loaded.
+    }
+
+    if (!usedOfficial) {
+        await seedSystemDefaults();
+    }
+
+    // Mirror to localStorage WITHOUT marking dirty so official keeps winning on reload.
+    normalizeAndSaveLocal();
     persistViewState();
+    emitConfigEvent('groupUserConfigChanged');
     renderAll();
-    showToast('Reset complete', 'Group User Config was reset to system defaults.', 'success');
+    showToast('Reset complete', usedOfficial
+        ? 'Restored the official Group User config.'
+        : 'Reset to system defaults (no official config found).', 'success');
 }
 
 function onImportConfig(e) {

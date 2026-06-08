@@ -204,3 +204,38 @@ test('captcha_ok rejects a wrong answer and an empty session', function () {
     // Wrong attempt also consumed it, so a follow-up with no challenge fails.
     assert_eq(false, api_admin_captcha_ok('15'), 'no challenge in session fails');
 });
+
+// --- captcha threshold: only required after enough recent failures ---
+test('captcha_required flips true once failures reach the threshold', function () {
+    $_SERVER['REMOTE_ADDR'] = '203.0.113.7';
+    $pdo = du_admin_db();
+    $pdo->exec('CREATE TABLE login_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, ip TEXT NOT NULL, ts INTEGER NOT NULL)');
+
+    $cfg = api_admin_rate_limit_config();
+    $threshold = (int)$cfg['captcha_after'];
+    $ins = $pdo->prepare('INSERT INTO login_attempts (ip, ts) VALUES (?, ?)');
+
+    // Below threshold: no captcha.
+    for ($i = 0; $i < $threshold - 1; $i++) {
+        $ins->execute(array('203.0.113.7', time()));
+    }
+    assert_eq(false, api_admin_captcha_required($pdo), 'below threshold → no captcha');
+
+    // One more failure reaches the threshold → captcha required.
+    $ins->execute(array('203.0.113.7', time()));
+    assert_true(api_admin_captcha_required($pdo), 'at threshold → captcha required');
+});
+
+test('captcha_required ignores failures outside the time window', function () {
+    $_SERVER['REMOTE_ADDR'] = '203.0.113.8';
+    $pdo = du_admin_db();
+    $pdo->exec('CREATE TABLE login_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, ip TEXT NOT NULL, ts INTEGER NOT NULL)');
+
+    $cfg = api_admin_rate_limit_config();
+    $stale = time() - (int)$cfg['window_seconds'] - 60;
+    $ins = $pdo->prepare('INSERT INTO login_attempts (ip, ts) VALUES (?, ?)');
+    for ($i = 0; $i < (int)$cfg['captcha_after'] + 2; $i++) {
+        $ins->execute(array('203.0.113.8', $stale));
+    }
+    assert_eq(false, api_admin_captcha_required($pdo), 'stale failures do not trigger captcha');
+});

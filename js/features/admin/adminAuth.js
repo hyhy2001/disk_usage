@@ -183,14 +183,19 @@ async function openAuthModal() {
     $('auth-password-confirm').classList.toggle('hidden', !isSetup);
     $('auth-form').dataset.mode = isSetup ? 'setup' : 'login';
 
-    // Captcha only gates login (not the one-time owner setup).
-    $('auth-captcha-row').classList.toggle('hidden', isSetup);
-    if (!isSetup) await loadCaptcha();
+    // Captcha gates login only after too many failed attempts (never on setup).
+    await setCaptchaVisible(!isSetup && adminState.captchaRequired);
 
     const modal = $('admin-auth-modal');
     modal.classList.add('visible');
     document.body.classList.add('admin-modal-open');
     $('auth-username').focus();
+}
+
+// Show/hide the captcha row, loading a fresh challenge when shown.
+async function setCaptchaVisible(visible) {
+    $('auth-captcha-row').classList.toggle('hidden', !visible);
+    if (visible) await loadCaptcha();
 }
 
 async function loadCaptcha() {
@@ -234,8 +239,12 @@ async function onAuthSubmit(e) {
         await onAuthChanged();
     } catch (err) {
         showToast(mode === 'setup' ? 'Setup failed' : 'Login failed', err.message, 'error');
-        // Captcha is single-use server-side — refresh it for the next attempt.
-        if (mode === 'login') await loadCaptcha();
+        // A failed login may have pushed this IP past the captcha threshold —
+        // re-check status and show/refresh the captcha when now required.
+        if (mode === 'login') {
+            try { await refreshAdminState(); } catch (_e) { /* ignore */ }
+            await setCaptchaVisible(adminState.captchaRequired);
+        }
     }
 }
 

@@ -90,7 +90,26 @@ function api_admin_ensure_db($root_dir) {
 // Rate-limit constants. 5 failed attempts within 5 minutes locks an IP for
 // the rest of the window. Successful login wipes that IP's attempt history.
 function api_admin_rate_limit_config() {
-    return array('window_seconds' => 300, 'max_attempts' => 5);
+    // captcha_after: show/require captcha once this many failures pile up in the
+    // window. max_attempts: the hard 429 lockout (must be > captcha_after so the
+    // captcha gets a chance to gate before the lockout kicks in).
+    return array('window_seconds' => 300, 'max_attempts' => 10, 'captcha_after' => 5);
+}
+
+// True when this IP has enough recent failures that login should require a
+// captcha. Lightweight count (no janitor) so status can call it cheaply.
+function api_admin_captcha_required($pdo) {
+    $cfg = api_admin_rate_limit_config();
+    $ip = api_admin_client_ip();
+    $cutoff = time() - (int)$cfg['window_seconds'];
+    try {
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM login_attempts WHERE ip = ? AND ts >= ?');
+        $stmt->execute(array($ip, $cutoff));
+        $count = (int)$stmt->fetchColumn();
+    } catch (Exception $e) {
+        return false;
+    }
+    return $count >= (int)$cfg['captcha_after'];
 }
 
 function api_admin_client_ip() {
@@ -385,6 +404,7 @@ function api_admin_handle_status($root_dir) {
         'username' => api_admin_current_user(),
         'role' => api_admin_current_role(),
         'csrf_token' => api_admin_csrf_token(),
+        'captcha_required' => api_admin_captcha_required($pdo),
     ));
 }
 
@@ -471,11 +491,14 @@ function api_admin_handle_login($root_dir) {
         );
     }
 
-    // Captcha gate before any credential work — wrong/missing answer is a
+    // Captcha only gates login once enough failures pile up for this IP. Below
+    // the threshold it's skipped; at/above it a wrong/missing answer is itself a
     // failed attempt (counts toward rate limit). Consumed single-use.
-    if (!api_admin_captcha_ok(param('captcha', ''))) {
-        api_admin_rate_limit_record_failure($pdo);
-        b64_error('Captcha answer is incorrect. Please try again.', 401);
+    if (api_admin_captcha_required($pdo)) {
+        if (!api_admin_captcha_ok(param('captcha', ''))) {
+            api_admin_rate_limit_record_failure($pdo);
+            b64_error('Captcha answer is incorrect. Please try again.', 401);
+        }
     }
 
     $username = trim((string)param('username', ''));

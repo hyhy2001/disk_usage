@@ -7,6 +7,7 @@ export const adminState = {
     role: '',
     username: '',
     hasAdmin: false,
+    captchaRequired: false,
 };
 
 let csrfToken = '';
@@ -48,5 +49,6 @@ export async function refreshAdminState() {
     adminState.authenticated = !!status.authenticated;
     adminState.role = status.role || '';
     adminState.username = status.username || '';
+    adminState.captchaRequired = !!status.captcha_required;
     return status;
 }
