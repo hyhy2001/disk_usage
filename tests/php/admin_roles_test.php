@@ -172,6 +172,14 @@ test('disk-mapping handlers reject a non-owner admin (owner gate)', function () 
     assert_throws(function () use ($root) { api_admin_restore_backup($root); }, 'restore_backup owner-only');
 });
 
+// --- reset_password is owner-only and POST-only ---
+test('reset_password rejects a non-owner admin (owner gate)', function () {
+    @session_start();
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+    $_SESSION = array('du_admin_auth' => true, 'du_admin_role' => 'admin', 'du_admin_id' => 5);
+    assert_throws(function () { api_admin_handle_reset_password(sys_get_temp_dir()); }, 'reset_password owner-only');
+});
+
 // --- auto-generated admin password ---
 test('generate_password yields the requested length from a safe alphabet', function () {
     $pw = api_admin_generate_password(16);

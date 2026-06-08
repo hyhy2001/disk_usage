@@ -594,6 +594,43 @@ function api_admin_handle_create_admin($root_dir) {
     b64_success(array('created' => true, 'id' => $new_id, 'username' => $username, 'role' => 'admin', 'password' => $password));
 }
 
+// reset_password: owner-only. Regenerates a strong password for another account
+// (so the owner can hand it over when an admin forgets theirs) and returns the
+// plaintext exactly once. Cannot target an owner account.
+function api_admin_handle_reset_password($root_dir) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        b64_error('Method not allowed.', 405);
+    }
+    api_admin_require_owner();
+    api_admin_require_csrf();
+
+    $pdo = api_admin_ensure_db($root_dir);
+    $target_id = (int)param('id', 0);
+    if ($target_id <= 0) {
+        b64_error('Missing target account id.', 400);
+    }
+
+    $stmt = $pdo->prepare('SELECT id, username, role FROM admins WHERE id = :i LIMIT 1');
+    $stmt->execute(array(':i' => $target_id));
+    $acct = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$acct) {
+        b64_error('Account not found.', 404);
+    }
+    if ((string)$acct['role'] === 'owner') {
+        b64_error('Cannot reset an owner password here.', 403);
+    }
+
+    $password = api_admin_generate_password(16);
+    $hash = api_admin_hash_password($password);
+    try {
+        $upd = $pdo->prepare('UPDATE admins SET password_hash = :p WHERE id = :i');
+        $upd->execute(array(':p' => $hash, ':i' => $target_id));
+    } catch (Exception $e) {
+        b64_error('Failed to reset password.', 500);
+    }
+    b64_success(array('reset' => true, 'id' => $target_id, 'username' => (string)$acct['username'], 'password' => $password));
+}
+
 // delete_admin: owner-only. Cannot delete an owner account, nor yourself.
 function api_admin_handle_delete_admin($root_dir) {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -916,6 +953,9 @@ function api_handle_admin($root_dir) {
     }
     if ($action === 'delete_admin') {
         api_admin_handle_delete_admin($root_dir);
+    }
+    if ($action === 'reset_password') {
+        api_admin_handle_reset_password($root_dir);
     }
     if ($action === 'change_password') {
         api_admin_handle_change_password($root_dir);

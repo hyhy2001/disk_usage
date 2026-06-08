@@ -17,18 +17,19 @@ function iconPerson() {
 // ── Header button (Login ⇄ Avatar) ───────────────────────────────────────────
 function ensureHeaderButton() {
     if ($('admin-auth-btn')) return;
-    const anchor = $('btn-fetch'); // Sync button in workspace-actions
-    if (!anchor || !anchor.parentNode) return;
+    // Pin to the bottom of the sidebar rail itself (a direct child of the
+    // sidebar) so it stays visible when the sidebar collapses — putting it
+    // inside #team-flyout-panel would hide it behind the hover-only space picker.
+    const sidebar = document.querySelector('aside.sidebar');
+    if (!sidebar) return;
 
     const wrap = document.createElement('div');
     wrap.id = 'admin-auth-wrap';
-    wrap.style.position = 'relative';
-    wrap.style.display = 'inline-flex';
 
     const btn = document.createElement('button');
     btn.id = 'admin-auth-btn';
     btn.type = 'button';
-    btn.className = 'btn-sync admin-auth-btn';
+    btn.className = 'admin-auth-btn';
     btn.addEventListener('click', onAuthButtonClick);
     wrap.appendChild(btn);
 
@@ -38,7 +39,7 @@ function ensureHeaderButton() {
     dropdown.style.display = 'none';
     wrap.appendChild(dropdown);
 
-    anchor.parentNode.insertBefore(wrap, anchor.nextSibling);
+    sidebar.appendChild(wrap);
 
     document.addEventListener('click', (e) => {
         if (dropdown.dataset.visible === 'true' && !wrap.contains(e.target)) {

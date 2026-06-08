@@ -35,7 +35,7 @@ function createAccountsShell() {
                     </form>
                     <p class="admin-hint">A strong password is generated automatically. Only the owner can create or delete admin accounts.</p>
                     <div id="acc-new-cred" class="admin-new-cred hidden">
-                        <p class="admin-new-cred-label">Account created — copy this password now, it won't be shown again:</p>
+                        <p id="acc-new-cred-label" class="admin-new-cred-label">Copy these credentials now — the password won't be shown again:</p>
                         <div class="admin-new-cred-row">
                             <code id="acc-new-cred-pw" class="admin-new-cred-pw"></code>
                             <button id="acc-copy-pw" class="admin-btn admin-btn-sm" type="button">Copy</button>
@@ -61,29 +61,34 @@ function createAccountsShell() {
             const data = await adminApi('create_admin', { method: 'POST', body: body.toString() });
             showToast('Created', 'Created admin: ' + u, 'success');
             $('acc-create-form').reset();
-            revealNewPassword(data.password || '');
+            revealNewCredential(data.username || u, data.password || '',
+                'Copy these credentials now — the password won\'t be shown again:');
             await refreshAdmins();
         } catch (err) {
             showToast('Create failed', err.message, 'error');
         }
     });
     $('acc-copy-pw').addEventListener('click', async () => {
-        const pw = $('acc-new-cred-pw').textContent || '';
+        const text = $('acc-new-cred-pw').dataset.copy || $('acc-new-cred-pw').textContent || '';
         try {
-            await navigator.clipboard.writeText(pw);
-            showToast('Copied', 'Password copied to clipboard.', 'success');
+            await navigator.clipboard.writeText(text);
+            showToast('Copied', 'Credentials copied to clipboard.', 'success');
         } catch (_err) {
-            showToast('Copy failed', 'Select the password and copy it manually.', 'error');
+            showToast('Copy failed', 'Select the text and copy it manually.', 'error');
         }
     });
     accountsBuilt = true;
 }
 
-function revealNewPassword(pw) {
+function revealNewCredential(username, password, label) {
     const box = $('acc-new-cred');
     if (!box) return;
-    if (!pw) { box.classList.add('hidden'); return; }
-    $('acc-new-cred-pw').textContent = pw;
+    if (!password) { box.classList.add('hidden'); return; }
+    $('acc-new-cred-label').textContent = label;
+    const display = 'username: ' + username + '\npassword: ' + password;
+    const el = $('acc-new-cred-pw');
+    el.textContent = display;
+    el.dataset.copy = display;
     box.classList.remove('hidden');
 }
 
@@ -135,9 +140,28 @@ function renderAdmins(admins, isOwner) {
         info.appendChild(roleEl);
         row.appendChild(info);
 
-        const canDelete = isOwner && a.role !== 'owner' && a.id !== undefined
+        const canManage = isOwner && a.role !== 'owner' && a.id !== undefined
             && String(a.username) !== String(adminState.username);
-        if (canDelete) {
+        if (canManage) {
+            const reset = document.createElement('button');
+            reset.className = 'admin-btn admin-btn-sm';
+            reset.type = 'button';
+            reset.textContent = 'Reset';
+            reset.title = 'Generate a new password for this admin';
+            reset.addEventListener('click', async () => {
+                if (!window.confirm('Reset password for "' + a.username + '"? Their current password stops working.')) return;
+                try {
+                    const body = new URLSearchParams({ id: String(a.id) });
+                    const data = await adminApi('reset_password', { method: 'POST', body: body.toString() });
+                    showToast('Reset', 'New password generated for ' + a.username + '.', 'success');
+                    revealNewCredential(data.username || a.username, data.password || '',
+                        'New password for ' + (data.username || a.username) + ' — copy it now:');
+                } catch (err) {
+                    showToast('Reset failed', err.message, 'error');
+                }
+            });
+            row.appendChild(reset);
+
             const del = document.createElement('button');
             del.className = 'admin-btn admin-btn-sm admin-btn-danger';
             del.type = 'button';

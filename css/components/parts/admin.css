@@ -3,10 +3,66 @@
    no Tabler dependency. */
 
 /* ── Header auth button ──────────────────────────────────────────────────── */
+#admin-auth-wrap {
+    position: relative;
+    margin-top: auto;        /* pin to the bottom of the sidebar flex column */
+    flex: 0 0 auto;
+    padding: 10px 15px 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
 .admin-auth-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm, 8px);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+    background: var(--bg-surface, rgba(255, 255, 255, 0.04));
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: background 0.12s ease, border-color 0.12s ease;
+}
+.admin-auth-btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.18); }
+.admin-auth-btn svg { flex-shrink: 0; }
+
+/* Sidebar sits at the bottom, so the dropdown opens upward. */
+#admin-avatar-dropdown {
+    top: auto;
+    bottom: calc(100% - 6px);
+    left: 15px;
+    right: 15px;
+}
+
+/* Collapsed sidebar: show only the avatar icon, centered on the rail. */
+body.sidebar-collapsed #admin-auth-wrap { padding: 10px 0 14px; }
+body.sidebar-collapsed .admin-auth-btn { padding: 9px 0; }
+body.sidebar-collapsed .admin-auth-btn span { display: none; }
+body.sidebar-collapsed #admin-avatar-dropdown {
+    left: calc(100% + 6px);
+    right: auto;
+    width: 200px;
+    bottom: 0;
+}
+
+/* Responsive auto-narrow: at ≤960px the sidebar shrinks to 64px without the
+   .sidebar-collapsed class, so apply the same icon-only treatment here or the
+   label truncates to "adm...". */
+@media (max-width: 960px) {
+    #admin-auth-wrap { padding: 10px 0 14px; }
+    .admin-auth-btn { padding: 9px 0; }
+    .admin-auth-btn span { display: none; }
+    #admin-avatar-dropdown {
+        left: calc(100% + 6px);
+        right: auto;
+        width: 200px;
+        bottom: 0;
+    }
 }
 
 .admin-dd-header {
@@ -57,6 +113,11 @@ body.admin-modal-open { overflow: hidden; }
     transition: opacity var(--duration-fast, 0.15s) ease;
 }
 .admin-modal.visible { opacity: 1; pointer-events: auto; }
+
+/* The `hidden` class must win inside modals — e.g. .admin-captcha-row sets
+   display:flex, which would otherwise override the global .hidden{display:none}
+   by source order (equal specificity). */
+.admin-modal .hidden { display: none !important; }
 
 .admin-modal-backdrop {
     position: absolute;
@@ -248,13 +309,12 @@ body.admin-modal-open { overflow: hidden; }
 .admin-account-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    gap: 8px;
     padding: 8px 12px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--radius-sm, 8px);
 }
-.admin-account-info { display: inline-flex; align-items: center; gap: 8px; }
+.admin-account-info { display: inline-flex; align-items: center; gap: 8px; flex: 1; margin-right: auto; }
 .admin-role-badge {
     display: inline-block;
     padding: 1px 8px;
@@ -294,6 +354,7 @@ body.admin-modal-open { overflow: hidden; }
     letter-spacing: 0.04em;
     color: var(--text-primary);
     word-break: break-all;
+    white-space: pre-line;   /* render the \n between username and password */
 }
 
 /* Login captcha */
