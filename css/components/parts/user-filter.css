@@ -10,10 +10,13 @@
     align-items: stretch;
 }
 
-/* Desktop viewport-fit for History + Permission tabs:
-   keep filter/search panel and main chart/list fitting the screen height,
-   and only scroll user lists when content exceeds available space. */
-@media (min-width: 1101px) {
+/* Desktop fit for History + Permission tabs: keep filter/search panel and main
+   chart/list fitting the screen height, scrolling only the inner lists. Gated on
+   the CONTENT container width (not viewport) so it matches the container-based
+   stacking resets below — otherwise a wide viewport with a narrow content area
+   (sidebar expanded) keeps the fixed-height/nowrap layout and squeezes the list
+   until items vanish. */
+@container main (min-width: 901px) {
     #tab-pane-history.detail-tab-pane.active {
         min-height: 0;
         height: calc(100dvh - 330px);
@@ -151,15 +154,50 @@
 
 /* Container query: when content < 560px, filter goes full-width above list */
 @container main (max-width: 560px) {
-    .user-filter-box {
-        width: 100%;
-        max-height: min(60dvh, 480px);
-        overflow: hidden;
-        align-self: stretch;
-    }
-
     .history-content {
         min-width: 0;
+    }
+}
+
+/* ── Narrow content: filter box becomes a click-to-open popover badge ───────
+   At ≤900px content width the inline filter sidebar would eat the height we
+   just freed up, so collapse it behind a "Filters" badge (History + Permission
+   both use .history-main-row). The box reveals as an absolute popover so it
+   overlays instead of pushing the list down. */
+.filter-toggle-badge { display: none; }
+
+@container main (max-width: 900px) {
+    .history-main-row { position: relative; }
+
+    .history-main-row .filter-toggle-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        align-self: flex-start;
+        padding: 7px 12px;
+        border-radius: var(--radius-sm, 8px);
+        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+        background: var(--bg-surface, rgba(255, 255, 255, 0.05));
+        color: var(--text-primary);
+        font-size: var(--text-xs);
+        font-weight: var(--font-semibold);
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    .history-main-row .filter-toggle-badge:hover { background: rgba(255, 255, 255, 0.1); }
+
+    /* Hide the inline box; reveal it only when the row is toggled open. */
+    .history-main-row > .user-filter-box { display: none !important; }
+    .history-main-row.filter-open > .user-filter-box {
+        display: flex !important;
+        position: absolute;
+        top: 46px;
+        left: 0;
+        z-index: 600;
+        width: min(320px, calc(100% - 4px)) !important;
+        max-height: min(60dvh, 440px) !important;
+        overflow-y: auto;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
     }
 }
 

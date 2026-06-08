@@ -18,5 +18,6 @@ import './features/group-user/groupUserManager.js';
 import './features/admin/adminAuth.js';
 import './ui/scrollToTop.js';
 import './ui/tooltip.js';
+import './ui/filterBadge.js';
 import './ui/pageBoot.js';
 import './core/boot.js';

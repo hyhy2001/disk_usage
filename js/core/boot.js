@@ -21,6 +21,7 @@ import { bindChangeLogEvents } from '../ui/changelogModal.js';
 import { initScrollToTop } from '../ui/scrollToTop.js';
 import { initGroupUser } from '../features/group-user/groupUserManager.js';
 import { initAdminAuth } from '../features/admin/adminAuth.js';
+import { initFilterBadge } from '../ui/filterBadge.js';
 
 const INIT_SEQUENCE = [
     ['appFetcher', initAppFetcher],
@@ -31,6 +32,7 @@ const INIT_SEQUENCE = [
     ['scrollToTop', initScrollToTop],
     ['groupUser', initGroupUser],
     ['adminAuth', initAdminAuth],
+    ['filterBadge', initFilterBadge],
 ];
 
 function runAll() {

@@ -530,8 +530,12 @@
     }
 }
 
-/* Viewport fallback -> Container query for robust internal wrapping */
-@container canvas (max-width: 900px) {
+/* Stacking resets for the mid-width band (681–900px content): the desktop
+   fixed-height layout is gated at @container main (min-width: 901px), so below
+   that the panes must release their height/overflow or the list gets squeezed
+   until items vanish. (Was @container canvas — a typo'd container name that
+   never matched; only "main" exists.) */
+@container main (max-width: 900px) {
     /* Reset desktop fixed-height + overflow when layout stacks */
     #tab-pane-history.detail-tab-pane.active,
     #tab-pane-permissions.detail-tab-pane.active {

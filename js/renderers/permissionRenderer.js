@@ -335,6 +335,10 @@ function renderPermissions(data, diskId) {
             <div class="perm-summary-item"><span class="perm-summary-num">${numUnk}</span><span class="perm-summary-label">Unknown items</span></div>
         </div>
         <div class="history-main-row">
+            <button type="button" class="filter-toggle-badge" aria-label="Toggle filters">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                Filters
+            </button>
             ${_renderFilterSidebar(_userSummary)}
             <div class="history-content">
                 <div class="perm-flat-list glass-panel" id="perm-flat-list">

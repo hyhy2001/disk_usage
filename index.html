@@ -16,12 +16,12 @@
     <meta property="og:description" content="Real-time static dashboard for disk usage analysis and storage capacity tracking.">
     <meta property="og:type" content="website">
     <!-- Eliminate Render/Import Waterfalls -->
-    <link rel="preload" href="css/app.min.css?v=801a0e10" as="style">
+    <link rel="preload" href="css/app.min.css?v=166db331" as="style">
     <link rel="preload" href="js/vendor/chart.min.js" as="script">
-    <link rel="modulepreload" href="js/app.min.js?v=f67835b0">
+    <link rel="modulepreload" href="js/app.min.js?v=6a9775c9">
 
     <!-- CSS -->
-    <link rel="stylesheet" href="css/app.min.css?v=801a0e10">
+    <link rel="stylesheet" href="css/app.min.css?v=166db331">
     
     <!-- Chart.js (Loaded Locally for 0ms latency) -->
     <script src="js/vendor/chart.min.js" defer></script>
@@ -491,6 +491,12 @@
                         <!-- ② Main row: Filter Box + Content -->
                         <div class="history-main-row">
 
+                            <!-- Narrow-width toggle: opens the filter box as a popover -->
+                            <button type="button" class="filter-toggle-badge" aria-label="Toggle filters">
+                                <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                                Filters
+                            </button>
+
                             <!-- Left: User Filter Box -->
                             <div class="glass-panel user-filter-box">
                                 <div class="user-filter-header">
@@ -596,6 +602,6 @@
 
 
 
-    <script src="js/app.min.js?v=f67835b0" type="module"></script>
+    <script src="js/app.min.js?v=6a9775c9" type="module"></script>
 </body>
 </html>
