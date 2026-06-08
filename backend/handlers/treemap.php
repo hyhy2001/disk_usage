@@ -159,6 +159,16 @@ function api_treemap_children($pdo, $parent_id, $node_type, $offset, $limit) {
         return array('items' => array(), 'total' => 0, 'has_more' => false, 'source' => 'sqlite_error');
     }
 
+    // Pre-resolve all dir paths in ONE batched walk (avoids per-row N+1:
+    // api_treemap_row_to_item → api_path_for would otherwise call
+    // api_path_resolve_batch with a single id per row). Populates the shared
+    // per-PDO path cache so each row's api_path_for hits cache (O(1)).
+    $path_ids = array();
+    foreach ($rows as $r) {
+        if ((int)$r['kind'] !== 1) $path_ids[] = (int)$r['id'];
+    }
+    if (!empty($path_ids)) api_path_resolve_batch($pdo, $path_ids, '');
+
     $items = array();
     if ($node_type !== 'file') {
         foreach ($rows as $r) {
@@ -297,6 +307,11 @@ function api_handle_treemap_search($disk_path) {
 
     $items = array();
     if ($node_type !== 'file') {
+        // Pre-resolve all paths in one batched walk (avoids per-row N+1).
+        $path_ids = array();
+        foreach ($rows as $r) $path_ids[] = (int)$r['id'];
+        if (!empty($path_ids)) api_path_resolve_batch($pdo, $path_ids, '');
+
         foreach ($rows as $r) {
             $parent_id = $r['parent_id'] === null ? '' : (string)$r['parent_id'];
             $item = api_treemap_row_to_item($pdo, $r);
