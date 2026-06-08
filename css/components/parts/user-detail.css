@@ -403,6 +403,17 @@
     white-space: nowrap;
     font-weight: var(--font-semibold);
     flex-shrink: 0;
+    /* Per-extension colour comes in via the --ext custom property (set inline by
+       the renderer). Dark mode mirrors the old inline style: 12.5% tint bg
+       (hex alpha 0x20) + full-strength text. */
+    background: color-mix(in srgb, var(--ext, #475569) 12.5%, transparent);
+    color: var(--ext, #475569);
+}
+/* Light mode: the raw mid-tone ext colours drop below readable contrast on a
+   light surface, so darken the text toward black and tint the bg toward white. */
+:root[data-theme='light'] .ud-ext-badge {
+    background: color-mix(in srgb, var(--ext, #475569) 14%, #fff);
+    color: color-mix(in srgb, var(--ext, #475569) 72%, #000);
 }
 
 /* Empty / prompt state */

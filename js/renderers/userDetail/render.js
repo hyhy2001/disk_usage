@@ -112,7 +112,7 @@ export function _renderFileCard(fileData) {
         const clr = _extColor(ext);
         return `
         <div class="ud-path-row">
-            <span class="ud-ext-badge" style="background:${clr}20;color:${clr}">.${ext}</span>
+            <span class="ud-ext-badge" style="--ext:${clr}">.${ext}</span>
             <div class="ud-path-name" title="${escHtml(_toAbsoluteDisplayPath(f.path))}" style="cursor: pointer;">${escHtml(_shortPath(_toAbsoluteDisplayPath(f.path)))}</div>
             <div class="ud-path-bar-wrap" data-tooltip="${fmt(f.size)} · ${pct}% of page total">
                 <div class="ud-path-bar-fill ud-fill-emerald" style="width:${pct}%"></div>

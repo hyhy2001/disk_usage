@@ -282,4 +282,22 @@
     background: rgba(255,253,250,0.95);
 }
 
+/* -- Detail snapshot badges ----------------------------------------------- */
+/* .team-badge hardcodes sky #38bdf8 text on a sky-tint bg (dark-tuned). On a
+   light surface that mid-tone sky drops below readable contrast, so darken the
+   text and firm up the tint/border for light mode. */
+:root[data-theme='light'] .team-badge {
+    background: rgba(14,165,233,0.12);
+    color: #0369a1;
+    border-color: rgba(14,165,233,0.25);
+}
+
+/* .rank-badge bg is rgba(255,255,255,0.06) — invisible on a light surface; its
+   #64748b slate text stays readable. Give it a faint dark tint so the pill is
+   still distinguishable in light mode. */
+:root[data-theme='light'] .rank-badge {
+    background: rgba(0,0,0,0.05);
+    color: #475569;
+}
+
 
