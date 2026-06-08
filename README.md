@@ -76,6 +76,14 @@ which generates the JSON reports this dashboard consumes.
 - **Input validation** — detects reserved names (e.g. `"other"`), duplicate usernames, and empty required fields
 - **One-click download** — downloads the generated config file directly from the browser
 
+### 🔐 Admin Panel (in-dashboard)
+- **Sidebar Login button** — opens a login/setup popup; once signed in it becomes an account menu with an avatar dropdown
+- **Role-based access** — the first account created (via setup) is the **owner**; owners create/delete admin accounts, edit disk mapping, and reset other admins' passwords. Regular admins edit only the group config and their own password
+- **Auto-generated passwords** — creating or resetting an admin generates a strong random password server-side and reveals the username + password once for one-shot copy (owners never hand-type passwords)
+- **Adaptive login captcha** — an offline math captcha appears only after 5 consecutive failed login attempts (per IP); a hard rate-limit lockout follows at 10
+- **Official group config** — admins publish one shared group-user config (`database/group_config/official.json`); guests keep a local override that survives until they Reset, which restores the official config (or system defaults if none exists)
+- **Stored in SQLite** — admin accounts live in `database/admin.db`; sessions are cookie-based with CSRF protection on state-changing actions
+
 ### UI / UX
 - **Theme Settings** — Light and Dark modes with preferences saved to `localStorage`
 - **Responsive Layout** — desktop edge collapse button and mobile off-canvas drawer; CSS container queries for dynamic component density
