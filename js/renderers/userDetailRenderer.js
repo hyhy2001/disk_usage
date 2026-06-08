@@ -216,9 +216,13 @@ function _attachFilterEvents(contentEl, root) {
         optionsDropdown.addEventListener('click', e => e.stopPropagation());
 
         // Keep it inside viewport when orientation/viewport changes.
-        window.addEventListener('resize', () => {
+        // remove-before-add so re-renders (per user load) don't stack resize handlers.
+        const onFilterResize = () => {
             if (optionsDropdown.style.display !== 'none') positionOptionsDropdown();
-        });
+        };
+        window.removeEventListener('resize', contentEl._filterResize);
+        contentEl._filterResize = onFilterResize;
+        window.addEventListener('resize', onFilterResize);
     }
 
     // click outside to close dropdowns
